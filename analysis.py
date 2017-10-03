@@ -11,18 +11,26 @@ utils = importr('utils')
 readxl = importr('readxl')
 cellranger = importr('cellranger')
 datafile = '/home/hermidalc/data/nci-lhc-nsclc/japan_luad/AffyU133+2array_NCC_226ADC_16Normal_MAS5normalized_test.xlsx'
-data = readxl.read_excel(datafile, \
-    sheet = 2, \
-    col_names = True, \
-    range = cellranger.cell_limits( \
-        base.c(18, 2), \
-        base.c(robjects.NA_Logical, robjects.NA_Logical) \
-    )
+meta_tbl = readxl.read_excel(
+    datafile,
+    sheet = 2,
+    col_names = True,
+    trim_ws = True
 )
-print(utils.head(data))
-# convert tibble to expressionset
 biobase = importr('Biobase')
-eset = biobase.ExpressionSet(assayData = base.as_matrix(data))
+# ph_adf = biobase.AnnotatedDataFrame(data = meta_tbl)
+# print(biobase.pData(ph_adf))
+data_tbl = readxl.read_excel(
+    datafile,
+    sheet = 3,
+    col_names = True,
+    trim_ws = True,
+)
+# convert tibbles to eset
+eset = biobase.ExpressionSet(
+    assayData = base.as_matrix(data_tbl),
+    phenoData = biobase.AnnotatedDataFrame(meta_tbl)
+)
 # limma analysis
 limma = importr('limma')
 print(utils.head(eset))
