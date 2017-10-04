@@ -4,7 +4,7 @@
 
 1. Install System Dependencies
 
-sudo dnf install libxml-devel libxml2-devel libxml++-devel
+sudo dnf install libxml-devel libxml2-devel
 
 2. Install Anaconda
 
@@ -17,9 +17,12 @@ https://docs.anaconda.com/anaconda/install/linux
 ```bash
 conda install -v -y r-essentials rpy2
 conda config --add channels bioconda
-conda install -v -y -c bioconda bioconductor-biocinstaller bioconductor-biobase bioconductor-simpleaffy bioconductor-limma
+conda install -v -y bioconductor-biocinstaller bioconductor-biobase bioconductor-simpleaffy bioconductor-limma
 ```
 
-3.
+3. Install HG-U133Plus2 Bioconductor DB
 
-conda config --add channels conda-forge
+```R
+source("https://bioconductor.org/biocLite.R")
+biocLite("hgu133plus2.db")
+```
