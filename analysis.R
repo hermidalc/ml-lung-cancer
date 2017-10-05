@@ -31,7 +31,7 @@ eset <- ExpressionSet(
 probesetIds <- featureNames(eset)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")
 fData(eset) <- data.frame(Symbol=geneSymbols)
-# filter control probesets
+# filter out control probesets
 eset.filtered <- featureFilter(eset,
     require.entrez=FALSE,
     require.GOBP=FALSE, require.GOCC=FALSE,
@@ -45,5 +45,6 @@ fit <- lmFit(eset.filtered, design)
 contrast.matrix <- makeContrasts(TumorvsNormal=Tumor-Normal, levels=design)
 fit.contrasts <- contrasts.fit(fit, contrast.matrix)
 fit.b <- eBayes(fit.contrasts)
-results = decideTests(fit.b)
-write.fit(fit.b, results, "data.txt")
+table <- topTable(fit.b)
+results <- decideTests(fit.b)
+summary(results)
