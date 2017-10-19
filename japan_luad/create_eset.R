@@ -1,11 +1,11 @@
 #!/usr/bin/env R
 
-library('tibble')
-library('readxl')
-library('Biobase')
-library('hgu133plus2.db')
-library('annotate')
-library('genefilter')
+suppressPackageStartupMessages(library('tibble'))
+suppressPackageStartupMessages(library('readxl'))
+suppressPackageStartupMessages(library('Biobase'))
+suppressPackageStartupMessages(suppressWarnings(library('hgu133plus2.db')))
+suppressPackageStartupMessages(library('annotate'))
+suppressPackageStartupMessages(library('genefilter'))
 datafile <- '/home/hermidalc/data/nci-lhc-nsclc/japan_luad/AffyU133Plus2array_NCC_226ADC_16Normal_MAS5normalized_reformatted.xlsx'
 exprs <- as.matrix(column_to_rownames(as.data.frame(read_excel(
     datafile,
@@ -32,10 +32,10 @@ probesetIds <- featureNames(eset)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")
 fData(eset) <- data.frame(Symbol=geneSymbols)
 # filter out control probesets
-eset.filtered <- featureFilter(eset,
+eset <- featureFilter(eset,
     require.entrez=FALSE,
     require.GOBP=FALSE, require.GOCC=FALSE,
     require.GOMF=FALSE, require.CytoBand=FALSE,
     remove.dupEntrez=FALSE, feature.exclude="^AFFX"
 )
-save(eset.filtered, file="eset.Rda")
+save(eset, file="eset.Rda")
