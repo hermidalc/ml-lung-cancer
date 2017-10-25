@@ -15,8 +15,8 @@ base = importr("base")
 base.load("eset.Rda")
 eset = robjects.globalenv['eset']
 base.source("feature_selection.R")
-r_select_gex_features = robjects.globalenv['selectGeneExpressionFeatures']
-for i in range(0, 0):
+r_select_gex_features = robjects.globalenv['selectExpressionFeatures']
+for i in range(0, 10):
     table = r_select_gex_features(eset)
     print(base.summary(table))
     print(i)
