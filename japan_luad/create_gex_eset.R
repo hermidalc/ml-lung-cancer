@@ -22,20 +22,20 @@ pData <- AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
     trim_ws = TRUE
 )), var="Biology ID"))
 # build eset
-eset <- ExpressionSet(
+eset.gex <- ExpressionSet(
     assayData = exprs,
     phenoData = pData,
     annotation="hgu133plus2"
 )
 # annotate eset
-probesetIds <- featureNames(eset)
+probesetIds <- featureNames(eset.gex)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")
-fData(eset) <- data.frame(Symbol=geneSymbols)
+fData(eset.gex) <- data.frame(Symbol=geneSymbols)
 # filter out control probesets
-eset <- featureFilter(eset,
+eset.gex <- featureFilter(eset.gex,
     require.entrez=FALSE,
     require.GOBP=FALSE, require.GOCC=FALSE,
     require.GOMF=FALSE, require.CytoBand=FALSE,
     remove.dupEntrez=FALSE, feature.exclude="^AFFX"
 )
-save(eset, file="eset.Rda")
+save(eset.gex, file="eset_gex.Rda")

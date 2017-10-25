@@ -12,13 +12,13 @@ from sklearn import svm
 
 style.use("ggplot")
 base = importr("base")
-base.load("eset.Rda")
-eset = robjects.globalenv['eset']
-base.source("feature_selection.R")
-r_select_gex_features = robjects.globalenv['selectExpressionFeatures']
+base.load("eset_gex.Rda")
+eset_gex = robjects.globalenv["eset.gex"]
+base.source("select_exp_features.R")
+r_select_exp_features = robjects.globalenv["selectExpressionFeatures"]
 for i in range(0, 10):
-    table = r_select_gex_features(eset)
+    table = r_select_exp_features(eset_gex)
     print(base.summary(table))
     print(i)
 
-svc = svm.SVC(kernel='linear')
+svc = svm.SVC(kernel="linear")
