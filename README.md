@@ -15,9 +15,10 @@ https://docs.anaconda.com/anaconda/install/linux
 2. Setup Conda Environment and Install R, Rpy2, Bioconductor, Limma, etc.
 
 ```bash
-conda install -v -y r-essentials rpy2
+conda config --add channels conda-forge
 conda config --add channels bioconda
-conda install -v -y bioconductor-biocinstaller bioconductor-biobase bioconductor-simpleaffy bioconductor-limma
+conda install -v -y r-essentials rpy2 bioconductor-biocinstaller bioconductor-biobase bioconductor-simpleaffy bioconductor-limma
+conda install -v -y -c conda-forge 'icu=58.*' lxml
 ```
 
 3. Install HG-U133Plus2 Bioconductor DB
