@@ -7,8 +7,12 @@ randPermSampleNums <- function(eset, is.relapse) {
     return(sample(which(eset$Relapse == is.relapse)))
 }
 
-filterEsetFs <- function(eset, relapse.samples, norelapse.samples) {
+filterEsetSamples <- function(eset, relapse.samples, norelapse.samples) {
     return(eset[,sort(c(relapse.samples, norelapse.samples))])
+}
+
+filterEsetFeatures <- function(eset, features) {
+    return (eset[sort(c(features)),])
 }
 
 # selectExpFeatures <- function(eset, min.p.value = 0.05, min.lfc = 1.5, max.num.features = 50) {

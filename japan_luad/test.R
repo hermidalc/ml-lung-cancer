@@ -2,9 +2,10 @@
 
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("limma"))
-# load("eset_gex.Rda")
+load("eset_gex.Rda")
 
-selectExpressionFeatures <- function(eset, relapse.fs.percent = .15, min.p.value = 0.05, min.lfc = 1.5, max.num.features = 50) {
+# selectExpressionFeatures <- function(eset, relapse.fs.percent = .15, min.p.value = 0.05, min.lfc = 1.5, max.num.features = 50) {
+selectExpFeatures <- function(eset, relapse.fs.percent = .15, max.num.features = 50) {
     num.relapse <- ncol(eset[,eset$Relapse == 1])
     num.relapse.fs <- ceiling(ncol(eset[,eset$Relapse == 1]) * relapse.fs.percent)
     num.norelapse.fs <- ncol(eset[,eset$Relapse == 0]) - num.relapse + num.relapse.fs
@@ -17,6 +18,6 @@ selectExpressionFeatures <- function(eset, relapse.fs.percent = .15, min.p.value
     fit.b <- eBayes(fit.contrasts)
     # results <- decideTests(fit.b, method="global")
     # summary(results)
-    table <- topTable(fit.b, number=max.num.features, adjust.method="BH", p.value=min.p.value, lfc=min.lfc, sort.by="logFC")
-    return(table)
+    # return(topTable(fit.b, number=max.num.features, adjust.method="BH", p.value=min.p.value, lfc=min.lfc, sort.by="logFC"))
+    return(topTable(fit.b, number=max.num.features, adjust.method="BH", sort.by="logFC"))
 }
