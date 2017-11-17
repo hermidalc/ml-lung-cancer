@@ -4,7 +4,9 @@
 
 1. Install System Dependencies
 
-sudo dnf install libxml-devel libxml2-devel
+```bash
+sudo dnf install -y libxml-devel libxml2-devel
+```
 
 2. Install Anaconda
 
