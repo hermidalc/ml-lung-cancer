@@ -21,19 +21,29 @@ r_rand_perm_sample_nums = robjects.globalenv["randPermSampleNums"]
 r_filter_eset = robjects.globalenv["filterEset"]
 r_filter_eset_relapse_labels = robjects.globalenv["filterEsetRelapseLabels"]
 r_select_exp_features = robjects.globalenv["selectExpFeatures"]
+num_perms = 10
 relapse_fs_percent = .15
-relapse_sample_nums = r_rand_perm_sample_nums(eset_gex, True)
-norelapse_sample_nums = r_rand_perm_sample_nums(eset_gex, False)
-num_relapse_samples_fs = math.ceil(len(relapse_sample_nums) * relapse_fs_percent)
-num_norelapse_samples_fs = len(norelapse_sample_nums) - len(relapse_sample_nums) + num_relapse_samples_fs
-sample_nums_fs = norelapse_sample_nums[:num_norelapse_samples_fs] + relapse_sample_nums[:num_relapse_samples_fs]
-eset_gex_fs = r_filter_eset(eset_gex, robjects.NULL, sample_nums_fs)
-features_df = r_select_exp_features(eset_gex_fs)
-num_samples_tr = len(relapse_sample_nums) - (num_relapse_samples_fs * 2)
-sample_nums_tr = relapse_sample_nums[num_relapse_samples_fs:(num_relapse_samples_fs + num_samples_tr)] + \
-                 norelapse_sample_nums[num_norelapse_samples_fs:(num_norelapse_samples_fs + num_samples_tr)]
-eset_gex_tr = r_filter_eset(eset_gex, base.rownames(features_df), sample_nums_tr)
-X_tr = np.array(base.t(biobase.exprs(eset_gex_tr)))
-y_tr = np.array(r_filter_eset_relapse_labels(eset_gex_tr))
-clf = svm.SVC()
-clf.fit(X_tr, y_tr)
+for i in range(1, num_perms):
+    relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
+    norelapse_samples = r_rand_perm_sample_nums(eset_gex, False)
+    num_relapse_samples_fs = math.ceil(len(relapse_samples) * relapse_fs_percent)
+    num_norelapse_samples_fs = len(norelapse_samples) - len(relapse_samples) + num_relapse_samples_fs
+    samples_fs = relapse_samples[:num_relapse_samples_fs] + \
+                 norelapse_samples[:num_norelapse_samples_fs]
+    eset_gex_fs = r_filter_eset(eset_gex, robjects.NULL, samples_fs)
+    features_df = r_select_exp_features(eset_gex_fs)
+    features = base.rownames(features_df)
+    num_samples_tr = len(relapse_samples) - (num_relapse_samples_fs * 2)
+    samples_tr = relapse_samples[num_relapse_samples_fs:(num_relapse_samples_fs + num_samples_tr)] + \
+                 norelapse_samples[num_norelapse_samples_fs:(num_norelapse_samples_fs + num_samples_tr)]
+    eset_gex_tr = r_filter_eset(eset_gex, features, samples_tr)
+    X_tr = np.array(base.t(biobase.exprs(eset_gex_tr)))
+    y_tr = np.array(r_filter_eset_relapse_labels(eset_gex_tr))
+    clf = svm.SVC()
+    clf.fit(X_tr, y_tr)
+    samples_ts = relapse_samples[(num_relapse_samples_fs + num_samples_tr):] + \
+                 norelapse_samples[(num_norelapse_samples_fs + num_samples_tr):]
+    eset_gex_ts = r_filter_eset(eset_gex, features, samples_ts)
+    X_ts = np.array(base.t(biobase.exprs(eset_gex_ts)))
+    y_ts = np.array(r_filter_eset_relapse_labels(eset_gex_ts))
+    print(clf.predict(X_ts))
