@@ -24,18 +24,15 @@ selectExpFeatures <- function(eset, relapse.fs.percent = .15, max.num.features =
 source("functions.R")
 load("eset_gex.Rda")
 relapse.fs.percent <- .15
-relapse.sample.nums <- randPermSampleNums(eset.gex, 1)
-norelapse.sample.nums <- randPermSampleNums(eset.gex, 0)
-num.relapse <- ncol(eset.gex[,eset.gex$Relapse == 1])
-num.relapse.fs <- ceiling(ncol(eset.gex[,eset.gex$Relapse == 1]) * relapse.fs.percent)
-num.norelapse.fs <- ncol(eset.gex[,eset.gex$Relapse == 0]) - num.relapse + num.relapse.fs
-relapse.sample.nums.fs <- relapse.sample.nums[1:num.relapse.fs]
-norelapse.sample.nums.fs <- norelapse.sample.nums[1:num.norelapse.fs]
-eset.fs <- filterEset(eset.gex, NULL, c(norelapse.sample.nums.fs, relapse.sample.nums.fs))
+relapse.samples <- randPermSampleNums(eset.gex, TRUE)
+norelapse.samples <- randPermSampleNums(eset.gex, FALSE)
+num.relapse.fs <- ceiling(length(relapse.samples) * relapse.fs.percent)
+num.norelapse.fs <- length(norelapse.samples) - length(relapse.samples) + num.relapse.fs
+eset.fs <- filterEset(eset.gex, NULL, c(relapse.samples[1:num.relapse.fs], norelapse.samples[1:num.norelapse.fs]))
 features.df <- selectExpFeatures(eset.fs)
 num.samples.tr <- num.relapse - (num.relapse.fs * 2)
-relapse.sample.nums.tr <- relapse.sample.nums[(num.relapse.fs + 1):(num.relapse.fs + num.samples.tr)]
-norelapse.sample.nums.tr <- norelapse.sample.nums[(num.norelapse.fs + 1):(num.norelapse.fs + num.samples.tr)]
-eset.tr <- filterEset(eset.gex, rownames(features.df), c(relapse.sample.nums.tr, norelapse.sample.nums.tr))
-data.tr <- exprs(eset.tr)
-labels.tr <- filterEsetRelapseLabels(eset.gex, c(relapse.sample.nums.tr, norelapse.sample.nums.tr))
+relapse.samples.tr <- relapse.samples[(num.relapse.fs + 1):(num.relapse.fs + num.samples.tr)]
+norelapse.samples.tr <- norelapse.samples[(num.norelapse.fs + 1):(num.norelapse.fs + num.samples.tr)]
+eset.tr <- filterEset(eset.gex, rownames(features.df), c(relapse.samples.tr, norelapse.samples.tr))
+data.tr <- t(exprs(eset.tr))
+labels.tr <- filterEsetRelapseLabels(eset.tr)

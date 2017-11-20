@@ -21,7 +21,7 @@ r_rand_perm_sample_nums = robjects.globalenv["randPermSampleNums"]
 r_filter_eset = robjects.globalenv["filterEset"]
 r_filter_eset_relapse_labels = robjects.globalenv["filterEsetRelapseLabels"]
 r_select_exp_features = robjects.globalenv["selectExpFeatures"]
-num_perms = 10
+num_perms = 50
 relapse_fs_percent = .15
 for i in range(1, num_perms):
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
