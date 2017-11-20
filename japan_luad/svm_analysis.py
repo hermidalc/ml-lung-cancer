@@ -39,7 +39,7 @@ for i in range(1, num_perms):
     eset_gex_tr = r_filter_eset(eset_gex, features, samples_tr)
     X_tr = np.array(base.t(biobase.exprs(eset_gex_tr)))
     y_tr = np.array(r_filter_eset_relapse_labels(eset_gex_tr))
-    clf = svm.SVC()
+    clf = svm.SVC(kernel='linear')
     clf.fit(X_tr, y_tr)
     samples_ts = relapse_samples[(num_relapse_samples_fs + num_samples_tr):] + \
                  norelapse_samples[(num_norelapse_samples_fs + num_samples_tr):]
