@@ -32,15 +32,12 @@ filterEsetRelapseLabels <- function(eset, samples=NULL) {
     }
 }
 
-# selectExpFeatures <- function(eset, min.p.value = 0.05, min.lfc = 1.5, max.num.features = 50) {
-selectExpFeatures <- function(eset, max.num.features = 50) {
+selectExpFeatures <- function(eset, min.p.value = 0.05, min.lfc = 1.5, max.num.features = 50) {
     design <- model.matrix(~0 + factor(pData(eset)$Relapse))
     colnames(design) <- c("NoRelapse", "Relapse")
     fit <- lmFit(eset, design)
     contrast.matrix <- makeContrasts(RelapseVsNoRelapse=Relapse-NoRelapse, levels=design)
     fit.contrasts <- contrasts.fit(fit, contrast.matrix)
     fit.b <- eBayes(fit.contrasts)
-    # results <- decideTests(fit.b, method="global")
-    # return(topTable(fit.b, number=max.num.features, p.value=min.p.value, lfc=min.lfc, adjust.method="BH", sort.by="logFC"))
-    return(topTable(fit.b, number=max.num.features, adjust.method="BH", sort.by="logFC"))
+    return(topTable(fit.b, number=max.num.features, p.value=min.p.value, lfc=min.lfc, adjust.method="BH", sort.by="logFC"))
 }
