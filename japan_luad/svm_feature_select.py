@@ -68,8 +68,10 @@ while perm_count < args.num_perms:
     all_y_test = np.append(all_y_test, y_test)
     print('Permutations:', perm_count, 'FS fails:', low_fs_count, end='\r', flush=True)
     perm_count += 1
-
-print("\n", roc_auc_score(all_y_test, all_y_scores))
+print(
+    'Permutations:', perm_count, 'FS fails:', low_fs_count, 
+    'ROC AUC score:', roc_auc_score(all_y_test, all_y_scores)
+)
 
     # fpr, tpr, thresholds = metrics.roc_curve(y_test, pred, pos_label=2)
     # metrics.auc(fpr, tpr)
