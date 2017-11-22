@@ -38,4 +38,4 @@ eset.gex <- featureFilter(eset.gex,
     require.GOMF=FALSE, require.CytoBand=FALSE,
     remove.dupEntrez=FALSE, feature.exclude="^AFFX"
 )
-save(eset.gex, file="eset_gex.Rda")
+save(eset.gex, file="data/eset_gex.Rda")
