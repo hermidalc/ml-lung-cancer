@@ -103,3 +103,6 @@ ENV/
 # R files
 *.Rda
 
+# data dirs
+/japan_luad/data
+
