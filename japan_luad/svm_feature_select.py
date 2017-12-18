@@ -23,7 +23,7 @@ base.source("functions.R")
 r_rand_perm_sample_nums = robjects.globalenv["randPermSampleNums"]
 r_filter_eset = robjects.globalenv["filterEset"]
 r_filter_eset_relapse_labels = robjects.globalenv["filterEsetRelapseLabels"]
-r_select_exp_features = robjects.globalenv["selectExpFeatures"]
+r_get_diff_exp_features = robjects.globalenv["getDiffExpFeatures"]
 # config
 parser = argparse.ArgumentParser()
 parser.add_argument('--num-folds', type=int, default=1000, help='num folds')
@@ -47,7 +47,7 @@ while fold_count < args.num_folds:
     samples_fs = relapse_samples[:num_relapse_samples_fs] + \
                  norelapse_samples[:num_norelapse_samples_fs]
     eset_gex_fs = r_filter_eset(eset_gex, robjects.NULL, samples_fs)
-    features_df = r_select_exp_features(eset_gex_fs)
+    features_df = r_get_diff_exp_features(eset_gex_fs)
     features = base.rownames(features_df)
     if len(features) < args.min_num_features:
         low_fs_count += 1
@@ -66,8 +66,8 @@ while fold_count < args.num_folds:
     X_test = np.array(base.t(biobase.exprs(eset_gex_ts)))
     X_test_scaled = scaler.transform(X_test)
     y_test = np.array(r_filter_eset_relapse_labels(eset_gex_ts))
-    clf = svm.SVC(kernel='linear')
-    y_score = clf.fit(X_train_scaled, y_train).decision_function(X_test_scaled)
+    svc = svm.SVC(kernel='linear', cache_size=1000)
+    y_score = svc.fit(X_train_scaled, y_train).decision_function(X_test_scaled)
     fpr, tpr, thres = roc_curve(y_test, y_score, pos_label=1)
     features_all = np.concatenate((features_all, np.array(features)))
     fpr_all = np.concatenate((fpr_all, fpr))
@@ -78,7 +78,7 @@ while fold_count < args.num_folds:
     roc_auc_score_all = np.append(roc_auc_score_all, roc_auc_score(y_test, y_score))
     fold_count += 1
     print('Folds:', fold_count, 'Fails:', low_fs_count, end='\r', flush=True)
-
+# end while
 print('Folds:', fold_count, 'Fails:', low_fs_count)
 # save numpy arrays
 np.save('data/features_all', features_all)

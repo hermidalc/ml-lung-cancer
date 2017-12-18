@@ -19,7 +19,7 @@ https://docs.anaconda.com/anaconda/install/linux
 ```bash
 conda config --add channels conda-forge
 conda config --add channels bioconda
-conda install -v -y r-essentials rpy2 bioconductor-biocinstaller bioconductor-biobase bioconductor-simpleaffy bioconductor-limma
+conda install -v -y r-essentials r-lintr rpy2 bioconductor-biocinstaller bioconductor-biobase bioconductor-simpleaffy bioconductor-limma
 conda install -v -y -c conda-forge 'icu=58.*' lxml
 
 ```

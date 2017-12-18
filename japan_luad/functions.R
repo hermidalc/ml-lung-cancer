@@ -32,7 +32,7 @@ filterEsetRelapseLabels <- function(eset, samples=NULL) {
     }
 }
 
-selectExpFeatures <- function(eset, min.p.value = 0.05, min.lfc = 1.5, max.num.features = 50) {
+getDiffExpFeatures <- function(eset, min.p.value = 0.05, min.lfc = 1.5, max.num.features = 50) {
     design <- model.matrix(~0 + factor(pData(eset)$Relapse))
     colnames(design) <- c("NoRelapse", "Relapse")
     fit <- lmFit(eset, design)
