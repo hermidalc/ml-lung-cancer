@@ -8,8 +8,9 @@ from rpy2.robjects.packages import importr
 # from rpy2.robjects import numpy2ri
 # import pandas as pd
 import numpy as np
-from sklearn import svm, preprocessing
 from sklearn.model_selection import test_train_split, StratifiedKFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 from sklearn.feature_selection import RFECV
 from sklearn.metrics import roc_curve, roc_auc_score
 import matplotlib.pyplot as plt
@@ -39,7 +40,7 @@ y = np.array(r_filter_eset_relapse_labels(eset_gex))
 X_train, X_test, y_train, y_test = train_test_split(
     X_scaled, y, random_state=1301, stratify=y, test_size=0.33
 )
-svc = svm.SVC(kernel='linear', cache_size=1000)
+svc = SVC(kernel='linear', cache_size=1000)
 rfecv = RFECV(
     estimator=svc, step=10,
     cv=StratifiedKFold(y_train, shuffle=True, n_folds=3, random_state=1301),
