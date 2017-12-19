@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, LinearSVC
-from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.metrics import auc, roc_curve, roc_auc_score
 import matplotlib.pyplot as plt
 from matplotlib import style
 
@@ -33,6 +33,7 @@ parser.add_argument('--min-num-features', type=int, default=10, help='feature se
 parser.add_argument('--num-top-features', type=int, default=10, help='feature selection number top scoring features')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
 parser.add_argument('--svm-alg', type=str, default='libsvm', help="svm algorithm (libsvm or liblinear)")
+parser.add_argument('--fs-rank-method', type=str, default='mean_abs_coefs', help="mean_roc_auc_scores or mean_abs_coefs")
 args = parser.parse_args()
 # fs_features = np.array([], dtype="str")
 # fs_fprs = np.array([], dtype="float64")
@@ -99,21 +100,21 @@ print('Folds:', fold_count, 'Fails:', low_fs_count)
 fs_data['features_uniq'] = list(set(fs_data['features_flat']))
 feature_mx_idx = {}
 for idx, feature in enumerate(fs_data['features_uniq']): feature_mx_idx[feature] = idx
-coef_mx = np.zeros((len(fs_data['features_uniq']), args.num_folds), dtype="float64")
+abs_coef_mx = np.zeros((len(fs_data['features_uniq']), args.num_folds), dtype="float64")
 for fold_idx in range(len(fs_data['fold_data'])):
     fold_data = fs_data['fold_data'][fold_idx]
     for feature_idx in range(len(fold_data['features'])):
-        coef_mx[feature_mx_idx[fold_data['features'][feature_idx]]][fold_idx] = \
+        abs_coef_mx[feature_mx_idx[fold_data['features'][feature_idx]]][fold_idx] = \
             abs(fold_data['coefs'][feature_idx])
-fs_data['feature_mean_coefs'] = []
+fs_data['feature_mean_abs_coefs'] = []
 for feature_idx in range(len(fs_data['features_uniq'])):
-    fs_data['feature_mean_coefs'].append(
-        statistics.mean(coef_mx[feature_idx])
+    fs_data['feature_mean_abs_coefs'].append(
+        statistics.mean(abs_coef_mx[feature_idx])
     )
     # print(
     #     fs_data['features_uniq'][feature_idx], "\t",
-    #     fs_data['feature_mean_coefs'][feature_idx], "\t",
-    #     coef_mx[feature_idx]
+    #     fs_data['feature_mean_abs_coefs'][feature_idx], "\t",
+    #     abs_coef_mx[feature_idx]
     # )
 roc_auc_score_mx = np.zeros((len(fs_data['features_uniq']), args.num_folds), dtype="float64")
 for fold_idx in range(len(fs_data['fold_data'])):
@@ -133,13 +134,14 @@ for feature_idx in range(len(fs_data['features_uniq'])):
     # )
 # for y, x in sorted(zip(fs_data['feature_mean_roc_auc_scores'], fs_data['features_uniq']), reverse=True):
 #     print(x, "\t", y)
-features = [x for _, x in sorted(zip(fs_data['feature_mean_coefs'], fs_data['features_uniq']), reverse=True)]
-features = robjects.StrVector(features[:10])
+features = [x for _, x in sorted(zip(fs_data['feature_' + args.fs_rank_method], fs_data['features_uniq']), reverse=True)]
 fl_data = {
+    'features': features[:args.num_top_features],
     'y_scores_flat': [],
     'y_tests_flat': [],
     'fold_data': [],
 }
+features = robjects.StrVector(features[:args.num_top_features])
 fold_count = 0
 while fold_count < args.num_folds:
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
@@ -174,9 +176,10 @@ while fold_count < args.num_folds:
         'roc_auc_score': roc_auc_score(y_test, y_score),
     })
     fold_count += 1
-    print('Folds:', fold_count, 'Fails:', low_fs_count, end='\r', flush=True)
+    print('Folds:', fold_count, end='\r', flush=True)
 # end while
-print('Folds:', fold_count, 'Fails:', low_fs_count)
+print('Folds:', fold_count)
+print(sorted(fl_data['features']))
 # save data
 # np.save('data/fs_features.npy', fs_features)
 # np.save('data/fs_fprs', fs_fprs)
@@ -194,13 +197,12 @@ fl_data_fh.close()
 # plot ROC AUC Curve
 fpr, tpr, thres = roc_curve(fl_data['y_tests_flat'], fl_data['y_scores_flat'], pos_label=1)
 roc_auc_score = roc_auc_score(fl_data['y_tests_flat'], fl_data['y_scores_flat'])
-plt.figure()
-plt.plot(fpr, tpr, color='darkorange', lw=4, label='ROC curve (area = %0.2f)' % roc_auc_score)
-plt.plot([0,1], [0,1], color='navy', lw=4, linestyle='--')
-plt.xlim([0.0,1.0])
-plt.ylim([0.0,1.05])
+plt.plot([0,1], [0,1], color='darkred', lw=4, linestyle='--', alpha=.8, label='Chance')
+plt.plot(fpr, tpr, color='darkblue', lw=4, label='ROC curve (area = %0.4f)' % roc_auc_score)
+plt.xlim([-0.05,1.05])
+plt.ylim([-0.05,1.05])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC')
-plt.legend(loc="lower right")
+plt.legend(loc='lower right')
 plt.show()
