@@ -1,12 +1,12 @@
 #!/usr/bin/env R
 
-suppressPackageStartupMessages(library('tibble'))
-suppressPackageStartupMessages(library('readxl'))
-suppressPackageStartupMessages(library('Biobase'))
-suppressPackageStartupMessages(suppressWarnings(library('hgu133plus2.db')))
-suppressPackageStartupMessages(library('annotate'))
-suppressPackageStartupMessages(library('genefilter'))
-datafile <- '/home/hermidalc/data/nci-lhc-nsclc/japan_luad/AffyU133Plus2array_NCC_226ADC_16Normal_MAS5normalized_reformatted.xlsx'
+suppressPackageStartupMessages(library("tibble"))
+suppressPackageStartupMessages(library("readxl"))
+suppressPackageStartupMessages(library("Biobase"))
+suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
+suppressPackageStartupMessages(library("annotate"))
+suppressPackageStartupMessages(library("genefilter"))
+datafile <- "/home/hermidalc/data/nci-lhc-nsclc/japan_luad/AffyU133Plus2array_NCC_226ADC_16Normal_MAS5normalized_reformatted.xlsx"
 exprs <- as.matrix(column_to_rownames(as.data.frame(read_excel(
     datafile,
     sheet = 3,
