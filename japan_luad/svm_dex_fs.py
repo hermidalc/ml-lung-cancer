@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 from matplotlib import style
 
 style.use("ggplot")
-plt.rcParams['font.size'] = 24
 base = importr("base")
 biobase = importr("Biobase")
 base.load("data/eset_gex.Rda")
@@ -32,8 +31,9 @@ parser.add_argument('--relapse-fs-percent', type=float, default=.15, help='featu
 parser.add_argument('--min-num-features', type=int, default=10, help='feature selection minimum number of features')
 parser.add_argument('--num-top-features', type=int, default=10, help='feature selection number top scoring features')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
-parser.add_argument('--svm-alg', type=str, default='libsvm', help="svm algorithm (libsvm or liblinear)")
-parser.add_argument('--fs-rank-method', type=str, default='mean_abs_coefs', help="mean_roc_auc_scores or mean_abs_coefs")
+parser.add_argument('--svm-alg', type=str, default='liblinear', help="svm algorithm (liblinear or libsvm)")
+parser.add_argument('--fs-rank-method', type=str, default='mean_abs_coefs', help="mean_abs_coefs or mean_roc_auc_scores")
+parser.add_argument('--cv-test-size', type=float, default=.33, help="cv test size")
 args = parser.parse_args()
 # fs_features = np.array([], dtype="str")
 # fs_fprs = np.array([], dtype="float64")
@@ -43,7 +43,7 @@ args = parser.parse_args()
 # fs_y_tests = np.array([], dtype="int")
 # fs_roc_auc_scores = np.array([], dtype="float64")
 fs_data = {
-    'features_flat': [],
+    'features_all': [],
     'fold_data': [],
 }
 fold_count = 0
@@ -81,7 +81,7 @@ while fold_count < args.num_folds:
         svc = LinearSVC()
     y_score = svc.fit(X_train_scaled, y_train).decision_function(X_test_scaled)
     fpr, tpr, thres = roc_curve(y_test, y_score, pos_label=1)
-    fs_data['features_flat'].extend(np.array(features).tolist())
+    fs_data['features_all'].extend(np.array(features).tolist())
     fs_data['fold_data'].append({
         'features': np.array(features).tolist(),
         'fprs': fpr.tolist(),
@@ -93,11 +93,11 @@ while fold_count < args.num_folds:
         'roc_auc_score': roc_auc_score(y_test, y_score),
     })
     fold_count += 1
-    print('Folds:', fold_count, 'Fails:', low_fs_count, end='\r', flush=True)
+    print('FS Folds:', fold_count, 'Fails:', low_fs_count, end='\r', flush=True)
 # end while
-print('Folds:', fold_count, 'Fails:', low_fs_count)
+print('FS Folds:', fold_count, 'Fails:', low_fs_count)
 # rank features
-fs_data['features_uniq'] = list(set(fs_data['features_flat']))
+fs_data['features_uniq'] = list(set(fs_data['features_all']))
 feature_mx_idx = {}
 for idx, feature in enumerate(fs_data['features_uniq']): feature_mx_idx[feature] = idx
 abs_coef_mx = np.zeros((len(fs_data['features_uniq']), args.num_folds), dtype="float64")
@@ -135,10 +135,10 @@ for feature_idx in range(len(fs_data['features_uniq'])):
 # for y, x in sorted(zip(fs_data['feature_mean_roc_auc_scores'], fs_data['features_uniq']), reverse=True):
 #     print(x, "\t", y)
 features = [x for _, x in sorted(zip(fs_data['feature_' + args.fs_rank_method], fs_data['features_uniq']), reverse=True)]
-fl_data = {
+cv_data = {
     'features': features[:args.num_top_features],
-    'y_scores_flat': [],
-    'y_tests_flat': [],
+    'y_scores_all': [],
+    'y_tests_all': [],
     'fold_data': [],
 }
 features = robjects.StrVector(features[:args.num_top_features])
@@ -146,7 +146,7 @@ fold_count = 0
 while fold_count < args.num_folds:
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
     norelapse_samples = r_rand_perm_sample_nums(eset_gex, False)
-    num_samples_tr = math.ceil(len(relapse_samples) * .80)
+    num_samples_tr = math.ceil(len(relapse_samples) * round((1 - args.cv_test_size),2))
     samples_tr = relapse_samples[:num_samples_tr] + norelapse_samples[:num_samples_tr]
     eset_gex_tr = r_filter_eset(eset_gex, features, samples_tr)
     X_train = np.array(base.t(biobase.exprs(eset_gex_tr)))
@@ -164,9 +164,9 @@ while fold_count < args.num_folds:
         svc = LinearSVC()
     y_score = svc.fit(X_train_scaled, y_train).decision_function(X_test_scaled)
     fpr, tpr, thres = roc_curve(y_test, y_score, pos_label=1)
-    fl_data['y_scores_flat'].extend(y_score.tolist())
-    fl_data['y_tests_flat'].extend(y_test.tolist())
-    fl_data['fold_data'].append({
+    cv_data['y_scores_all'].extend(y_score.tolist())
+    cv_data['y_tests_all'].extend(y_test.tolist())
+    cv_data['fold_data'].append({
         'fprs': fpr.tolist(),
         'tprs': tpr.tolist(),
         'thres': thres.tolist(),
@@ -176,10 +176,10 @@ while fold_count < args.num_folds:
         'roc_auc_score': roc_auc_score(y_test, y_score),
     })
     fold_count += 1
-    print('Folds:', fold_count, end='\r', flush=True)
+    print('CV Folds:', fold_count, end='\r', flush=True)
 # end while
-print('Folds:', fold_count)
-print(sorted(fl_data['features']))
+print('CV Folds:', fold_count)
+print("\n".join(sorted(cv_data['features'])))
 # save data
 # np.save('data/fs_features.npy', fs_features)
 # np.save('data/fs_fprs', fs_fprs)
@@ -189,14 +189,15 @@ print(sorted(fl_data['features']))
 # np.save('data/fs_y_tests', fs_y_tests)
 # np.save('data/fs_roc_auc_scores', fs_roc_auc_scores)
 fs_data_fh = open('data/fs_data.pkl', 'wb')
-fl_data_fh = open('data/fl_data.pkl', 'wb')
+cv_data_fh = open('data/cv_data.pkl', 'wb')
 pickle.dump(fs_data, fs_data_fh, pickle.HIGHEST_PROTOCOL)
-pickle.dump(fl_data, fl_data_fh, pickle.HIGHEST_PROTOCOL)
+pickle.dump(cv_data, cv_data_fh, pickle.HIGHEST_PROTOCOL)
 fs_data_fh.close()
-fl_data_fh.close()
+cv_data_fh.close()
 # plot ROC AUC Curve
-fpr, tpr, thres = roc_curve(fl_data['y_tests_flat'], fl_data['y_scores_flat'], pos_label=1)
-roc_auc_score = roc_auc_score(fl_data['y_tests_flat'], fl_data['y_scores_flat'])
+fpr, tpr, thres = roc_curve(cv_data['y_tests_all'], cv_data['y_scores_all'], pos_label=1)
+roc_auc_score = roc_auc_score(cv_data['y_tests_all'], cv_data['y_scores_all'])
+plt.rcParams['font.size'] = 24
 plt.plot([0,1], [0,1], color='darkred', lw=4, linestyle='--', alpha=.8, label='Chance')
 plt.plot(fpr, tpr, color='darkblue', lw=4, label='ROC curve (area = %0.4f)' % roc_auc_score)
 plt.xlim([-0.05,1.05])
