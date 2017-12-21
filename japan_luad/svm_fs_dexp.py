@@ -17,8 +17,6 @@ from matplotlib import style
 style.use("ggplot")
 base = importr("base")
 biobase = importr("Biobase")
-base.load("data/eset_gex.Rda")
-eset_gex = robjects.globalenv["eset.gex"]
 base.source("functions.R")
 r_rand_perm_sample_nums = robjects.globalenv["randPermSampleNums"]
 r_filter_eset = robjects.globalenv["filterEset"]
@@ -35,6 +33,8 @@ parser.add_argument('--svm-alg', type=str, default='liblinear', help="svm algori
 parser.add_argument('--fs-rank-method', type=str, default='mean_abs_coefs', help="mean_abs_coefs or mean_roc_auc_scores")
 parser.add_argument('--cv-test-size', type=float, default=.33, help="cv test size")
 args = parser.parse_args()
+base.load("data/eset_gex_nci_japan_luad.Rda")
+eset_gex = robjects.globalenv["eset_gex_nci_japan_luad"]
 # fs_features = np.array([], dtype="str")
 # fs_fprs = np.array([], dtype="float64")
 # fs_tprs = np.array([], dtype="float64")
@@ -132,16 +132,17 @@ for feature_idx in range(len(fs_data['features_uniq'])):
     #     fs_data['feature_mean_roc_auc_scores'][feature_idx], "\t",
     #     roc_auc_score_mx[feature_idx]
     # )
-# for y, x in sorted(zip(fs_data['feature_mean_roc_auc_scores'], fs_data['features_uniq']), reverse=True):
-#     print(x, "\t", y)
-features = [x for _, x in sorted(zip(fs_data['feature_' + args.fs_rank_method], fs_data['features_uniq']), reverse=True)]
+feature_ranks = sorted(zip(fs_data['feature_' + args.fs_rank_method], fs_data['features_uniq']), reverse=True)
+# for y, x in feature_ranks: print(x, "\t", y)
+feature_ranks = feature_ranks[:args.num_top_features]
+features = [x for _, x in feature_ranks]
 cv_data = {
-    'features': features[:args.num_top_features],
+    'features': features,
     'y_scores_all': [],
     'y_tests_all': [],
     'fold_data': [],
 }
-features = robjects.StrVector(features[:args.num_top_features])
+features = robjects.StrVector(features)
 fold_count = 0
 while fold_count < args.num_folds:
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
@@ -179,7 +180,7 @@ while fold_count < args.num_folds:
     print('CV Folds:', fold_count, end='\r', flush=True)
 # end while
 print('CV Folds:', fold_count)
-print("\n".join(sorted(cv_data['features'])))
+for rank, feature in feature_ranks: print(feature, "\t", rank)
 # save data
 # np.save('data/fs_features.npy', fs_features)
 # np.save('data/fs_fprs', fs_fprs)

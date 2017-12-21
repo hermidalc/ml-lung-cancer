@@ -6,36 +6,38 @@ suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(library("annotate"))
 suppressPackageStartupMessages(library("genefilter"))
-datafile <- "/home/hermidalc/data/nci-lhc-nsclc/japan_luad/AffyU133Plus2array_NCC_226ADC_16Normal_MAS5normalized_reformatted.xlsx"
+datafile <- "/home/hermidalc/data/nci-lhc-nsclc/japan_luad/validation_datasets/GSE37745_series_matrix.xlsx"
 exprs <- as.matrix(column_to_rownames(as.data.frame(read_excel(
     datafile,
     sheet = 3,
-    range = cell_cols("A:HS"),
     col_names = TRUE,
     trim_ws = TRUE
-)), var="Probeset ID"))
+)), var="ID_REF"))
 pData <- AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
     datafile,
     sheet = 2,
-    range = cell_rows(1:227),
     col_names = TRUE,
     trim_ws = TRUE
-)), var="Biology ID"))
+)), var="Sample_geo_accession"))
 # build eset
-eset.gex <- ExpressionSet(
+eset_gex_gse37745 <- ExpressionSet(
     assayData = exprs,
     phenoData = pData,
     annotation="hgu133plus2"
 )
+# filter eset
+eset_gex_gse37745 <- eset_gex_gse37745[, eset_gex_gse37745$Histology == "adeno"]
+eset_gex_gse37745 <- eset_gex_gse37745[, eset_gex_gse37745$"Tumor Stage" %in% c("1a","1b","2a","2b")]
+eset_gex_gse37745 <- eset_gex_gse37745[, eset_gex_gse37745$Relapse %in% c(0,1)]
 # annotate eset
-probesetIds <- featureNames(eset.gex)
+probesetIds <- featureNames(eset_gex_gse37745)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")
-fData(eset.gex) <- data.frame(Symbol=geneSymbols)
+fData(eset_gex_gse37745) <- data.frame(Symbol=geneSymbols)
 # filter out control probesets
-eset.gex <- featureFilter(eset.gex,
+eset_gex_gse37745 <- featureFilter(eset_gex_gse37745,
     require.entrez=FALSE,
     require.GOBP=FALSE, require.GOCC=FALSE,
     require.GOMF=FALSE, require.CytoBand=FALSE,
     remove.dupEntrez=FALSE, feature.exclude="^AFFX"
 )
-save(eset.gex, file="data/eset_gex.Rda")
+save(eset_gex_gse37745, file="data/eset_gex_gse37745.Rda")
