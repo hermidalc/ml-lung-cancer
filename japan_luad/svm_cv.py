@@ -34,19 +34,55 @@ base.load("data/eset_gex_gse50081.Rda")
 eset_gex_cv = robjects.globalenv["eset_gex_gse50081"]
 features = [
     '209251_x_at',
-    '200092_s_at',
     '209365_s_at',
     '213646_x_at',
-    '211296_x_at',
-    '213084_x_at',
+    '211072_x_at',
+    '200092_s_at',
+    '212639_x_at',
     '210427_x_at',
-    '201049_s_at',
-    '211972_x_at',
-    '212363_x_at',
-    '212661_x_at',
+    '211750_x_at',
+    '211058_x_at',
+    '213503_x_at',
+    '208640_at',
     '213347_x_at',
+    '212363_x_at',
+    '213583_x_at',
+    '213084_x_at',
+    '201049_s_at',
+    '201590_x_at',
     '226675_s_at',
+    '211296_x_at',
+    '225750_at',
+    '214003_x_at',
+    '212581_x_at',
+    '200650_s_at',
+    '203107_x_at',
+    '212661_x_at',
+    '213453_x_at',
     '201090_x_at',
+    '217398_x_at',
+    '211972_x_at',
+    '201492_s_at',
+    '213037_x_at',
+    '203665_at',
+    '203123_s_at',
+    '200748_s_at',
+    '200674_s_at',
+    '217733_s_at',
+    '213614_x_at',
+    '200088_x_at',
+    '201429_s_at',
+    '201650_at',
+    '218140_x_at',
+    '201180_s_at',
+    '200606_at',
+    '200871_s_at',
+    '211378_x_at',
+    '206559_x_at',
+    '202075_s_at',
+    '212039_x_at',
+    '200933_x_at',
+    '201293_x_at',
 ]
 cv_data = {
     'features': features,
@@ -59,7 +95,7 @@ fold_count = 0
 while fold_count < args.num_folds:
     relapse_samples = r_rand_perm_sample_nums(eset_gex_cv, True)
     norelapse_samples = r_rand_perm_sample_nums(eset_gex_cv, False)
-    num_samples_tr = math.ceil(len(relapse_samples) * round((1 - args.cv_test_size),2))
+    num_samples_tr = math.ceil(len(relapse_samples) * round((1 - args.cv_test_size), 2))
     samples_tr = relapse_samples[:num_samples_tr] + norelapse_samples[:num_samples_tr]
     eset_gex_cv_tr = r_filter_eset(eset_gex_cv, features, samples_tr)
     X_train = np.array(base.t(biobase.exprs(eset_gex_cv_tr)))

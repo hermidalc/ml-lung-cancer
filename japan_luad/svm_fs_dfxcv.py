@@ -7,7 +7,10 @@ from rpy2.robjects.packages import importr
 # from rpy2.robjects import numpy2ri
 # import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
+from natsort import natsorted
+from sklearn.feature_selection import RFECV
+from sklearn.model_selection import train_test_split, StratifiedShuffleSplit, GridSearchCV
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, LinearSVC
 from sklearn.metrics import auc, roc_curve, roc_auc_score
@@ -24,10 +27,10 @@ r_filter_eset_relapse_labels = robjects.globalenv["filterEsetRelapseLabels"]
 r_get_diff_exp_features = robjects.globalenv["getDiffExpFeatures"]
 # config
 parser = argparse.ArgumentParser()
-parser.add_argument('--num-folds', type=int, default=1000, help='num folds')
+parser.add_argument('--num-folds', type=int, default=100, help='num folds')
 parser.add_argument('--relapse-fs-percent', type=float, default=.15, help='feature selection relapse percentage')
 parser.add_argument('--min-num-features', type=int, default=10, help='feature selection minimum number of features')
-parser.add_argument('--num-top-features', type=int, default=10, help='feature selection number top scoring features')
+parser.add_argument('--num-top-features', type=int, default=20, help='num top scoring features to select')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
 parser.add_argument('--svm-alg', type=str, default='liblinear', help="svm algorithm (liblinear or libsvm)")
 parser.add_argument('--fs-rank-method', type=str, default='mean_abs_coefs', help="mean_abs_coefs or mean_roc_auc_scores")
@@ -97,7 +100,7 @@ while fold_count < args.num_folds:
 # end while
 print('FS Folds:', fold_count, 'Fails:', low_fs_count)
 # rank features
-fs_data['features_uniq'] = list(set(fs_data['features_all']))
+fs_data['features_uniq'] = natsorted(list(set(fs_data['features_all'])))
 feature_mx_idx = {}
 for idx, feature in enumerate(fs_data['features_uniq']): feature_mx_idx[feature] = idx
 abs_coef_mx = np.zeros((len(fs_data['features_uniq']), args.num_folds), dtype="float64")
@@ -147,7 +150,7 @@ fold_count = 0
 while fold_count < args.num_folds:
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
     norelapse_samples = r_rand_perm_sample_nums(eset_gex, False)
-    num_samples_tr = math.ceil(len(relapse_samples) * round((1 - args.cv_test_size),2))
+    num_samples_tr = math.ceil(len(relapse_samples) * round((1 - args.cv_test_size), 2))
     samples_tr = relapse_samples[:num_samples_tr] + norelapse_samples[:num_samples_tr]
     eset_gex_tr = r_filter_eset(eset_gex, features, samples_tr)
     X_train = np.array(base.t(biobase.exprs(eset_gex_tr)))
