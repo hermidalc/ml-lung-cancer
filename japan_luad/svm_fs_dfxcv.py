@@ -14,6 +14,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, LinearSVC
 from sklearn.metrics import auc, roc_curve, roc_auc_score
+from sklearn.externals import joblib
 import matplotlib.pyplot as plt
 from matplotlib import style
 
@@ -38,13 +39,6 @@ parser.add_argument('--cv-test-size', type=float, default=.33, help="cv test siz
 args = parser.parse_args()
 base.load("data/eset_gex_nci_japan_luad.Rda")
 eset_gex = robjects.globalenv["eset_gex_nci_japan_luad"]
-# fs_features = np.array([], dtype="str")
-# fs_fprs = np.array([], dtype="float64")
-# fs_tprs = np.array([], dtype="float64")
-# fs_thres = np.array([], dtype="float64")
-# fs_y_scores = np.array([], dtype="float64")
-# fs_y_tests = np.array([], dtype="int")
-# fs_roc_auc_scores = np.array([], dtype="float64")
 fs_data = {
     'features_all': [],
     'fold_data': [],
@@ -185,13 +179,6 @@ while fold_count < args.num_folds:
 print('CV Folds:', fold_count)
 for rank, feature in feature_ranks: print(feature, "\t", rank)
 # save data
-# np.save('data/fs_features.npy', fs_features)
-# np.save('data/fs_fprs', fs_fprs)
-# np.save('data/fs_tprs', fs_tprs)
-# np.save('data/fs_thres', fs_thres)
-# np.save('data/fs_y_scores', fs_y_scores)
-# np.save('data/fs_y_tests', fs_y_tests)
-# np.save('data/fs_roc_auc_scores', fs_roc_auc_scores)
 fs_data_fh = open('data/fs_data.pkl', 'wb')
 cv_data_fh = open('data/cv_data.pkl', 'wb')
 pickle.dump(fs_data, fs_data_fh, pickle.HIGHEST_PROTOCOL)
