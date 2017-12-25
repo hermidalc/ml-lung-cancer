@@ -102,7 +102,7 @@ for fold_idx in range(len(fs_data['fold_data'])):
     fold_data = fs_data['fold_data'][fold_idx]
     for feature_idx in range(len(fold_data['features'])):
         abs_coef_mx[feature_mx_idx[fold_data['features'][feature_idx]]][fold_idx] = \
-            abs(fold_data['coefs'][feature_idx])
+            pow(fold_data['coefs'][feature_idx], 2)
 fs_data['feature_mean_abs_coefs'] = []
 for feature_idx in range(len(fs_data['features_uniq'])):
     fs_data['feature_mean_abs_coefs'].append(

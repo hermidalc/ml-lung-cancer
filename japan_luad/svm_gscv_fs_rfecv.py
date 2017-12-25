@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import argparse, math, statistics
+import argparse, math, statistics, time
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 # from rpy2.robjects import pandas2ri
@@ -28,13 +28,13 @@ r_filter_eset_relapse_labels = robjects.globalenv["filterEsetRelapseLabels"]
 r_get_diff_exp_features = robjects.globalenv["getDiffExpFeatures"]
 # config
 parser = argparse.ArgumentParser()
-parser.add_argument('--num-gscv-folds', type=int, default=10, help='num gridsearchcv folds')
-parser.add_argument('--num-rfecv-folds', type=int, default=10, help='num rfecv folds')
+parser.add_argument('--num-gscv-folds', type=int, default=1, help='num gridsearchcv folds')
+parser.add_argument('--num-rfecv-folds', type=int, default=1, help='num rfecv folds')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
 parser.add_argument('--svm-alg', type=str, default='liblinear', help="svm algorithm (liblinear or libsvm)")
 parser.add_argument('--num-gscv-jobs', type=int, default=1, help="number of gridsearchcv parallel jobs")
-parser.add_argument('--num-rfecv-jobs', type=int, default=-1, help="number of rfecv parallel jobs")
-parser.add_argument('--rfecv-steps', type=float, default=10, help="rfecv steps")
+parser.add_argument('--num-rfecv-jobs', type=int, default=1, help="number of rfecv parallel jobs")
+parser.add_argument('--rfecv-step', type=float, default=1, help="rfecv step")
 args = parser.parse_args()
 base.load("data/eset_gex_nci_japan_luad.Rda")
 eset_gex = robjects.globalenv["eset_gex_nci_japan_luad"]
@@ -43,7 +43,7 @@ grid_clf = GridSearchCV(
         ('slr', StandardScaler()),
         ('rfe',
             RFECV(
-                LinearSVC(class_weight='balanced'), step=args.rfecv_steps,
+                LinearSVC(class_weight='balanced'), step=args.rfecv_step,
                 cv=StratifiedShuffleSplit(n_splits=args.num_rfecv_folds, test_size=0.2),
                 scoring='roc_auc', n_jobs=args.num_rfecv_jobs, verbose=1
             )
@@ -51,8 +51,8 @@ grid_clf = GridSearchCV(
         ('svc', LinearSVC(class_weight='balanced')),
     ]),
     param_grid=[
-        # { 'svc__kernel': ['linear'], 'svc__C': [0.01, 0.1, 1, 10, 100, 1000] },
-        { 'svc__C': [0.01, 0.1, 1, 10, 100, 1000] },
+        # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
+        { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
     ],
     cv=StratifiedShuffleSplit(n_splits=args.num_gscv_folds, test_size=0.2),
     scoring='roc_auc', n_jobs=args.num_gscv_jobs, verbose=2
@@ -60,10 +60,16 @@ grid_clf = GridSearchCV(
 X = np.array(base.t(biobase.exprs(eset_gex)))
 y = np.array(r_filter_eset_relapse_labels(eset_gex))
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, stratify=y)
+start_time = time.time()
 y_score = grid_clf.fit(X_train, y_train).decision_function(X_test)
+print("Completed in %s minutes" % (math.ceil((time.time() - start_time) / 60)))
 print(grid_clf.best_params_)
-print(grid_clf.best_estimator_)
 print(grid_clf.best_estimator_.named_steps['rfe'].n_features_)
+feature_idxs = grid_clf.best_estimator_.named_steps['rfe'].get_support(indices=True)
+feature_names = np.array(biobase.featureNames(eset_gex))
+feature_names = feature_names[feature_idxs]
+rankings = grid_clf.best_estimator_.named_steps['rfe'].ranking_[feature_idxs]
+for feature, rank in zip(feature_names, rankings): print(feature, "\t", rank)
 # predict on external dataset
 # base.load("data/eset_gex_gse30219.Rda")
 # eset_gex_test = robjects.globalenv["eset_gex_gse30219"]
@@ -79,8 +85,8 @@ roc_auc_score = roc_auc_score(y_test, y_score)
 plt.rcParams['font.size'] = 24
 plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=.8, label='Chance')
 plt.plot(fpr, tpr, color='darkblue', lw=2, label='ROC curve (area = %0.4f)' % roc_auc_score)
-plt.xlim([-0.05,1.05])
-plt.ylim([-0.05,1.05])
+plt.xlim([0.0,1.05])
+plt.ylim([0.0,1.05])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC')
