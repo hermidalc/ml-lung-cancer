@@ -33,6 +33,9 @@ parser.add_argument('--fs-folds', type=int, default=100, help='num fs folds')
 parser.add_argument('--cv-folds', type=int, default=10, help='num cv folds')
 parser.add_argument('--cv-size', type=float, default=.33, help="cv size")
 parser.add_argument('--min-dfx-fs', type=int, default=10, help='min num dfx features to select')
+parser.add_argument('--max-dfx-fs', type=int, default=100, help='min num dfx features to select')
+parser.add_argument('--min-p-val', type=float, default=.05, help="min dfs p value")
+parser.add_argument('--min-lfc', type=float, default=1.5, help="min logfc")
 parser.add_argument('--gscv-folds', type=int, default=10, help='num gridsearchcv folds')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help="num gridsearchcv parallel jobs")
 parser.add_argument('--gscv-verbose', type=int, default=1, help="gridsearchcv verbosity")
@@ -74,7 +77,15 @@ while fold_count < args.fs_folds:
     if print_header:
         print('FS:', fs_idxs.size, 'TR:', tr_idxs.size, 'CV:', cv_idxs.size)
         print_header = False
-    feature_idxs = np.array(r_get_dfx_features(r_filter_eset(eset_gex, robjects.NULL, robjects.IntVector(fs_idxs + 1)), True)) - 1
+    feature_idxs = np.array(
+        r_get_dfx_features(
+            r_filter_eset(eset_gex, robjects.NULL, robjects.IntVector(fs_idxs + 1)),
+            True,
+            args.min_p_val,
+            args.min_lfc,
+            args.max_dfx_fs,
+        )
+    ) - 1
     if feature_idxs.size < args.min_dfx_fs:
         low_fs_count += 1
         continue
@@ -158,7 +169,7 @@ plt.rcParams['font.size'] = 24
 plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=.8, label='Chance')
 plt.plot(fpr, tpr, color='darkblue', lw=2, label='ROC curve (area = %0.4f)' % roc_auc)
 plt.xlim([0,1.01])
-plt.ylim([1.01,1])
+plt.ylim([0,1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC')

@@ -81,7 +81,7 @@ plt.rcParams['font.size'] = 24
 plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=.8, label='Chance')
 plt.plot(fpr, tpr, color='darkblue', lw=2, label='ROC curve (area = %0.4f)' % roc_auc_score)
 plt.xlim([0,1.01])
-plt.ylim([1.01,1])
+plt.ylim([0,1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC')
