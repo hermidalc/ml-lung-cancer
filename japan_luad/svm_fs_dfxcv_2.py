@@ -11,7 +11,7 @@ from natsort import natsorted
 from sklearn.feature_selection import RFECV
 from sklearn.model_selection import train_test_split, StratifiedShuffleSplit, GridSearchCV
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer, StandardScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, LinearSVC
 from sklearn.metrics import auc, roc_curve, roc_auc_score
 from sklearn.externals import joblib

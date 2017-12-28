@@ -107,7 +107,8 @@ while fold_count < args.fs_folds:
 print('FS Folds:', fold_count, 'Fails:', low_fs_count)
 # rank features
 fs_data['features_uniq'] = natsorted(list(set(fs_data['features_all'])))
-print(*fs_data['features_uniq'], sep="\n")
+print('Num Features:', len(fs_data['features_uniq']))
+# print(*fs_data['features_uniq'], sep="\n")
 feature_mx_idx = {}
 for idx, feature in enumerate(fs_data['features_uniq']): feature_mx_idx[feature] = idx
 coef_mx = np.zeros((len(fs_data['features_uniq']), args.fs_folds), dtype="float64")
