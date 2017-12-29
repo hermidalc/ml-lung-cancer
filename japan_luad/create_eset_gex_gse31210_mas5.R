@@ -27,7 +27,7 @@ eset_gex_gse31210_mas5 <- ExpressionSet(
 )
 # filter eset
 eset_gex_gse31210_mas5 <- eset_gex_gse31210_mas5[, eset_gex_gse31210_mas5$Tissue != "normal lung"]
-eset_gex_gse31210_mas5 <- eset_gex_gse31210_mas5[, eset_gex_gse31210_mas5$"Exclude Prognosis Analysis Incomplete Resection/Adjuvant Therapy" == 1]
+eset_gex_gse31210_mas5 <- eset_gex_gse31210_mas5[, eset_gex_gse31210_mas5$"Exclude Prognosis Analysis Incomplete Resection/Adjuvant Therapy" == 0]
 # annotate eset
 probesetIds <- featureNames(eset_gex_gse31210_mas5)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")

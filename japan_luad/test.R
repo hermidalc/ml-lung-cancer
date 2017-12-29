@@ -26,7 +26,7 @@ load("eset_gex.Rda")
 relapse.fs.percent <- .15
 relapse.samples <- randPermSampleNums(eset.gex, TRUE)
 norelapse.samples <- randPermSampleNums(eset.gex, FALSE)
-num.relapse.fs <- ceiling(length(relapse.samples) * relapse.fs.percent)
+num.relapse.fs <- 10
 num.norelapse.fs <- length(norelapse.samples) - length(relapse.samples) + num.relapse.fs
 eset.fs <- filterEset(eset.gex, NULL, c(relapse.samples[1:num.relapse.fs], norelapse.samples[1:num.norelapse.fs]))
 features.df <- selectExpFeatures(eset.fs)

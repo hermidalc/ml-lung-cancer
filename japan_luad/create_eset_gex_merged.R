@@ -6,6 +6,7 @@ suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(library("annotate"))
 suppressPackageStartupMessages(library("genefilter"))
+# GSE31210
 datafile <- "/home/hermidalc/data/nci-lhc-nsclc/japan_luad/GSE31210_series_matrix_gcrma.xlsx"
 exprs <- as.matrix(column_to_rownames(as.data.frame(read_excel(
     datafile,
@@ -26,13 +27,13 @@ eset_gex_gse31210 <- ExpressionSet(
     annotation="hgu133plus2"
 )
 # filter eset
-eset_gex_gse31210 <- eset_gex_gse31210[, eset_gex_gse31210$"Exclude Prognosis Analysis Incomplete Resection/Adjuvant Therapy" == 1]
+eset_gex_gse31210 <- eset_gex_gse31210[, eset_gex_gse31210$"Exclude Prognosis Analysis Incomplete Resection/Adjuvant Therapy" == 0]
 # annotate eset
 probesetIds <- featureNames(eset_gex_gse31210)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")
 fData(eset_gex_gse31210) <- data.frame(Symbol=geneSymbols)
 # filter eset
-phenoData(eset_gex_gse31210) <- pheno[, c("Relapse","Sex","Batch")]
+pData(eset_gex_gse31210) <- pData(eset_gex_gse31210)[,c("Relapse","Sex","Batch")]
 # GSE30219
 datafile <- "/home/hermidalc/data/nci-lhc-nsclc/japan_luad/validation_datasets/GSE30219_series_matrix.xlsx"
 exprs <- as.matrix(column_to_rownames(as.data.frame(read_excel(
@@ -57,7 +58,7 @@ eset_gex_gse30219 <- ExpressionSet(
 eset_gex_gse30219 <- eset_gex_gse30219[, eset_gex_gse30219$Sample_source_name_ch1 == "Lung Tumour"]
 eset_gex_gse30219 <- eset_gex_gse30219[, eset_gex_gse30219$Histology == "ADC"]
 eset_gex_gse30219 <- eset_gex_gse30219[, eset_gex_gse30219$"PT Stage" %in% c("T1","T2")]
-phenoData(eset_gex_gse30219) <- pheno[, c("Relapse","Sex","Batch")]
+pData(eset_gex_gse30219) <- pData(eset_gex_gse30219)[,c("Relapse","Sex","Batch")]
 # annotate eset
 probesetIds <- featureNames(eset_gex_gse30219)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")
@@ -86,7 +87,7 @@ eset_gex_gse37745 <- ExpressionSet(
 eset_gex_gse37745 <- eset_gex_gse37745[, eset_gex_gse37745$Histology == "adeno"]
 eset_gex_gse37745 <- eset_gex_gse37745[, eset_gex_gse37745$"Tumor Stage" %in% c("1a","1b","2a","2b")]
 eset_gex_gse37745 <- eset_gex_gse37745[, eset_gex_gse37745$Relapse %in% c(0,1)]
-phenoData(eset_gex_gse37745) <- pheno[, c("Relapse","Sex","Batch")]
+pData(eset_gex_gse37745) <- pData(eset_gex_gse37745)[c("Relapse","Sex","Batch")]
 # annotate eset
 probesetIds <- featureNames(eset_gex_gse37745)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")
@@ -115,7 +116,7 @@ eset_gex_gse50081 <- ExpressionSet(
 eset_gex_gse50081 <- eset_gex_gse50081[, eset_gex_gse50081$Histology == "adenocarcinoma"]
 eset_gex_gse50081 <- eset_gex_gse50081[, eset_gex_gse50081$"Tumor Stage" %in% c("1A","1B","2A","2B")]
 eset_gex_gse50081 <- eset_gex_gse50081[, eset_gex_gse50081$Relapse %in% c(0,1)]
-phenoData(eset_gex_gse50081) <- pheno[, c("Relapse","Sex","Batch")]
+pData(eset_gex_gse50081) <- pData(eset_gex_gse50081)[c("Relapse","Sex","Batch")]
 # annotate eset
 probesetIds <- featureNames(eset_gex_gse50081)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")

@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--fs-folds', type=int, default=100, help='num fs folds')
 parser.add_argument('--cv-folds', type=int, default=100, help='num cv folds')
 parser.add_argument('--cv-size', type=float, default=.33, help="cv size")
-parser.add_argument('--relapse-fs-percent', type=float, default=.15, help='feature selection relapse percentage')
+parser.add_argument('--dfx-fs-relapse', type=int, default=10, help='num dfx fs relapse samples')
 parser.add_argument('--min-dfx-fs', type=int, default=10, help='min num dfx features to select')
 parser.add_argument('--max-dfx-fs', type=int, default=100, help='min num dfx features to select')
 parser.add_argument('--min-p-val', type=float, default=.05, help="min dfs p value")
@@ -44,19 +44,22 @@ parser.add_argument('--fs-rank-method', type=str, default='mean_coefs', help="me
 parser.add_argument('--gscv-folds', type=int, default=10, help='num gridsearchcv folds')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help="num gridsearchcv parallel jobs")
 parser.add_argument('--gscv-verbose', type=int, default=1, help="gridsearchcv verbosity")
+parser.add_argument('--src-data', type=str, help="src R eset for building svm")
 args = parser.parse_args()
-base.load("data/eset_gex_nci_japan_luad.Rda")
-eset_gex = robjects.globalenv["eset_gex_nci_japan_luad"]
+base.load("data/eset_gex_gse31210_bc.Rda")
+eset_gex = robjects.globalenv["eset_gex_gse31210_bc"]
 fs_data = {
     'features_all': [],
     'fold_data': [],
 }
 fold_count = 0
 low_fs_count = 0
+print_header = True
 while fold_count < args.fs_folds:
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
     norelapse_samples = r_rand_perm_sample_nums(eset_gex, False)
-    num_relapse_samples_fs = math.ceil(len(relapse_samples) * args.relapse_fs_percent)
+    # num_relapse_samples_fs = math.ceil(len(relapse_samples) * args.dfx_fs_relapse)
+    num_relapse_samples_fs = args.dfx_fs_relapse
     num_norelapse_samples_fs = len(norelapse_samples) - len(relapse_samples) + num_relapse_samples_fs
     samples_fs = relapse_samples[:num_relapse_samples_fs] + \
                  norelapse_samples[:num_norelapse_samples_fs]
@@ -84,6 +87,13 @@ while fold_count < args.fs_folds:
     X_test = np.array(base.t(biobase.exprs(eset_gex_ts)))
     X_test_scaled = scaler.transform(X_test)
     y_test = np.array(r_filter_eset_relapse_labels(eset_gex_ts))
+    if print_header:
+        print(
+            'FS:', num_relapse_samples_fs, '/', num_norelapse_samples_fs,
+            'TR:', len(samples_tr),
+            'CV:', len(samples_ts)
+        )
+        print_header = False
     if args.svm_alg == 'liblinear':
         svc = LinearSVC()
     elif args.svm_alg == 'libsvm':
@@ -173,6 +183,8 @@ gscv_cv_clf = GridSearchCV(
     scoring='roc_auc', return_train_score=False, n_jobs=args.gscv_jobs,
     verbose=args.gscv_verbose
 )
+base.load("data/eset_gex_gse30219_bc.Rda")
+eset_gex = robjects.globalenv["eset_gex_gse30219_bc"]
 fold_count = 0
 while fold_count < args.cv_folds:
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
