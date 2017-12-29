@@ -35,8 +35,8 @@ parser.add_argument('--cv-size', type=float, default=.33, help="cv size")
 parser.add_argument('--dfx-fs-relapse', type=int, default=10, help='num dfx fs relapse samples')
 parser.add_argument('--min-dfx-fs', type=int, default=10, help='min num dfx features to select')
 parser.add_argument('--max-dfx-fs', type=int, default=100, help='min num dfx features to select')
-parser.add_argument('--min-p-val', type=float, default=.05, help="min dfs p value")
-parser.add_argument('--min-lfc', type=float, default=1.5, help="min logfc")
+parser.add_argument('--min-dfx-pval', type=float, default=.05, help="min dfx adj p value")
+parser.add_argument('--min-dfx-lfc', type=float, default=1, help="min dfx logfc")
 parser.add_argument('--top-fs', type=int, default=20, help='num top scoring features to select')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
 parser.add_argument('--svm-alg', type=str, default='liblinear', help="svm algorithm (liblinear or libsvm)")
@@ -44,14 +44,15 @@ parser.add_argument('--fs-rank-method', type=str, default='mean_coefs', help="me
 parser.add_argument('--gscv-folds', type=int, default=10, help='num gridsearchcv folds')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help="num gridsearchcv parallel jobs")
 parser.add_argument('--gscv-verbose', type=int, default=1, help="gridsearchcv verbosity")
-parser.add_argument('--src-data', type=str, help="src R eset for building svm")
+parser.add_argument('--eset-src', type=str, default="eset_gex_gse31210", help="R eset for building svm")
+parser.add_argument('--eset-cv', type=str, help="R eset for cross validation")
 args = parser.parse_args()
-base.load("data/eset_gex_gse31210_bc.Rda")
-eset_gex = robjects.globalenv["eset_gex_gse31210_bc"]
 fs_data = {
     'features_all': [],
     'fold_data': [],
 }
+base.load("data/" + args.eset_src + ".Rda")
+eset_gex = robjects.globalenv[args.eset_src]
 fold_count = 0
 low_fs_count = 0
 print_header = True
@@ -66,8 +67,8 @@ while fold_count < args.fs_folds:
     features = r_get_dfx_features(
         r_filter_eset(eset_gex, robjects.NULL, samples_fs),
         False,
-        args.min_p_val,
-        args.min_lfc,
+        args.min_dfx_pval,
+        args.min_dfx_lfc,
         args.max_dfx_fs,
     )
     if len(features) < args.min_dfx_fs:
@@ -169,7 +170,6 @@ cv_data = {
     'y_tests_all': [],
     'fold_data': [],
 }
-features = robjects.StrVector(features)
 gscv_cv_clf = GridSearchCV(
     Pipeline([
         ('slr', StandardScaler()),
@@ -183,9 +183,12 @@ gscv_cv_clf = GridSearchCV(
     scoring='roc_auc', return_train_score=False, n_jobs=args.gscv_jobs,
     verbose=args.gscv_verbose
 )
-base.load("data/eset_gex_gse30219_bc.Rda")
-eset_gex = robjects.globalenv["eset_gex_gse30219_bc"]
+features = robjects.StrVector(features)
+if args.eset_cv:
+    base.load("data/" + args.eset_cv + ".Rda")
+    eset_gex = robjects.globalenv[args.eset_cv]
 fold_count = 0
+print_header = True
 while fold_count < args.cv_folds:
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
     norelapse_samples = r_rand_perm_sample_nums(eset_gex, False)
@@ -198,6 +201,9 @@ while fold_count < args.cv_folds:
     eset_gex_ts = r_filter_eset(eset_gex, features, samples_ts)
     X_test = np.array(base.t(biobase.exprs(eset_gex_ts)))
     y_test = np.array(r_filter_eset_relapse_labels(eset_gex_ts))
+    if print_header:
+        print('TR:', len(samples_tr), 'CV:', len(samples_ts))
+        print_header = False
     y_score = gscv_cv_clf.fit(X_train, y_train).decision_function(X_test)
     fpr, tpr, thres = roc_curve(y_test, y_score, pos_label=1)
     cv_data['y_scores_all'].extend(y_score.tolist())

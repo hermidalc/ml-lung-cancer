@@ -34,11 +34,14 @@ filterEsetRelapseLabels <- function(eset, samples=NULL) {
 
 getGeneSymbols <- function(eset, features=NULL) {
     if (!is.null(features)) {
-        return(as.character(featureData(eset)[c(features)]$Symbol))
+        symbols <- as.character(featureData(eset)[c(features)]$Symbol)
+
     }
     else {
-        return(as.character(featureData(eset)$Symbol))
+        symbols <- as.character(featureData(eset)$Symbol)
     }
+    symbols[is.na(symbols)] <- ""
+    return(symbols)
 }
 
 getDfxFeatures <- function(eset, numbers=FALSE, min.p.value=0.05, min.lfc=1, max.num.features=100) {
