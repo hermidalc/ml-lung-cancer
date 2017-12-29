@@ -14,17 +14,17 @@ exprs <- as.matrix(column_to_rownames(as.data.frame(read_excel(
     col_names = TRUE,
     trim_ws = TRUE
 )), var="Probeset ID"))
-pData <- AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
+pheno <- AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
     datafile,
     sheet = 2,
     range = cell_rows(1:227),
     col_names = TRUE,
     trim_ws = TRUE
-)), var="Biology ID"))
+)), var="Sample ID"))
 # build eset
 eset_gex_nci_japan_luad <- ExpressionSet(
     assayData = exprs,
-    phenoData = pData,
+    phenoData = pheno,
     annotation="hgu133plus2"
 )
 # annotate eset

@@ -13,16 +13,16 @@ exprs <- as.matrix(column_to_rownames(as.data.frame(read_excel(
     col_names = TRUE,
     trim_ws = TRUE
 )), var="ID_REF"))
-pData <- AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
+pheno <- AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
     datafile,
     sheet = 2,
     col_names = TRUE,
     trim_ws = TRUE
-)), var="Sample_geo_accession"))
+)), var="Sample ID"))
 # build eset
 eset_gex_gse30219 <- ExpressionSet(
     assayData = exprs,
-    phenoData = pData,
+    phenoData = pheno,
     annotation="hgu133plus2"
 )
 # filter eset

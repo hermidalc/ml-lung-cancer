@@ -20,7 +20,8 @@ https://docs.anaconda.com/anaconda/install/linux
 conda config --add channels conda-forge
 conda config --add channels bioconda
 conda install -v -y r-essentials r-lintr rpy2 r-pamr r-minqa r-nloptr r-rcppeigen r-lme4
-conda install -v -y bioconductor-biocinstaller bioconductor-biobase bioconductor-simpleaffy bioconductor-limma bioconductor-sva bioconductor-vsn
+conda install -v -y bioconductor-biocinstaller bioconductor-biobase bioconductor-simpleaffy
+conda install -v -y bioconductor-limma bioconductor-sva bioconductor-vsn bioconductor-gcrma
 conda install -v -y -c conda-forge 'icu=58.*' lxml natsort mlxtend
 
 ```
@@ -30,5 +31,7 @@ conda install -v -y -c conda-forge 'icu=58.*' lxml natsort mlxtend
 ```R
 source("https://bioconductor.org/biocLite.R")
 biocLite("hgu133plus2.db")
+biocLite("hgu133plus2cdf")
+biocLite("hgu133plus2probe")
 biocLite("pvca")
 ```
