@@ -31,7 +31,7 @@ r_get_dfx_features = robjects.globalenv["getDfxFeatures"]
 parser = argparse.ArgumentParser()
 parser.add_argument('--fs-folds', type=int, default=100, help='num fs folds')
 parser.add_argument('--cv-folds', type=int, default=100, help='num cv folds')
-parser.add_argument('--cv-size', type=float, default=.33, help="cv size")
+parser.add_argument('--cv-size', type=float, default=.20, help="cv size")
 parser.add_argument('--dfx-fs-relapse', type=int, default=10, help='num dfx fs relapse samples')
 parser.add_argument('--min-dfx-fs', type=int, default=10, help='min num dfx features to select')
 parser.add_argument('--max-dfx-fs', type=int, default=100, help='min num dfx features to select')
