@@ -31,8 +31,8 @@ r_get_dfx_features = robjects.globalenv["getDfxFeatures"]
 parser = argparse.ArgumentParser()
 parser.add_argument('--fs-folds', type=int, default=100, help='num fs folds')
 parser.add_argument('--cv-folds', type=int, default=10, help='num cv folds')
-parser.add_argument('--cv-size', type=float, default=.33, help="cv size")
-parser.add_argument('--dfx-fs-size', type=int, default=60, help='num dfx fs size')
+parser.add_argument('--cv-size', type=float, default=0.33, help="cv size")
+parser.add_argument('--dfx-fs-size', type=int, default=0.5, help='num dfx fs size')
 parser.add_argument('--min-dfx-fs', type=int, default=10, help='min num dfx features to select')
 parser.add_argument('--max-dfx-fs', type=int, default=100, help='min num dfx features to select')
 parser.add_argument('--min-dfx-pval', type=float, default=.05, help="min dfx adj p value")
@@ -75,7 +75,7 @@ fold_count = 0
 low_fs_count = 0
 print_header = True
 while fold_count < args.fs_folds:
-    tr_fs_idxs, cv_idxs = train_test_split(np.arange(y.size), test_size=0.2, stratify=y)
+    tr_fs_idxs, cv_idxs = train_test_split(np.arange(y.size), test_size=0.1, stratify=y)
     tr_idxs, fs_idxs = train_test_split(tr_fs_idxs, test_size=args.dfx_fs_size, stratify=y[tr_fs_idxs])
     if print_header:
         print('FS:', fs_idxs.size, 'TR:', tr_idxs.size, 'CV:', cv_idxs.size)
@@ -149,7 +149,7 @@ while fold_count < args.cv_folds:
         cv=StratifiedShuffleSplit(n_splits=args.gscv_folds, test_size=0.2),
         scoring='roc_auc', return_train_score=False, verbose=args.gscv_verbose
     )
-    y_score = gscv_rfecv_clf.fit(X[np.ix_(tr_idxs, feature_idxs)], y[tr_idxs]).decision_function(X[np.ix_(cv_idxs, feature_idxs)])
+    y_score = gscv_rfecv_clf.fit(X[np.ix_(tr_idxs, feature_idxs_fs)], y[tr_idxs]).decision_function(X[np.ix_(cv_idxs, feature_idxs_fs)])
     fpr, tpr, thres = roc_curve(y[cv_idxs], y_score, pos_label=1)
     roc_auc = roc_auc_score(y[cv_idxs], y_score)
     cv_data['y_scores_all'].extend(y_score.tolist())
@@ -159,7 +159,7 @@ while fold_count < args.cv_folds:
         'clf': gscv_rfecv_clf,
         'feature_ranks': sorted(zip(
             gscv_rfecv_clf.best_estimator_.named_steps['rfe'].ranking_[rfecv_feature_idxs],
-            feature_names[rfecv_feature_idxs],
+            feature_names_fs[rfecv_feature_idxs],
             r_get_gene_symbols(eset_gex, robjects.IntVector(rfecv_feature_idxs + 1))
         )),
         'fprs': fpr,

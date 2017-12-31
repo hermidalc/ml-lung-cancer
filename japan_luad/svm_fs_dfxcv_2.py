@@ -31,8 +31,8 @@ r_get_dfx_features = robjects.globalenv["getDfxFeatures"]
 parser = argparse.ArgumentParser()
 parser.add_argument('--fs-folds', type=int, default=100, help='num fs folds')
 parser.add_argument('--cv-folds', type=int, default=100, help='num cv folds')
-parser.add_argument('--cv-size', type=float, default=.33, help="cv size")
-parser.add_argument('--dfx-fs-size', type=int, default=80, help='num dfx fs size')
+parser.add_argument('--cv-size', type=float, default=0.33, help="cv size")
+parser.add_argument('--dfx-fs-size', type=int, default=0.5, help='num dfx fs size')
 parser.add_argument('--min-dfx-fs', type=int, default=10, help='min num dfx features to select')
 parser.add_argument('--max-dfx-fs', type=int, default=100, help='min num dfx features to select')
 parser.add_argument('--min-dfx-pval', type=float, default=.05, help="min dfx adj p value")
@@ -73,7 +73,7 @@ fold_count = 0
 low_fs_count = 0
 print_header = True
 while fold_count < args.fs_folds:
-    tr_fs_idxs, cv_idxs = train_test_split(np.arange(y.size), test_size=0.2, stratify=y)
+    tr_fs_idxs, cv_idxs = train_test_split(np.arange(y.size), test_size=0.1, stratify=y)
     tr_idxs, fs_idxs = train_test_split(tr_fs_idxs, test_size=args.dfx_fs_size, stratify=y[tr_fs_idxs])
     if print_header:
         print('FS:', fs_idxs.size, 'TR:', tr_idxs.size, 'CV:', cv_idxs.size)
