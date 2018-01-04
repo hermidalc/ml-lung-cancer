@@ -2,7 +2,6 @@
 
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("genefilter"))
-suppressPackageStartupMessages(library("sva"))
 
 source("normFact.R")
 load("data/eset_gex_merged.Rda")

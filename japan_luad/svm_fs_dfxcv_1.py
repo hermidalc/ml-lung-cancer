@@ -44,7 +44,7 @@ parser.add_argument('--fs-rank-method', type=str, default='mean_coefs', help="me
 parser.add_argument('--gscv-folds', type=int, default=10, help='num gridsearchcv folds')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help="num gridsearchcv parallel jobs")
 parser.add_argument('--gscv-verbose', type=int, default=1, help="gridsearchcv verbosity")
-parser.add_argument('--eset-src', type=str, default="eset_gex_gse31210", help="R eset for building svm")
+parser.add_argument('--eset-src', type=str, help="R eset for building svm")
 parser.add_argument('--eset-cv', type=str, help="R eset for cross validation")
 args = parser.parse_args()
 fs_data = {

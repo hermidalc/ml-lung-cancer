@@ -46,7 +46,7 @@ parser.add_argument('--rfecv-step', type=float, default=1, help="rfecv step")
 parser.add_argument('--rfecv-verbose', type=int, default=0, help="rfecv verbosity")
 parser.add_argument('--svm-alg', type=str, default='liblinear', help="svm algorithm (liblinear or libsvm)")
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='libsvm cache size')
-parser.add_argument('--eset-src', type=str, default="eset_gex_gse31210", help="R eset for building svm")
+parser.add_argument('--eset-src', type=str, help="R eset for building svm")
 parser.add_argument('--eset-cv', type=str, help="R eset for cross validation")
 args = parser.parse_args()
 fs_data = {
