@@ -22,13 +22,13 @@ conda config --add channels bioconda
 conda install -v -y \
 r-essentials \
 r-lintr \
-rpy2 \
 r-pamr \
 r-minqa \
 r-nloptr \
 r-rcppeigen \
 r-lme4 \
-r-corpcor
+r-corpcor \
+rpy2
 conda install -v -y \
 bioconductor-biocinstaller \
 bioconductor-biobase \
