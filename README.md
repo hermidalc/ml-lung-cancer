@@ -19,14 +19,34 @@ https://docs.anaconda.com/anaconda/install/linux
 ```bash
 conda config --add channels conda-forge
 conda config --add channels bioconda
-conda install -v -y r-essentials r-lintr rpy2 r-pamr r-minqa r-nloptr r-rcppeigen r-lme4 r-corpcor
-conda install -v -y bioconductor-biocinstaller bioconductor-biobase bioconductor-simpleaffy
-conda install -v -y bioconductor-limma bioconductor-sva bioconductor-vsn bioconductor-gcrma
+conda install -v -y \
+r-essentials \
+r-lintr \
+rpy2 \
+r-pamr \
+r-minqa \
+r-nloptr \
+r-rcppeigen \
+r-lme4 \
+r-corpcor
+conda install -v -y \
+bioconductor-biocinstaller \
+bioconductor-biobase \
+bioconductor-affyplm \
+bioconductor-simpleaffy \
+bioconductor-limma \
+bioconductor-sva \
+bioconductor-vsn \
+bioconductor-gcrma
 conda install -v -y -c conda-forge 'icu=58.*' lxml natsort mlxtend
 
 ```
+3. Install CRAN Packages (not available via Conda)
 
-3. Install HG-U133Plus2 Bioconductor DB
+```R
+install.packages("bapred")
+```
+4. Install Bioconductor Packages (not available via Conda)
 
 ```R
 source("https://bioconductor.org/biocLite.R")
