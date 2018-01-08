@@ -104,5 +104,5 @@ ENV/
 *.Rda
 
 # data dirs
-/japan_luad/data
+/luad/data
 
