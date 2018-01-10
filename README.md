@@ -28,7 +28,8 @@ r-nloptr \
 r-rcppeigen \
 r-lme4 \
 r-corpcor \
-rpy2
+rpy2 \
+libiconv
 conda install -v -y \
 bioconductor-biocinstaller \
 bioconductor-biobase \
