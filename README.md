@@ -37,7 +37,7 @@ bioconductor-simpleaffy \
 bioconductor-limma \
 bioconductor-sva \
 bioconductor-vsn \
-bioconductor-gcrma
+bioconductor-gcrma \
 'icu=58.*' \
 lxml \
 natsort \
