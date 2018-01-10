@@ -44,6 +44,7 @@ conda install -v -y -c conda-forge 'icu=58.*' lxml natsort mlxtend
 3. Install CRAN Packages (not available via Conda)
 
 ```R
+options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
 install.packages("bapred")
 ```
 4. Install Bioconductor Packages (not available via Conda)
