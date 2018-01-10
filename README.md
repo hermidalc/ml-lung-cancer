@@ -29,8 +29,7 @@ r-rcppeigen \
 r-lme4 \
 r-corpcor \
 rpy2 \
-libiconv
-conda install -v -y \
+libiconv \
 bioconductor-biocinstaller \
 bioconductor-biobase \
 bioconductor-affyplm \
@@ -39,7 +38,10 @@ bioconductor-limma \
 bioconductor-sva \
 bioconductor-vsn \
 bioconductor-gcrma
-conda install -v -y -c conda-forge 'icu=58.*' lxml natsort mlxtend
+'icu=58.*' \
+lxml \
+natsort \
+mlxtend
 
 ```
 3. Install CRAN Packages (not available via Conda)
