@@ -5,8 +5,7 @@ suppressPackageStartupMessages(library("readxl"))
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(library("annotate"))
-suppressPackageStartupMessages(library("genefilter"))
-datafile <- "/home/hermidalc/data/nci-lhc-nsclc/japan_luad/GSE31210_series_matrix_mas5.xlsx"
+datafile <- "data/GSE31210_series_matrix_mas5.xlsx"
 exprs <- as.matrix(column_to_rownames(as.data.frame(read_excel(
     datafile,
     sheet = 3,
@@ -18,7 +17,7 @@ pheno <- AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
     sheet = 2,
     col_names = TRUE,
     trim_ws = TRUE
-)), var="Sample ID"))
+)), var="Sample_geo_accession"))
 # build eset
 eset_gex_gse31210_mas5 <- ExpressionSet(
     assayData = exprs,
@@ -32,11 +31,4 @@ eset_gex_gse31210_mas5 <- eset_gex_gse31210_mas5[, eset_gex_gse31210_mas5$"Exclu
 probesetIds <- featureNames(eset_gex_gse31210_mas5)
 geneSymbols <- getSYMBOL(probesetIds,"hgu133plus2.db")
 fData(eset_gex_gse31210_mas5) <- data.frame(Symbol=geneSymbols)
-# filter out control probesets
-eset_gex_gse31210_mas5 <- featureFilter(eset_gex_gse31210_mas5,
-    require.entrez=FALSE,
-    require.GOBP=FALSE, require.GOCC=FALSE,
-    require.GOMF=FALSE, require.CytoBand=FALSE,
-    remove.dupEntrez=FALSE, feature.exclude="^AFFX"
-)
 save(eset_gex_gse31210_mas5, file="data/eset_gex_gse31210_mas5.Rda")

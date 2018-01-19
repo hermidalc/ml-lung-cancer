@@ -1,6 +1,7 @@
 #!/usr/bin/env R
 
 suppressPackageStartupMessages(library("Biobase"))
+suppressPackageStartupMessages(library("genefilter"))
 suppressPackageStartupMessages(library("limma"))
 
 randPermSampleNums <- function(eset, is.relapse) {
@@ -21,6 +22,15 @@ filterEset <- function(eset, features=NULL, samples=NULL) {
     else {
         return(eset)
     }
+}
+
+filterEsetControlProbesets <- function(eset) {
+    return(featureFilter(eset,
+        require.entrez=FALSE,
+        require.GOBP=FALSE, require.GOCC=FALSE,
+        require.GOMF=FALSE, require.CytoBand=FALSE,
+        remove.dupEntrez=FALSE, feature.exclude="^AFFX"
+    ))
 }
 
 filterEsetRelapseLabels <- function(eset, samples=NULL) {

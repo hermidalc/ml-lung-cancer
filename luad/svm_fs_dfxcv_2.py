@@ -24,6 +24,7 @@ biobase = importr("Biobase")
 base.source("functions.R")
 r_rand_perm_sample_nums = robjects.globalenv["randPermSampleNums"]
 r_filter_eset = robjects.globalenv["filterEset"]
+r_filter_eset_ctrl_probesets = robjects.globalenv["filterEsetControlProbesets"]
 r_filter_eset_relapse_labels = robjects.globalenv["filterEsetRelapseLabels"]
 r_get_gene_symbols = robjects.globalenv["getGeneSymbols"]
 r_get_dfx_features = robjects.globalenv["getDfxFeatures"]
@@ -31,11 +32,11 @@ r_get_dfx_features = robjects.globalenv["getDfxFeatures"]
 parser = argparse.ArgumentParser()
 parser.add_argument('--fs-folds', type=int, default=100, help='num fs folds')
 parser.add_argument('--cv-folds', type=int, default=100, help='num cv folds')
-parser.add_argument('--cv-size', type=float, default=0.33, help="cv size")
+parser.add_argument('--cv-size', type=float, default=0.20, help="cv size")
 parser.add_argument('--dfx-fs-size', type=int, default=0.5, help='num dfx fs size')
 parser.add_argument('--min-dfx-fs', type=int, default=10, help='min num dfx features to select')
 parser.add_argument('--max-dfx-fs', type=int, default=100, help='min num dfx features to select')
-parser.add_argument('--min-dfx-pval', type=float, default=.05, help="min dfx adj p value")
+parser.add_argument('--min-dfx-pval', type=float, default=0.05, help="min dfx adj p value")
 parser.add_argument('--min-dfx-lfc', type=float, default=1, help="min dfx logfc")
 parser.add_argument('--top-fs', type=int, default=20, help='num top scoring features to select')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
@@ -66,6 +67,7 @@ gscv_fs_clf = GridSearchCV(
 )
 base.load("data/" + args.eset_src + ".Rda")
 eset_gex = robjects.globalenv[args.eset_src]
+eset_gex = r_filter_eset_ctrl_probesets(eset_gex)
 X = np.array(base.t(biobase.exprs(eset_gex)))
 y = np.array(r_filter_eset_relapse_labels(eset_gex))
 feature_names = np.array(biobase.featureNames(eset_gex))
@@ -108,7 +110,6 @@ while fold_count < args.fs_folds:
     print('FS Folds:', fold_count, 'Fails:', low_fs_count, 'ROC AUC:', roc_auc)
 feature_idxs_fs = sorted(list(set(fs_data['feature_idxs_all'])))
 feature_names_fs = feature_names[feature_idxs_fs]
-print('Num Features:', len(feature_idxs_fs))
 # print(*natsorted(feature_names_fs), sep="\n")
 feature_mx_idx = {}
 for idx, feature_idx in enumerate(feature_idxs_fs): feature_mx_idx[feature_idx] = idx
@@ -152,6 +153,7 @@ feature_ranks = sorted(
     ),
     reverse=True
 )
+print('Num Features:', args.top_fs, '/', len(feature_idxs_fs))
 feature_ranks = feature_ranks[:args.top_fs]
 feature_names_fs = [x for _, x, _ in feature_ranks]
 cv_data = {
