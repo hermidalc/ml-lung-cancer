@@ -3,6 +3,7 @@
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("genefilter"))
 suppressPackageStartupMessages(library("limma"))
+# set.seed(1982)
 
 randPermSampleNums <- function(eset, is.relapse) {
     is.relapse.num <- if (is.relapse) 1 else 0

@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split, StratifiedShuffleSplit, Gr
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, LinearSVC
-from sklearn.metrics import auc, roc_curve, roc_auc_score
+from sklearn.metrics import roc_curve, roc_auc_score
 from sklearn.externals import joblib
 import matplotlib.pyplot as plt
 from matplotlib import style
@@ -30,39 +30,54 @@ r_get_gene_symbols = robjects.globalenv["getGeneSymbols"]
 r_get_dfx_features = robjects.globalenv["getDfxFeatures"]
 # config
 parser = argparse.ArgumentParser()
-parser.add_argument('--fs-folds', type=int, default=100, help='num fs folds')
-parser.add_argument('--cv-folds', type=int, default=100, help='num cv folds')
-parser.add_argument('--cv-size', type=float, default=0.20, help="cv size")
-parser.add_argument('--dfx-fs-relapse', type=int, default=10, help='num dfx fs relapse samples')
+parser.add_argument('--fs-splits', type=int, default=100, help='num feature selection splits')
+parser.add_argument('--tr-splits', type=int, default=100, help='num training splits')
+parser.add_argument('--tr-cv-size', type=float, default=.3, help="training cv size")
+parser.add_argument('--fs-dfx-relapse', type=int, default=10, help='num dfx fs relapse samples')
 parser.add_argument('--min-dfx-fs', type=int, default=10, help='min num dfx features to select')
 parser.add_argument('--max-dfx-fs', type=int, default=100, help='min num dfx features to select')
 parser.add_argument('--min-dfx-pval', type=float, default=.05, help="min dfx adj p value")
 parser.add_argument('--min-dfx-lfc', type=float, default=1, help="min dfx logfc")
-parser.add_argument('--top-fs', type=int, default=20, help='num top scoring features to select')
+parser.add_argument('--top-fs', type=int, default=10, help='num top scoring features to select')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
 parser.add_argument('--svm-alg', type=str, default='liblinear', help="svm algorithm (liblinear or libsvm)")
 parser.add_argument('--fs-rank-method', type=str, default='mean_coefs', help="mean_coefs or mean_roc_auc_scores")
-parser.add_argument('--gscv-folds', type=int, default=10, help='num gridsearchcv folds')
+parser.add_argument('--gscv-splits', type=int, default=10, help='num gridsearchcv splits')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help="num gridsearchcv parallel jobs")
-parser.add_argument('--gscv-verbose', type=int, default=1, help="gridsearchcv verbosity")
-parser.add_argument('--eset-src', type=str, help="R eset for building svm")
-parser.add_argument('--eset-cv', type=str, help="R eset for cross validation")
+parser.add_argument('--gscv-verbose', type=int, default=0, help="gridsearchcv verbosity")
+parser.add_argument('--eset-fs', type=str, help="R eset for fs")
+parser.add_argument('--eset-tr', type=str, help="R eset for tr")
 args = parser.parse_args()
 fs_data = {
     'features_all': [],
-    'fold_data': [],
+    'split_data': [],
 }
-base.load("data/" + args.eset_src + ".Rda")
-eset_gex = robjects.globalenv[args.eset_src]
+gscv_fs_clf = GridSearchCV(
+    Pipeline([
+        ('slr', StandardScaler()),
+        ('svc', LinearSVC()),
+    ]),
+    param_grid=[
+        # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
+        { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
+    ],
+    cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=0.2),
+    scoring='roc_auc', return_train_score=False, n_jobs=args.gscv_jobs,
+    verbose=args.gscv_verbose
+)
+base.load("data/" + args.eset_fs + ".Rda")
+eset_gex = robjects.globalenv[args.eset_fs]
 eset_gex = r_filter_eset_ctrl_probesets(eset_gex)
-fold_count = 0
+split_count = 0
 low_fs_count = 0
 print_header = True
-while fold_count < args.fs_folds:
+while split_count < args.fs_splits:
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
     norelapse_samples = r_rand_perm_sample_nums(eset_gex, False)
-    # num_relapse_samples_fs = math.ceil(len(relapse_samples) * args.dfx_fs_relapse)
-    num_relapse_samples_fs = args.dfx_fs_relapse
+    if args.fs_dfx_relapse >= 1:
+        num_relapse_samples_fs = args.fs_dfx_relapse
+    else
+        num_relapse_samples_fs = math.ceil(len(relapse_samples) * args.fs_dfx_relapse)
     num_norelapse_samples_fs = len(norelapse_samples) - len(relapse_samples) + num_relapse_samples_fs
     samples_fs = relapse_samples[:num_relapse_samples_fs] + \
                  norelapse_samples[:num_norelapse_samples_fs]
@@ -79,56 +94,50 @@ while fold_count < args.fs_folds:
     num_samples_tr = len(relapse_samples) - (num_relapse_samples_fs * 2)
     samples_tr = relapse_samples[num_relapse_samples_fs:(num_relapse_samples_fs + num_samples_tr)] + \
                  norelapse_samples[num_norelapse_samples_fs:(num_norelapse_samples_fs + num_samples_tr)]
-    eset_gex_tr = r_filter_eset(eset_gex, features, samples_tr)
-    X_train = np.array(base.t(biobase.exprs(eset_gex_tr)))
-    scaler = StandardScaler().fit(X_train)
-    X_train_scaled = scaler.transform(X_train)
-    y_train = np.array(r_filter_eset_relapse_labels(eset_gex_tr))
+    num_samples_ts = len(relapse_samples) - num_relapse_samples_fs - num_samples_tr
     samples_ts = relapse_samples[(num_relapse_samples_fs + num_samples_tr):] + \
                  norelapse_samples[(num_norelapse_samples_fs + num_samples_tr):]
-    eset_gex_ts = r_filter_eset(eset_gex, features, samples_ts)
-    X_test = np.array(base.t(biobase.exprs(eset_gex_ts)))
-    X_test_scaled = scaler.transform(X_test)
-    y_test = np.array(r_filter_eset_relapse_labels(eset_gex_ts))
     if print_header:
         print(
             'FS:', num_relapse_samples_fs, '/', num_norelapse_samples_fs,
-            'TR:', len(samples_tr),
-            'CV:', len(samples_ts)
+            'TR:', num_samples_tr, '/', num_samples_tr,
+            'CV:', num_samples_ts, '/', num_samples_ts,
         )
         print_header = False
-    if args.svm_alg == 'liblinear':
-        svc = LinearSVC()
-    elif args.svm_alg == 'libsvm':
-        svc = SVC(kernel='linear', cache_size=args.svm_cache_size)
-    y_score = svc.fit(X_train_scaled, y_train).decision_function(X_test_scaled)
+    eset_gex_tr = r_filter_eset(eset_gex, features, samples_tr)
+    X_train = np.array(base.t(biobase.exprs(eset_gex_tr)))
+    y_train = np.array(r_filter_eset_relapse_labels(eset_gex_tr))
+    eset_gex_ts = r_filter_eset(eset_gex, features, samples_ts)
+    X_test = np.array(base.t(biobase.exprs(eset_gex_ts)))
+    y_test = np.array(r_filter_eset_relapse_labels(eset_gex_ts))
+    y_score = gscv_fs_clf.fit(X_train, y_train).decision_function(X_test)
     fpr, tpr, thres = roc_curve(y_test, y_score, pos_label=1)
+    roc_auc = roc_auc_score(y_test, y_score)
     fs_data['features_all'].extend(np.array(features).tolist())
-    fs_data['fold_data'].append({
+    fs_data['split_data'].append({
         'features': np.array(features).tolist(),
         'fprs': fpr,
         'tprs': tpr,
         'thres': thres,
-        'coefs': np.square(svc.coef_[0]),
+        'coefs': np.square(gscv_fs_clf.best_estimator_.named_steps['svc'].coef_[0]),
         'y_scores': y_score,
         'y_tests': y_test,
-        'roc_auc_score': roc_auc_score(y_test, y_score),
+        'roc_auc_score': roc_auc,
     })
-    fold_count += 1
-    print('FS Folds:', fold_count, 'Fails:', low_fs_count, end='\r', flush=True)
+    split_count += 1
+    print('FS splits:', '%3s' % split_count, 'Fails:', '%3s' % low_fs_count, 'ROC AUC:', '%.4f' % roc_auc)
 # end while
-print('FS Folds:', fold_count, 'Fails:', low_fs_count)
 # rank features
 fs_data['features_uniq'] = natsorted(list(set(fs_data['features_all'])))
 # print(*fs_data['features_uniq'], sep="\n")
 feature_mx_idx = {}
 for idx, feature in enumerate(fs_data['features_uniq']): feature_mx_idx[feature] = idx
-coef_mx = np.zeros((len(fs_data['features_uniq']), args.fs_folds), dtype="float64")
-for fold_idx in range(len(fs_data['fold_data'])):
-    fold_data = fs_data['fold_data'][fold_idx]
-    for feature_idx in range(len(fold_data['features'])):
-        coef_mx[feature_mx_idx[fold_data['features'][feature_idx]]][fold_idx] = \
-            fold_data['coefs'][feature_idx]
+coef_mx = np.zeros((len(fs_data['features_uniq']), args.fs_splits), dtype="float64")
+for split_idx in range(len(fs_data['split_data'])):
+    split_data = fs_data['split_data'][split_idx]
+    for feature_idx in range(len(split_data['features'])):
+        coef_mx[feature_mx_idx[split_data['features'][feature_idx]]][split_idx] = \
+            split_data['coefs'][feature_idx]
 fs_data['feature_mean_coefs'] = []
 for feature_idx in range(len(fs_data['features_uniq'])):
     fs_data['feature_mean_coefs'].append(
@@ -139,12 +148,12 @@ for feature_idx in range(len(fs_data['features_uniq'])):
     #     fs_data['feature_mean_coefs'][feature_idx], "\t",
     #     coef_mx[feature_idx]
     # )
-roc_auc_score_mx = np.zeros((len(fs_data['features_uniq']), args.fs_folds), dtype="float64")
-for fold_idx in range(len(fs_data['fold_data'])):
-    fold_data = fs_data['fold_data'][fold_idx]
-    for feature in fold_data['features']:
-        roc_auc_score_mx[feature_mx_idx[feature]][fold_idx] = \
-            fold_data['roc_auc_score']
+roc_auc_score_mx = np.zeros((len(fs_data['features_uniq']), args.fs_splits), dtype="float64")
+for split_idx in range(len(fs_data['split_data'])):
+    split_data = fs_data['split_data'][split_idx]
+    for feature in split_data['features']:
+        roc_auc_score_mx[feature_mx_idx[feature]][split_idx] = \
+            split_data['roc_auc_score']
 fs_data['feature_mean_roc_auc_scores'] = []
 for feature_idx in range(len(fs_data['features_uniq'])):
     fs_data['feature_mean_roc_auc_scores'].append(
@@ -164,15 +173,15 @@ feature_ranks = sorted(
     reverse=True
 )
 feature_ranks = feature_ranks[:args.top_fs]
-features = [x for _, x, _ in feature_ranks]
+feature_names_fs = [x for _, x, _ in feature_ranks]
 print('Num Features:', args.top_fs, '/', len(fs_data['features_uniq']))
-cv_data = {
-    'features': features,
+tr_data = {
+    'feature_names': feature_names_fs,
     'y_scores_all': [],
     'y_tests_all': [],
-    'fold_data': [],
+    'split_data': [],
 }
-gscv_cv_clf = GridSearchCV(
+gscv_tr_clf = GridSearchCV(
     Pipeline([
         ('slr', StandardScaler()),
         ('svc', LinearSVC()),
@@ -181,59 +190,66 @@ gscv_cv_clf = GridSearchCV(
         # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
         { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
     ],
-    cv=StratifiedShuffleSplit(n_splits=args.gscv_folds, test_size=0.2),
+    cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=0.2),
     scoring='roc_auc', return_train_score=False, n_jobs=args.gscv_jobs,
     verbose=args.gscv_verbose
 )
-features = robjects.StrVector(features)
-if args.eset_cv:
-    base.load("data/" + args.eset_cv + ".Rda")
-    eset_gex = robjects.globalenv[args.eset_cv]
-fold_count = 0
+feature_names_fs = robjects.StrVector(feature_names_fs)
+if args.eset_tr:
+    base.load("data/" + args.eset_tr + ".Rda")
+    eset_gex = robjects.globalenv[args.eset_tr]
+eset_gex = r_filter_eset(eset_gex, feature_names_fs)
+split_count = 0
 print_header = True
-while fold_count < args.cv_folds:
+while split_count < args.tr_splits:
     relapse_samples = r_rand_perm_sample_nums(eset_gex, True)
     norelapse_samples = r_rand_perm_sample_nums(eset_gex, False)
-    num_samples_tr = math.ceil(len(relapse_samples) * round((1 - args.cv_size), 2))
+    num_samples_tr = math.ceil(len(relapse_samples) * round((1 - args.tr_cv_size), 2))
+    num_samples_ts = len(relapse_samples) - num_samples_tr
     samples_tr = relapse_samples[:num_samples_tr] + norelapse_samples[:num_samples_tr]
-    eset_gex_tr = r_filter_eset(eset_gex, features, samples_tr)
+    eset_gex_tr = r_filter_eset(eset_gex, robjects.NULL, samples_tr)
+    samples_ts = relapse_samples[num_samples_tr:(num_samples_tr + num_samples_ts)] + \
+                 norelapse_samples[num_samples_tr:(num_samples_tr + num_samples_ts)]
+    eset_gex_ts = r_filter_eset(eset_gex, robjects.NULL, samples_ts)
     X_train = np.array(base.t(biobase.exprs(eset_gex_tr)))
     y_train = np.array(r_filter_eset_relapse_labels(eset_gex_tr))
-    samples_ts = relapse_samples[num_samples_tr:] + norelapse_samples[num_samples_tr:]
-    eset_gex_ts = r_filter_eset(eset_gex, features, samples_ts)
     X_test = np.array(base.t(biobase.exprs(eset_gex_ts)))
     y_test = np.array(r_filter_eset_relapse_labels(eset_gex_ts))
     if print_header:
-        print('TR:', len(samples_tr), 'CV:', len(samples_ts))
+        print(
+            'TR:', num_samples_tr, '/', num_samples_tr,
+            'CV:', num_samples_ts, '/', num_samples_ts,
+        )
         print_header = False
-    y_score = gscv_cv_clf.fit(X_train, y_train).decision_function(X_test)
+    y_score = gscv_tr_clf.fit(X_train, y_train).decision_function(X_test)
     fpr, tpr, thres = roc_curve(y_test, y_score, pos_label=1)
-    cv_data['y_scores_all'].extend(y_score.tolist())
-    cv_data['y_tests_all'].extend(y_test.tolist())
-    cv_data['fold_data'].append({
+    roc_auc = roc_auc_score(y_test, y_score)
+    tr_data['y_scores_all'].extend(y_score.tolist())
+    tr_data['y_tests_all'].extend(y_test.tolist())
+    tr_data['split_data'].append({
         'fprs': fpr,
         'tprs': tpr,
         'thres': thres,
         'coefs': np.square(svc.coef_[0]),
         'y_scores': y_score,
         'y_tests': y_test,
-        'roc_auc_score': roc_auc_score(y_test, y_score),
+        'roc_auc_score': roc_auc,
     })
-    fold_count += 1
-    print('CV Folds:', fold_count, end='\r', flush=True)
+    split_count += 1
+    print('TR splits:', '%3s' % split_count, 'ROC AUC:', '%.4f' % roc_auc)
 # end while
-print('CV Folds:', fold_count)
 for rank, feature, symbol in feature_ranks: print(feature, "\t", symbol, "\t", rank)
 # save data
 fs_data_fh = open('data/fs_data.pkl', 'wb')
-cv_data_fh = open('data/cv_data.pkl', 'wb')
+tr_data_fh = open('data/tr_data.pkl', 'wb')
 pickle.dump(fs_data, fs_data_fh, pickle.HIGHEST_PROTOCOL)
-pickle.dump(cv_data, cv_data_fh, pickle.HIGHEST_PROTOCOL)
+pickle.dump(tr_data, tr_data_fh, pickle.HIGHEST_PROTOCOL)
 fs_data_fh.close()
-cv_data_fh.close()
+tr_data_fh.close()
 # plot ROC AUC Curve
-fpr, tpr, thres = roc_curve(cv_data['y_tests_all'], cv_data['y_scores_all'], pos_label=1)
-roc_auc = roc_auc_score(cv_data['y_tests_all'], cv_data['y_scores_all'])
+fpr, tpr, thres = roc_curve(tr_data['y_tests_all'], tr_data['y_scores_all'], pos_label=1)
+roc_auc = roc_auc_score(tr_data['y_tests_all'], tr_data['y_scores_all'])
+print ('Overall ROC AUC:', '%.6f' % roc_auc)
 plt.rcParams['font.size'] = 24
 plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=.8, label='Chance')
 plt.plot(fpr, tpr, color='darkblue', lw=2, label='ROC curve (area = %0.4f)' % roc_auc)
