@@ -3,9 +3,10 @@
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("limma"))
 
-selectExpFeatures <- function(eset, relapse.fs.percent = .15, min.p.value = 0.05, min.lfc = 0.5, max.num.features = 100) {
+selectExpFeatures <- function(eset, relapse.fs.percent=0.15, min.p.value=0.001, min.lfc=0, max.num.features=50) {
     num.relapse <- ncol(eset[,eset$Relapse == 1])
-    num.relapse.fs <- ceiling(ncol(eset[,eset$Relapse == 1]) * relapse.fs.percent)
+    # num.relapse.fs <- ceiling(ncol(eset[,eset$Relapse == 1]) * relapse.fs.percent)
+    num.relapse.fs <- 100
     num.norelapse.fs <- ncol(eset[,eset$Relapse == 0]) - num.relapse + num.relapse.fs
     eset.fs <- eset[,sort(c(sample(which(eset$Relapse == 1), num.relapse.fs),sample(which(eset$Relapse == 0), num.norelapse.fs)))]
     design <- model.matrix(~0 + factor(pData(eset.fs)$Relapse))
@@ -22,14 +23,8 @@ selectExpFeatures <- function(eset, relapse.fs.percent = .15, min.p.value = 0.05
 }
 
 source("functions.R")
-load("data/eset_gex_gse31210_gse8894_gse37745_gse50081.Rda")
-relapse.fs.percent <- .15
-relapse.samples <- randPermSampleNums(eset_gex_gse31210_gse8894_gse37745_gse50081, TRUE)
-norelapse.samples <- randPermSampleNums(eset_gex_gse31210_gse8894_gse37745_gse50081, FALSE)
-num.relapse.fs <- 100
-num.norelapse.fs <- length(norelapse.samples) - length(relapse.samples) + num.relapse.fs
-eset.fs <- filterEset(eset_gex_gse31210_gse8894_gse37745_gse50081, NULL, c(relapse.samples[1:num.relapse.fs], norelapse.samples[1:num.norelapse.fs]))
-features.df <- selectExpFeatures(eset.fs)
+load("data/eset_gex_gse31210_gse8894_gse30219_gse50081_stica05_tr.Rda")
+features.df <- selectExpFeatures(eset_gex_gse31210_gse8894_gse30219_gse50081_stica05_tr)
 # num.samples.tr <- num.relapse - (num.relapse.fs * 2)
 # relapse.samples.tr <- relapse.samples[(num.relapse.fs + 1):(num.relapse.fs + num.samples.tr)]
 # norelapse.samples.tr <- norelapse.samples[(num.norelapse.fs + 1):(num.norelapse.fs + num.samples.tr)]

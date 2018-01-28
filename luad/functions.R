@@ -55,7 +55,7 @@ getGeneSymbols <- function(eset, features=NULL) {
     return(symbols)
 }
 
-getDfxFeatures <- function(eset, numbers=FALSE, min.p.value=0.05, min.lfc=1, max.num.features=100) {
+getDfxFeatures <- function(eset, numbers=FALSE, min.p.value=0.05, min.lfc=0, max.num.features=100) {
     design <- model.matrix(~0 + factor(pData(eset)$Relapse))
     colnames(design) <- c("NoRelapse", "Relapse")
     fit <- lmFit(eset, design)

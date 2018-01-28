@@ -31,22 +31,22 @@ r_get_dfx_features = robjects.globalenv["getDfxFeatures"]
 # config
 parser = argparse.ArgumentParser()
 parser.add_argument('--fs-splits', type=int, default=100, help='num fs splits')
-parser.add_argument('--fs-cv-size', type=float, default=0.2, help="fs cv size")
-parser.add_argument('--fs-dfx-min', type=int, default=10, help='fs min num dfx features')
-parser.add_argument('--fs-dfx-max', type=int, default=100, help='fs max num dfx features')
-parser.add_argument('--fs-dfx-pval', type=float, default=0.01, help="min dfx adj p value")
-parser.add_argument('--fs-dfx-lfc', type=float, default=1, help="min dfx logfc")
+parser.add_argument('--fs-cv-size', type=float, default=0.3, help="fs cv size")
+parser.add_argument('--fs-dfx-min', type=int, default=5, help='fs min num dfx features')
+parser.add_argument('--fs-dfx-max', type=int, default=50, help='fs max num dfx features')
+parser.add_argument('--fs-dfx-pval', type=float, default=0.001, help="min dfx adj p value")
+parser.add_argument('--fs-dfx-lfc', type=float, default=0, help="min dfx logfc")
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help="mean_coefs or mean_roc_auc_scores")
 parser.add_argument('--fs-top-cutoff', type=int, default=50, help='fs top ranked features cutoff')
 parser.add_argument('--fs-gscv-splits', type=int, default=20, help='num fs gscv splits')
-parser.add_argument('--fs-gscv-size', type=int, default=0.2, help='fs gscv cv size')
+parser.add_argument('--fs-gscv-size', type=int, default=0.3, help='fs gscv cv size')
 parser.add_argument('--fs-gscv-jobs', type=int, default=-1, help="num gscv parallel jobs")
 parser.add_argument('--fs-gscv-verbose', type=int, default=0, help="gscv verbosity")
 parser.add_argument('--tr-gscv-splits', type=int, default=20, help='num tr gscv splits')
-parser.add_argument('--tr-gscv-size', type=int, default=0.2, help='tr gscv size')
+parser.add_argument('--tr-gscv-size', type=int, default=0.3, help='tr gscv size')
 parser.add_argument('--tr-gscv-verbose', type=int, default=2, help="tr gscv verbosity")
-parser.add_argument('--tr-rfecv-splits', type=int, default=32, help='num tr rfecv splits')
-parser.add_argument('--tr-rfecv-size', type=int, default=0.2, help='rfecv cv size')
+parser.add_argument('--tr-rfecv-splits', type=int, default=16, help='num tr rfecv splits')
+parser.add_argument('--tr-rfecv-size', type=int, default=0.3, help='rfecv cv size')
 parser.add_argument('--tr-rfecv-jobs', type=int, default=-1, help="num tr rfecv parallel jobs")
 parser.add_argument('--tr-rfecv-step', type=float, default=1, help="tr rfecv step")
 parser.add_argument('--tr-rfecv-verbose', type=int, default=0, help="tr rfecv verbosity")
@@ -75,7 +75,7 @@ y_tr = np.array(r_filter_eset_relapse_labels(eset_gex_tr), dtype=int)
 base.load("data/" + args.eset_te + ".Rda")
 eset_gex_te = r_filter_eset_ctrl_probesets(robjects.globalenv[args.eset_te])
 X_te = np.array(base.t(biobase.exprs(eset_gex_te)))
-y_te = np.array(r_filter_eset_relapse_labels(eset_gex_te))
+y_te = np.array(r_filter_eset_relapse_labels(eset_gex_te), dtype=int)
 feature_names = np.array(biobase.featureNames(eset_gex_tr))
 fs_data = {
     'feature_idxs': [],
@@ -87,7 +87,7 @@ print_fs_header = True
 while fs_split_count < args.fs_splits:
     fs_idxs, cv_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_cv_size, stratify=y_tr)
     if print_fs_header:
-        print('FS:', fs_idxs.size, ' CV:', cv_idxs.size)
+        print('FS:', '%3s' % fs_idxs.size, ' CV:', '%3s' % cv_idxs.size)
         print_fs_header = False
     feature_idxs = np.array(
         r_get_dfx_features(
@@ -164,16 +164,14 @@ feature_rank_data = sorted(
         fs_data['feature_' + args.fs_rank_meth],
         fs_feature_idxs,
         fs_feature_names,
-        r_get_gene_symbols(eset_gex_tr, robjects.StrVector(fs_feature_names))
     ),
     reverse=True
 )
 fs_top_cutoff = min(args.fs_top_cutoff, len(fs_feature_idxs))
 print('Num Features:', fs_top_cutoff, '/', len(fs_feature_idxs))
 feature_rank_data = feature_rank_data[:fs_top_cutoff]
-# for rank, idx, name, symbol in feature_rank_data: print(name, "\t", symbol, "\t", rank)
-fs_feature_idxs = np.array([x for _, x, _, _ in feature_rank_data], dtype=int)
-fs_feature_names = np.array([x for _, _, x, _ in feature_rank_data], dtype=str)
+fs_feature_idxs = np.array([x for _, x, _ in feature_rank_data], dtype=int)
+fs_feature_names = np.array([x for _, _, x in feature_rank_data], dtype=str)
 # train and test classifier
 tr_gscv_clf = GridSearchCV(
     Pipeline([

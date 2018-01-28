@@ -35,20 +35,20 @@ parser.add_argument('--fs-splits', type=int, default=100, help='num fs splits')
 parser.add_argument('--fs-cv-size', type=float, default=0.2, help="fs cv size")
 parser.add_argument('--fs-dfx-min', type=int, default=10, help='fs min num dfx features')
 parser.add_argument('--fs-dfx-max', type=int, default=100, help='fs max num dfx features')
-parser.add_argument('--fs-dfx-pval', type=float, default=0.05, help="min dfx adj p value")
-parser.add_argument('--fs-dfx-lfc', type=float, default=1, help="min dfx logfc")
+parser.add_argument('--fs-dfx-pval', type=float, default=0.01, help="min dfx adj p value")
+parser.add_argument('--fs-dfx-lfc', type=float, default=0, help="min dfx logfc")
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help="mean_coefs or mean_roc_auc_scores")
 parser.add_argument('--fs-top-cutoff', type=int, default=15, help='fs top ranked features cutoff')
 parser.add_argument('--fs-gscv-splits', type=int, default=20, help='num fs gscv splits')
-parser.add_argument('--fs-gscv-size', type=int, default=0.2, help='fs gscv cv size')
+parser.add_argument('--fs-gscv-size', type=int, default=0.3, help='fs gscv cv size')
 parser.add_argument('--fs-gscv-jobs', type=int, default=-1, help="num gscv parallel jobs")
 parser.add_argument('--fs-gscv-verbose', type=int, default=0, help="gscv verbosity")
 parser.add_argument('--tr-splits', type=int, default=100, help='num tr splits')
 parser.add_argument('--tr-gscv-splits', type=int, default=20, help='num tr gscv splits')
-parser.add_argument('--tr-gscv-size', type=int, default=0.2, help='tr gscv size')
+parser.add_argument('--tr-gscv-size', type=int, default=0.3, help='tr gscv size')
 parser.add_argument('--tr-gscv-verbose', type=int, default=0, help="tr gscv verbosity")
 parser.add_argument('--tr-rfecv-splits', type=int, default=32, help='num tr rfecv splits')
-parser.add_argument('--tr-rfecv-size', type=int, default=0.2, help='rfecv cv size')
+parser.add_argument('--tr-rfecv-size', type=int, default=0.3, help='rfecv cv size')
 parser.add_argument('--tr-rfecv-jobs', type=int, default=-1, help="num tr rfecv parallel jobs")
 parser.add_argument('--tr-rfecv-step', type=float, default=1, help="tr rfecv step")
 parser.add_argument('--tr-rfecv-verbose', type=int, default=0, help="tr rfecv verbosity")
@@ -77,7 +77,7 @@ y_tr = np.array(r_filter_eset_relapse_labels(eset_gex_tr), dtype=int)
 base.load("data/" + args.eset_te + ".Rda")
 eset_gex_te = r_filter_eset_ctrl_probesets(robjects.globalenv[args.eset_te])
 X_te = np.array(base.t(biobase.exprs(eset_gex_te)))
-y_te = np.array(r_filter_eset_relapse_labels(eset_gex_te))
+y_te = np.array(r_filter_eset_relapse_labels(eset_gex_te), dtype=int)
 feature_names = np.array(biobase.featureNames(eset_gex_tr))
 fs_data = {
     'feature_idxs': [],
@@ -100,11 +100,7 @@ while fs_split_count < args.fs_splits:
     tr_idxs = np.concatenate((y_tr_r_idxs[fs_num_r:(fs_num_r + tr_num)], y_tr_n_idxs[fs_num_n:(fs_num_n + tr_num)]))
     cv_idxs = np.concatenate((y_tr_r_idxs[(fs_num_r + tr_num):], y_tr_n_idxs[(fs_num_n + tr_num):]))
     if print_fs_header:
-        print(
-            'FS:', fs_num_r, '/', fs_num_n,
-            ' TR:', tr_num, '/', tr_num,
-            ' CV:', cv_num, '/', cv_num,
-        )
+        print('FS:', fs_num_r, '/', fs_num_n, ' TR:', tr_num, '/', tr_num, ' CV:', cv_num, '/', cv_num)
         print_fs_header = False
     feature_idxs = np.array(
         r_get_dfx_features(
@@ -181,7 +177,7 @@ feature_rank_data = sorted(
         fs_data['feature_' + args.fs_rank_meth],
         fs_feature_idxs,
         fs_feature_names,
-        r_get_gene_symbols(eset_gex_tr, robjects.StrVector(fs_feature_names))
+        r_get_gene_symbols(eset_gex_tr, robjects.StrVector(fs_feature_names)),
     ),
     reverse=True
 )
