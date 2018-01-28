@@ -62,7 +62,7 @@ getDfxFeatures <- function(eset, numbers=FALSE, min.p.value=0.05, min.lfc=1, max
     contrast.matrix <- makeContrasts(RelapseVsNoRelapse=Relapse-NoRelapse, levels=design)
     fit.contrasts <- contrasts.fit(fit, contrast.matrix)
     fit.b <- eBayes(fit.contrasts)
-    feature.names <- rownames(topTable(fit.b, number=max.num.features, p.value=min.p.value, lfc=min.lfc, adjust.method="BH", sort.by="logFC"))
+    feature.names <- rownames(topTable(fit.b, number=max.num.features, p.value=min.p.value, lfc=min.lfc, adjust.method="BH", sort.by="P"))
     if (numbers) {
         return(which(featureNames(eset) %in% feature.names))
     }

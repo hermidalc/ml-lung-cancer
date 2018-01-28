@@ -1,5 +1,5 @@
 
-unbiased_stICA <- function(X,k=10,alpha=0.5) {
+unbiased_stICA <- function(X,k=10,alpha=.5) {
 
 #
 #    [A B W] = unbiased_stICA(X, k,alpha)

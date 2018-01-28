@@ -1,30 +1,48 @@
 #!/usr/bin/env R
 
 suppressPackageStartupMessages(library("Biobase"))
-suppressPackageStartupMessages(library("genefilter"))
-
 source("normFact.R")
-load("data/eset_gex_merged.Rda")
-pheno <- pData(eset_gex_merged)
-exprs <- exprs(eset_gex_merged)
-batch <- pheno$Batch
-icaobj <- normFact("stICA", exprs, batch, "categorical", k=20, alpha=0.5)
-exprs_ica <- icaobj$Xn
-eset_gex_merged_ica <- eset_gex_merged
-exprs(eset_gex_merged_ica) <- exprs_ica
-# filter out control probesets
-eset_gex_merged_ica <- featureFilter(eset_gex_merged_ica,
-    require.entrez=FALSE,
-    require.GOBP=FALSE, require.GOCC=FALSE,
-    require.GOMF=FALSE, require.CytoBand=FALSE,
-    remove.dupEntrez=FALSE, feature.exclude="^AFFX"
-)
-eset_gex_gse31210_ica <- eset_gex_merged_ica[, eset_gex_merged_ica$Batch == 1]
-eset_gex_gse30219_ica <- eset_gex_merged_ica[, eset_gex_merged_ica$Batch == 2]
-eset_gex_gse37745_ica <- eset_gex_merged_ica[, eset_gex_merged_ica$Batch == 3]
-eset_gex_gse50081_ica <- eset_gex_merged_ica[, eset_gex_merged_ica$Batch == 4]
-save(eset_gex_merged_ica, file="data/eset_gex_merged_ica.Rda")
-save(eset_gex_gse31210_ica, file="data/eset_gex_gse31210_ica.Rda")
-save(eset_gex_gse30219_ica, file="data/eset_gex_gse30219_ica.Rda")
-save(eset_gex_gse37745_ica, file="data/eset_gex_gse37745_ica.Rda")
-save(eset_gex_gse50081_ica, file="data/eset_gex_gse50081_ica.Rda")
+
+load("data/eset_gex_gse31210_gse8894_gse30219_gse37745.Rda")
+ptr <- pData(eset_gex_gse31210_gse8894_gse30219_gse37745)
+Xtr <- exprs(eset_gex_gse31210_gse8894_gse30219_gse37745)
+stica0obj <- normFact("stICA", Xtr, ptr$Batch, "categorical", ref2=ptr$Relapse, refType2="categorical", alpha=0)
+stica025obj <- normFact("stICA", Xtr, ptr$Batch, "categorical", ref2=ptr$Relapse, refType2="categorical", alpha=0.25)
+stica05obj <- normFact("stICA", Xtr, ptr$Batch, "categorical", ref2=ptr$Relapse, refType2="categorical", alpha=0.5)
+stica075obj <- normFact("stICA", Xtr, ptr$Batch, "categorical", ref2=ptr$Relapse, refType2="categorical", alpha=0.75)
+stica1obj <- normFact("stICA", Xtr, ptr$Batch, "categorical", ref2=ptr$Relapse, refType2="categorical", alpha=1)
+eset_gex_gse31210_gse8894_gse30219_gse37745_stica0_tr <- eset_gex_gse31210_gse8894_gse30219_gse37745
+eset_gex_gse31210_gse8894_gse30219_gse37745_stica025_tr <- eset_gex_gse31210_gse8894_gse30219_gse37745
+eset_gex_gse31210_gse8894_gse30219_gse37745_stica05_tr <- eset_gex_gse31210_gse8894_gse30219_gse37745
+eset_gex_gse31210_gse8894_gse30219_gse37745_stica075_tr <- eset_gex_gse31210_gse8894_gse30219_gse37745
+eset_gex_gse31210_gse8894_gse30219_gse37745_stica1_tr <- eset_gex_gse31210_gse8894_gse30219_gse37745
+exprs(eset_gex_gse31210_gse8894_gse30219_gse37745_stica0_tr) <- stica0obj$Xn
+exprs(eset_gex_gse31210_gse8894_gse30219_gse37745_stica025_tr) <- stica025obj$Xn
+exprs(eset_gex_gse31210_gse8894_gse30219_gse37745_stica05_tr) <- stica05obj$Xn
+exprs(eset_gex_gse31210_gse8894_gse30219_gse37745_stica075_tr) <- stica075obj$Xn
+exprs(eset_gex_gse31210_gse8894_gse30219_gse37745_stica1_tr) <- stica1obj$Xn
+save(eset_gex_gse31210_gse8894_gse30219_gse37745_stica0_tr, file="data/eset_gex_gse31210_gse8894_gse30219_gse37745_stica0_tr.Rda")
+save(eset_gex_gse31210_gse8894_gse30219_gse37745_stica025_tr, file="data/eset_gex_gse31210_gse8894_gse30219_gse37745_stica025_tr.Rda")
+save(eset_gex_gse31210_gse8894_gse30219_gse37745_stica05_tr, file="data/eset_gex_gse31210_gse8894_gse30219_gse37745_stica05_tr.Rda")
+save(eset_gex_gse31210_gse8894_gse30219_gse37745_stica075_tr, file="data/eset_gex_gse31210_gse8894_gse30219_gse37745_stica075_tr.Rda")
+save(eset_gex_gse31210_gse8894_gse30219_gse37745_stica1_tr, file="data/eset_gex_gse31210_gse8894_gse30219_gse37745_stica1_tr.Rda")
+load("data/eset_gex_gse50081.Rda")
+Xte <- exprs(eset_gex_gse50081)
+eset_gex_gse50081_stica0_te <- eset_gex_gse50081
+eset_gex_gse50081_stica025_te <- eset_gex_gse50081
+eset_gex_gse50081_stica05_te <- eset_gex_gse50081
+eset_gex_gse50081_stica075_te <- eset_gex_gse50081
+eset_gex_gse50081_stica1_te <- eset_gex_gse50081
+exprs(eset_gex_gse50081_stica0_te) <- stica0obj$U %*% t((t(Xte) %*% stica0obj$U) %*% solve(t(stica0obj$U) %*% stica0obj$U))
+exprs(eset_gex_gse50081_stica025_te) <- stica025obj$U %*% t((t(Xte) %*% stica025obj$U) %*% solve(t(stica025obj$U) %*% stica025obj$U))
+exprs(eset_gex_gse50081_stica05_te) <- stica05obj$U %*% t((t(Xte) %*% stica05obj$U) %*% solve(t(stica05obj$U) %*% stica05obj$U))
+exprs(eset_gex_gse50081_stica075_te) <- stica075obj$U %*% t((t(Xte) %*% stica075obj$U) %*% solve(t(stica075obj$U) %*% stica075obj$U))
+exprs(eset_gex_gse50081_stica0_te) <- stica1obj$U %*% t((t(Xte) %*% stica1obj$U) %*% solve(t(stica1obj$U) %*% stica1obj$U))
+save(eset_gex_gse50081_stica0_te, file="data/eset_gex_gse50081_stica0_te.Rda")
+save(eset_gex_gse50081_stica025_te, file="data/eset_gex_gse50081_stica025_te.Rda")
+save(eset_gex_gse50081_stica05_te, file="data/eset_gex_gse50081_stica05_te.Rda")
+save(eset_gex_gse50081_stica075_te, file="data/eset_gex_gse50081_stica075_te.Rda")
+save(eset_gex_gse50081_stica1_te, file="data/eset_gex_gse50081_stica1_te.Rda")
+
+# Vte = dot(dot(Xte.T,U),np.linalg.inv(dot(U.T,U)))
+# Xte_n = dot(U,Vte.T)
