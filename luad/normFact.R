@@ -5,7 +5,7 @@ normFact <- function(fact,X,ref,refType,k=20,t=0.5,ref2=NULL,refType2=NULL,t2=0.
 #
 #    Inputs:
 #    - fact : factorization method, 'SVD' or 'stICA'
-#    - X :(matrix n*p) samples*features matrix to normalize
+#    - X :(matrix n*p) features*samples matrix to normalize
 #    - ref: (vector n) variable representing the information we want to remove from  X
 #    - refType : type of ref, 'categorical' or 'continuous' to indicates which linear model to use (class means or linear regression)
 #    - k: rank of the low-rank decomposition

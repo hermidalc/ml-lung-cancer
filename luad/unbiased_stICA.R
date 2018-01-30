@@ -1,5 +1,5 @@
 
-unbiased_stICA <- function(X,k=10,alpha=.5) {
+unbiased_stICA <- function(X,k=20,alpha=0.5) {
 
 #
 #    [A B W] = unbiased_stICA(X, k,alpha)
@@ -10,7 +10,7 @@ unbiased_stICA <- function(X,k=10,alpha=.5) {
 # - X (matrix p*n) is the matrix to factorise
 # - alpha (scalar between 0 and 1) is the trade-off between spatial ICA (alpha = 0) et temporal ICA
 # (alpha=1) (default alpha =0.5)
-# - k (scalar integer) is the number of components to estimate (default = 10)
+# - k (scalar integer) is the number of components to estimate (default = 20)
 #
 # Ouputs:
 # - A (matrix p*k), B (matrix n*k) such that A*B' is an approximation of X
@@ -58,13 +58,11 @@ unbiased_stICA <- function(X,k=10,alpha=.5) {
       #  'Spatiotemporal blind source separation using double-sided approximate joint diagonalization',
       #  EUSIPCO 2005 (Antalya), 2005.
 
-
       n <- nrow(X)
       t <- ncol(X)
 
       M <- array(0,c(n,n,n*(n+1)/2))
       scale <- matrix(1,n,1)/t  # for convenience
-
 
       R <- cov(t(X)) # covariance
 
@@ -93,14 +91,8 @@ unbiased_stICA <- function(X,k=10,alpha=.5) {
 
    }
 
-
-
-
-
-
    p <- nrow(X)
    n <- ncol(X)
-
 
    dimmin <- min(n,p)
 
@@ -112,7 +104,6 @@ unbiased_stICA <- function(X,k=10,alpha=.5) {
    }
 
    # Remove the spatiotemporal mean
-
    Xc <- X - matrix(rep(colMeans(X,dims=1),p),nrow = p,byrow=T);
    Xc <- Xc - matrix(rep(rowMeans(Xc,dims=1),n),nrow = p);
 
@@ -122,7 +113,6 @@ unbiased_stICA <- function(X,k=10,alpha=.5) {
    D <- diag(udv$d[1:k]); if (k==1) {D <- udv$d[1]}
    U <- udv$u;
    V <- udv$v;
-
 
    # Estimation of the cumulant matrices
    nummat <- k*(k+1)/2;
@@ -134,23 +124,16 @@ unbiased_stICA <- function(X,k=10,alpha=.5) {
    M[,,1:nummat] <- jadeCummulantMatrices(Bt);
    M[,,(nummat+1):(2*nummat)] <- jadeCummulantMatrices(At)
 
-
-
-
    # normalization within the groups in order to allow for comparisons using
    # alpha
    M[,,1:nummat] <- alpha*M[,,1:nummat]/mean(sqrt(apply(M[,,1:nummat]*M[,,1:nummat],3,sum)));
    M[,,(nummat+1):(2*nummat)] <- (1-alpha)*M[,,(nummat+1):(2*nummat)]/mean(sqrt(apply(M[,,(nummat+1):(2*nummat)]*M[,,(nummat+1):(2*nummat)],3,sum)));
 
-
-
    # Joint diagonalization
-       Worth <- rjd(M,eps = 1e-06, maxiter = 1000);
-      Wo <-t (Worth$V);
+   Worth <- rjd(M,eps = 1e-06, maxiter = 1000);
+   Wo <-t (Worth$V);
 
-
-   #     Computation of A and B
-
+   # Computation of A and B
    A0 <- U %*% D^(alpha) %*% solve(Wo);
    B0 <- V%*% D^(1-alpha) %*% t(Wo);
    if (alpha == 1) { B0 <- V %*% t(Wo)}
@@ -166,10 +149,6 @@ unbiased_stICA <- function(X,k=10,alpha=.5) {
    Bfin <- B0 + matrix(rep(meanB,n),nrow = n,byrow=T)
    Afin <- A0 + matrix(rep(meanA,p),nrow = p,byrow=T)
 
-
-
    return(list(A=Afin,B=Bfin,W=Wo))
-
-
 
 }
