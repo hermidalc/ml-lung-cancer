@@ -61,7 +61,7 @@ normFact <- function(fact,X,ref,refType,k=20,t=0.5,ref2=NULL,refType2=NULL,t2=0.
         for (i in 1:length(refType2)) {
              idx2 = c(idx2,which(factR2_2$allR2[,i]>t2[i]))
         }
-        idx2keep2 =intersect(idx2remove,idx2)
+        idx2keep2 = intersect(idx2remove,idx2)
         print(paste("Keeping",length(idx2keep2), "components with R2(ref2) higher than",t2))
         idx2remove = setdiff(idx2remove,idx2keep2)
         idx2keep = union(idx2keep,idx2keep2)
