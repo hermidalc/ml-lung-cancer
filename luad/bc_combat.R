@@ -23,7 +23,7 @@ for (i in 1:length(eset_tr_strs)) {
     exprs(eset_tr_cbt) <- t(cbt.params$xadj)
     eset_tr_cbt_str <- paste0(eset_tr_strs[i], "_tr_cbt")
     assign(eset_tr_cbt_str, eset_tr_cbt)
-    save(get(eset_tr_cbt_str), file=paste0("data/", eset_tr_cbt_str, ".Rda"))
+    save(list=eset_tr_cbt_str, file=paste0("data/", eset_tr_cbt_str, ".Rda"))
     load(paste0("data/", eset_te_strs[i], ".Rda"))
     ptr <- pData(get(eset_te_strs[i]))
     Xte <- exprs(get(eset_te_strs[i]))
@@ -39,7 +39,7 @@ for (i in 1:length(eset_tr_strs)) {
     exprs(eset_te_cbt) <- t(combatbaaddon(cbt.params, t(Xte), bte))
     eset_te_cbt_str <- paste0(eset_te_strs[i], "_te_cbt")
     assign(eset_te_cbt_str, eset_te_cbt)
-    save(get(eset_te_cbt_str), file=paste0("data/", eset_te_cbt_str, ".Rda"))
+    save(list=eset_te_cbt_str, file=paste0("data/", eset_te_cbt_str, ".Rda"))
 }
 
 # pheno <- pData(eset_gex_merged)
