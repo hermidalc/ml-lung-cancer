@@ -3,156 +3,44 @@
 suppressPackageStartupMessages(library("Biobase"))
 # suppressPackageStartupMessages(library("sva"))
 suppressPackageStartupMessages(library("bapred"))
+source("config.R")
 
-load("data/eset_gex_gse31210_gse8894_gse30219_gse37745.Rda")
-ptr <- pData(eset_gex_gse31210_gse8894_gse30219_gse37745)
-Xtr <- exprs(eset_gex_gse31210_gse8894_gse30219_gse37745)
-btr <- ptr$Batch
-butr <- sort(unique(btr))
-for (i in 1:length(butr)) {
-    if (i != butr[i]) {
-        btr <- replace(btr, btr == butr[i], i)
+for (i in 1:length(eset_tr_strs)) {
+    load(paste0("data/", eset_tr_strs[i], ".Rda"))
+    ptr <- pData(get(eset_tr_strs[i]))
+    Xtr <- exprs(get(eset_tr_strs[i]))
+    ytr <- as.factor(ptr$Relapse + 1)
+    btr <- ptr$Batch
+    butr <- sort(unique(btr))
+    for (i in 1:length(butr)) {
+        if (i != butr[i]) {
+            btr <- replace(btr, btr == butr[i], i)
+        }
     }
-}
-btr <- as.factor(btr)
-cbt.params <- combatba(t(Xtr), btr)
-eset_gex_gse31210_gse8894_gse30219_gse37745_cbt_tr <- eset_gex_gse31210_gse8894_gse30219_gse37745
-exprs(eset_gex_gse31210_gse8894_gse30219_gse37745_cbt_tr) <- t(cbt.params$xadj)
-save(eset_gex_gse31210_gse8894_gse30219_gse37745_cbt_tr, file="data/eset_gex_gse31210_gse8894_gse30219_gse37745_cbt_tr.Rda")
-load("data/eset_gex_gse50081.Rda")
-pte <- pData(eset_gex_gse50081)
-Xte <- exprs(eset_gex_gse50081)
-bte <- pte$Batch
-bute <- sort(unique(bte))
-for (i in 1:length(bute)) {
-    if (i != bute[i]) {
-        bte <- replace(bte, bte == bute[i], i)
+    btr <- as.factor(btr)
+    cbt.params <- combatba(t(Xtr), btr)
+    eset_tr_cbt <- get(eset_tr_strs[i])
+    exprs(eset_tr_cbt) <- t(cbt.params$xadj)
+    eset_tr_cbt_str <- paste0(eset_tr_strs[i], "_tr_cbt")
+    assign(eset_tr_cbt_str, eset_tr_cbt)
+    save(get(eset_tr_cbt_str), file=paste0("data/", eset_tr_cbt_str, ".Rda"))
+    load(paste0("data/", eset_te_strs[i], ".Rda"))
+    ptr <- pData(get(eset_te_strs[i]))
+    Xte <- exprs(get(eset_te_strs[i]))
+    bte <- pte$Batch
+    bute <- sort(unique(bte))
+    for (i in 1:length(bute)) {
+        if (i != bute[i]) {
+            bte <- replace(bte, bte == bute[i], i)
+        }
     }
+    bte <- as.factor(bte)
+    eset_te_cbt <- get(eset_te_strs[i])
+    exprs(eset_te_cbt) <- t(combatbaaddon(cbt.params, t(Xte), bte))
+    eset_te_cbt_str <- paste0(eset_te_strs[i], "_te_cbt")
+    assign(eset_te_cbt_str, eset_te_cbt)
+    save(get(eset_te_cbt_str), file=paste0("data/", eset_te_cbt_str, ".Rda"))
 }
-bte <- as.factor(bte)
-eset_gex_gse50081_cbt_te <- eset_gex_gse50081
-exprs(eset_gex_gse50081_cbt_te) <- t(combatbaaddon(cbt.params, t(Xte), bte))
-save(eset_gex_gse50081_cbt_te, file="data/eset_gex_gse50081_cbt_te.Rda")
-#
-load("data/eset_gex_gse31210_gse8894_gse30219_gse50081.Rda")
-ptr <- pData(eset_gex_gse31210_gse8894_gse30219_gse50081)
-Xtr <- exprs(eset_gex_gse31210_gse8894_gse30219_gse50081)
-btr <- ptr$Batch
-butr <- sort(unique(btr))
-for (i in 1:length(butr)) {
-    if (i != butr[i]) {
-        btr <- replace(btr, btr == butr[i], i)
-    }
-}
-btr <- as.factor(btr)
-cbt.params <- combatba(t(Xtr), btr)
-eset_gex_gse31210_gse8894_gse30219_gse50081_cbt_tr <- eset_gex_gse31210_gse8894_gse30219_gse50081
-exprs(eset_gex_gse31210_gse8894_gse30219_gse50081_cbt_tr) <- t(cbt.params$xadj)
-save(eset_gex_gse31210_gse8894_gse30219_gse50081_cbt_tr, file="data/eset_gex_gse31210_gse8894_gse30219_gse50081_cbt_tr.Rda")
-load("data/eset_gex_gse37745.Rda")
-pte <- pData(eset_gex_gse37745)
-Xte <- exprs(eset_gex_gse37745)
-bte <- pte$Batch
-bute <- sort(unique(bte))
-for (i in 1:length(bute)) {
-    if (i != bute[i]) {
-        bte <- replace(bte, bte == bute[i], i)
-    }
-}
-bte <- as.factor(bte)
-eset_gex_gse37745_cbt_te <- eset_gex_gse37745
-exprs(eset_gex_gse37745_cbt_te) <- t(combatbaaddon(cbt.params, t(Xte), bte))
-save(eset_gex_gse37745_cbt_te, file="data/eset_gex_gse37745_cbt_te.Rda")
-#
-load("data/eset_gex_gse31210_gse8894_gse37745_gse50081.Rda")
-ptr <- pData(eset_gex_gse31210_gse8894_gse37745_gse50081)
-Xtr <- exprs(eset_gex_gse31210_gse8894_gse37745_gse50081)
-btr <- ptr$Batch
-butr <- sort(unique(btr))
-for (i in 1:length(butr)) {
-    if (i != butr[i]) {
-        btr <- replace(btr, btr == butr[i], i)
-    }
-}
-btr <- as.factor(btr)
-cbt.params <- combatba(t(Xtr), btr)
-eset_gex_gse31210_gse8894_gse37745_gse50081_cbt_tr <- eset_gex_gse31210_gse8894_gse37745_gse50081
-exprs(eset_gex_gse31210_gse8894_gse37745_gse50081_cbt_tr) <- t(cbt.params$xadj)
-save(eset_gex_gse31210_gse8894_gse37745_gse50081_cbt_tr, file="data/eset_gex_gse31210_gse8894_gse37745_gse50081_cbt_tr.Rda")
-load("data/eset_gex_gse30219.Rda")
-pte <- pData(eset_gex_gse30219)
-Xte <- exprs(eset_gex_gse30219)
-bte <- pte$Batch
-bute <- sort(unique(bte))
-for (i in 1:length(bute)) {
-    if (i != bute[i]) {
-        bte <- replace(bte, bte == bute[i], i)
-    }
-}
-bte <- as.factor(bte)
-eset_gex_gse30219_cbt_te <- eset_gex_gse30219
-exprs(eset_gex_gse30219_cbt_te) <- t(combatbaaddon(cbt.params, t(Xte), bte))
-save(eset_gex_gse30219_cbt_te, file="data/eset_gex_gse30219_cbt_te.Rda")
-#
-load("data/eset_gex_gse31210_gse30219_gse37745_gse50081.Rda")
-ptr <- pData(eset_gex_gse31210_gse30219_gse37745_gse50081)
-Xtr <- exprs(eset_gex_gse31210_gse30219_gse37745_gse50081)
-btr <- ptr$Batch
-butr <- sort(unique(btr))
-for (i in 1:length(butr)) {
-    if (i != butr[i]) {
-        btr <- replace(btr, btr == butr[i], i)
-    }
-}
-btr <- as.factor(btr)
-cbt.params <- combatba(t(Xtr), btr)
-eset_gex_gse31210_gse30219_gse37745_gse50081_cbt_tr <- eset_gex_gse31210_gse30219_gse37745_gse50081
-exprs(eset_gex_gse31210_gse30219_gse37745_gse50081_cbt_tr) <- t(cbt.params$xadj)
-save(eset_gex_gse31210_gse30219_gse37745_gse50081_cbt_tr, file="data/eset_gex_gse31210_gse30219_gse37745_gse50081_cbt_tr.Rda")
-load("data/eset_gex_gse8894.Rda")
-pte <- pData(eset_gex_gse8894)
-Xte <- exprs(eset_gex_gse8894)
-bte <- pte$Batch
-bute <- sort(unique(bte))
-for (i in 1:length(bute)) {
-    if (i != bute[i]) {
-        bte <- replace(bte, bte == bute[i], i)
-    }
-}
-bte <- as.factor(bte)
-eset_gex_gse8894_cbt_te <- eset_gex_gse8894
-exprs(eset_gex_gse8894_cbt_te) <- t(combatbaaddon(cbt.params, t(Xte), bte))
-save(eset_gex_gse8894_cbt_te, file="data/eset_gex_gse8894_cbt_te.Rda")
-#
-load("data/eset_gex_gse8894_gse30219_gse37745_gse50081.Rda")
-ptr <- pData(eset_gex_gse8894_gse30219_gse37745_gse50081)
-Xtr <- exprs(eset_gex_gse8894_gse30219_gse37745_gse50081)
-btr <- ptr$Batch
-butr <- sort(unique(btr))
-for (i in 1:length(butr)) {
-    if (i != butr[i]) {
-        btr <- replace(btr, btr == butr[i], i)
-    }
-}
-btr <- as.factor(btr)
-cbt.params <- combatba(t(Xtr), btr)
-eset_gex_gse8894_gse30219_gse37745_gse50081_cbt_tr <- eset_gex_gse8894_gse30219_gse37745_gse50081
-exprs(eset_gex_gse8894_gse30219_gse37745_gse50081_cbt_tr) <- t(cbt.params$xadj)
-save(eset_gex_gse8894_gse30219_gse37745_gse50081_cbt_tr, file="data/eset_gex_gse8894_gse30219_gse37745_gse50081_cbt_tr.Rda")
-load("data/eset_gex_gse31210.Rda")
-pte <- pData(eset_gex_gse31210)
-Xte <- exprs(eset_gex_gse31210)
-bte <- pte$Batch
-bute <- sort(unique(bte))
-for (i in 1:length(bute)) {
-    if (i != bute[i]) {
-        bte <- replace(bte, bte == bute[i], i)
-    }
-}
-bte <- as.factor(bte)
-eset_gex_gse31210_cbt_te <- eset_gex_gse31210
-exprs(eset_gex_gse31210_cbt_te) <- t(combatbaaddon(cbt.params, t(Xte), bte))
-save(eset_gex_gse31210_cbt_te, file="data/eset_gex_gse31210_cbt_te.Rda")
 
 # pheno <- pData(eset_gex_merged)
 # exprs <- exprs(eset_gex_merged)
