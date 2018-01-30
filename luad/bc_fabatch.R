@@ -17,12 +17,13 @@ for (i in 1:length(eset_tr_strs)) {
         }
     }
     btr <- as.factor(btr)
-    fab.params <- fabatch(t(Xtr), ytr, btr)
+    fab_params <- fabatch(t(Xtr), ytr, btr)
     eset_tr_fab <- get(eset_tr_strs[i])
-    exprs(eset_tr_fab) <- t(fab.params$xadj)
+    exprs(eset_tr_fab) <- t(fab_params$xadj)
     eset_tr_fab_str <- paste0(eset_tr_strs[i], "_tr_fab")
     assign(eset_tr_fab_str, eset_tr_fab)
     save(list=eset_tr_fab_str, file=paste0("data/", eset_tr_fab_str, ".Rda"))
+    save(list=fab_params, file=paste0("data/", eset_tr_fab_str, "_params.Rda"))
     load(paste0("data/", eset_te_strs[i], ".Rda"))
     ptr <- pData(get(eset_te_strs[i]))
     Xte <- exprs(get(eset_te_strs[i]))
@@ -35,7 +36,7 @@ for (i in 1:length(eset_tr_strs)) {
     }
     bte <- as.factor(bte)
     eset_te_fab <- get(eset_te_strs[i])
-    exprs(eset_te_fab) <- t(fabatchaddon(fab.params, t(Xte), bte))
+    exprs(eset_te_fab) <- t(fabatchaddon(fab_params, t(Xte), bte))
     eset_te_fab_str <- paste0(eset_te_strs[i], "_te_fab")
     assign(eset_te_fab_str, eset_te_fab)
     save(list=eset_te_fab_str, file=paste0("data/", eset_te_fab_str, ".Rda"))
