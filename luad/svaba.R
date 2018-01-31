@@ -1,8 +1,9 @@
-svaba <- function(x, batch, mod, mod0, numsv, controls=NULL, algorithm="exact") {
+svaba <- function(x, batch, mod, mod0, algorithm="fast", controls=NULL) {
     if(any(is.na(x)))
         stop("Data contains missing values.")
     if(!is.matrix(x))
         stop("'x' has to be of class 'matrix'.")
+    numsv <- sva::num.sv(t(x), mod, method="be", seed=1982)
     if (numsv != 0) {
         if (!is.null(controls)) {
           svobj <- sva::sva(t(x), mod, mod0, method="supervised", n.sv=numsv, controls=controls)
@@ -45,7 +46,7 @@ svabaaddon <- function(params, x) {
         stop("'x' has to be of class 'matrix'.")
     if(class(params) != "svatrain")
         stop("Input parameter 'params' has to be of class 'svatrain'.")
-    if(ncol(params$xadj) != ncol(x))
+    if(ncol(params$xtrain) != ncol(x))
         stop("Number of variables in test data matrix different to that of training data matrix.")
     if (!is.null(params$svobj)) {
         fsvaobj <- sva::fsva(t(params$xtrain), params$mod, params$svobj, newdat=t(x), method=params$algorithm)

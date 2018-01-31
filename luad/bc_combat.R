@@ -12,9 +12,9 @@ for (i in 1:length(eset_tr_strs)) {
     ytr <- as.factor(ptr$Relapse + 1)
     btr <- ptr$Batch
     butr <- sort(unique(btr))
-    for (i in 1:length(butr)) {
-        if (i != butr[i]) {
-            btr <- replace(btr, btr == butr[i], i)
+    for (j in 1:length(butr)) {
+        if (j != butr[j]) {
+            btr <- replace(btr, btr == butr[j], j)
         }
     }
     btr <- as.factor(btr)
@@ -24,15 +24,15 @@ for (i in 1:length(eset_tr_strs)) {
     eset_tr_cbt_str <- paste0(eset_tr_strs[i], "_tr_cbt")
     assign(eset_tr_cbt_str, eset_tr_cbt)
     save(list=eset_tr_cbt_str, file=paste0("data/", eset_tr_cbt_str, ".Rda"))
-    save(list=cbt_params, file=paste0("data/", eset_tr_cbt_str, "_params.Rda"))
+    save(cbt_params, file=paste0("data/", eset_tr_cbt_str, "_params.Rda"))
     load(paste0("data/", eset_te_strs[i], ".Rda"))
     ptr <- pData(get(eset_te_strs[i]))
     Xte <- exprs(get(eset_te_strs[i]))
     bte <- pte$Batch
     bute <- sort(unique(bte))
-    for (i in 1:length(bute)) {
-        if (i != bute[i]) {
-            bte <- replace(bte, bte == bute[i], i)
+    for (j in 1:length(bute)) {
+        if (j != bute[j]) {
+            bte <- replace(bte, bte == bute[j], j)
         }
     }
     bte <- as.factor(bte)

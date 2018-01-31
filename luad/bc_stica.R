@@ -18,7 +18,7 @@ for (i in 1:length(eset_tr_strs)) {
         eset_tr_stica_str <- paste0(eset_tr_strs[i], "_tr_stica", alpha_str)
         assign(eset_tr_stica_str, eset_tr_stica)
         save(list=eset_tr_stica_str, file=paste0("data/", eset_tr_stica_str, ".Rda"))
-        save(list=sticaobj, file=paste0("data/", eset_tr_stica_str, "_obj.Rda"))
+        save(sticaobj, file=paste0("data/", eset_tr_stica_str, "_obj.Rda"))
         eset_te_stica <- get(eset_te_strs[i])
         # Renard et al stICA IEEE 2017 paper code add-on batch effect correction
         # Vte = dot(dot(Xte.T,U),np.linalg.inv(dot(U.T,U)))
