@@ -6,6 +6,9 @@ suppressPackageStartupMessages(library("bapred"))
 source("config.R")
 
 for (i in 1:length(eset_tr_strs)) {
+    eset_tr_cbt_str <- paste0(eset_tr_strs[i], "_tr_cbt")
+    eset_te_cbt_str <- paste0(eset_te_strs[i], "_te_cbt")
+    print(paste(eset_tr_cbt_str, "->", eset_te_cbt_str))
     load(paste0("data/", eset_tr_strs[i], ".Rda"))
     ptr <- pData(get(eset_tr_strs[i]))
     Xtr <- exprs(get(eset_tr_strs[i]))
@@ -21,12 +24,13 @@ for (i in 1:length(eset_tr_strs)) {
     cbt_params <- combatba(t(Xtr), btr)
     eset_tr_cbt <- get(eset_tr_strs[i])
     exprs(eset_tr_cbt) <- t(cbt_params$xadj)
-    eset_tr_cbt_str <- paste0(eset_tr_strs[i], "_tr_cbt")
     assign(eset_tr_cbt_str, eset_tr_cbt)
     save(list=eset_tr_cbt_str, file=paste0("data/", eset_tr_cbt_str, ".Rda"))
-    save(cbt_params, file=paste0("data/", eset_tr_cbt_str, "_params.Rda"))
+    eset_tr_cbt_params_str <- paste0(eset_tr_cbt_str, "_params")
+    assign(eset_tr_cbt_params_str, cbt_params)
+    save(list=eset_tr_cbt_params_str, file=paste0("data/", eset_tr_cbt_params_str, ".Rda"))
     load(paste0("data/", eset_te_strs[i], ".Rda"))
-    ptr <- pData(get(eset_te_strs[i]))
+    pte <- pData(get(eset_te_strs[i]))
     Xte <- exprs(get(eset_te_strs[i]))
     bte <- pte$Batch
     bute <- sort(unique(bte))
@@ -38,14 +42,8 @@ for (i in 1:length(eset_tr_strs)) {
     bte <- as.factor(bte)
     eset_te_cbt <- get(eset_te_strs[i])
     exprs(eset_te_cbt) <- t(combatbaaddon(cbt_params, t(Xte), bte))
-    eset_te_cbt_str <- paste0(eset_te_strs[i], "_te_cbt")
     assign(eset_te_cbt_str, eset_te_cbt)
     save(list=eset_te_cbt_str, file=paste0("data/", eset_te_cbt_str, ".Rda"))
 }
 
-# pheno <- pData(eset_gex_merged)
-# exprs <- exprs(eset_gex_merged)
-# batch <- pheno$Batch
 # exprs_cbt <- ComBat(dat=exprs, batch=batch, mod=NULL, par.prior=TRUE, prior.plots=FALSE)
-# eset_gex_merged_cbt <- eset_gex_merged
-# exprs(eset_gex_merged_cbt) <- exprs_cbt
