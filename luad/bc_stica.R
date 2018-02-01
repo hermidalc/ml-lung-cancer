@@ -11,11 +11,11 @@ for (i in 1:length(eset_tr_strs)) {
     Xtr <- exprs(get(eset_tr_strs[i]))
     Xte <- exprs(get(eset_te_strs[i]))
     for (alpha in stica_alphas) {
+        alpha_str <- gsub("[^0-9]", "", alpha)
         eset_tr_stica_str <- paste0(eset_tr_strs[i], "_tr_stica", alpha_str)
         eset_te_stica_str <- paste0(eset_te_strs[i], "_te_stica", alpha_str)
         print(paste(eset_tr_stica_str, "->", eset_te_stica_str))
         stica_obj <- normFact("stICA", Xtr, ptr$Batch, "categorical", ref2=ptr$Relapse, refType2="categorical", alpha=alpha)
-        alpha_str <- gsub("[^0-9]", "", alpha)
         eset_tr_stica <- get(eset_tr_strs[i])
         exprs(eset_tr_stica) <- stica_obj$Xn
         assign(eset_tr_stica_str, eset_tr_stica)
