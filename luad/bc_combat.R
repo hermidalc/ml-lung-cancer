@@ -21,14 +21,14 @@ for (i in 1:length(eset_tr_strs)) {
         }
     }
     btr <- as.factor(btr)
-    cbt_params <- combatba(t(Xtr), btr)
+    cbt_obj <- combatba(t(Xtr), btr)
     eset_tr_cbt <- get(eset_tr_strs[i])
-    exprs(eset_tr_cbt) <- t(cbt_params$xadj)
+    exprs(eset_tr_cbt) <- t(cbt_obj$xadj)
     assign(eset_tr_cbt_str, eset_tr_cbt)
     save(list=eset_tr_cbt_str, file=paste0("data/", eset_tr_cbt_str, ".Rda"))
-    eset_tr_cbt_params_str <- paste0(eset_tr_cbt_str, "_params")
-    assign(eset_tr_cbt_params_str, cbt_params)
-    save(list=eset_tr_cbt_params_str, file=paste0("data/", eset_tr_cbt_params_str, ".Rda"))
+    eset_tr_cbt_obj_str <- paste0(eset_tr_cbt_str, "_obj")
+    assign(eset_tr_cbt_obj_str, cbt_obj)
+    save(list=eset_tr_cbt_obj_str, file=paste0("data/", eset_tr_cbt_obj_str, ".Rda"))
     load(paste0("data/", eset_te_strs[i], ".Rda"))
     pte <- pData(get(eset_te_strs[i]))
     Xte <- exprs(get(eset_te_strs[i]))
@@ -41,7 +41,7 @@ for (i in 1:length(eset_tr_strs)) {
     }
     bte <- as.factor(bte)
     eset_te_cbt <- get(eset_te_strs[i])
-    exprs(eset_te_cbt) <- t(combatbaaddon(cbt_params, t(Xte), bte))
+    exprs(eset_te_cbt) <- t(combatbaaddon(cbt_obj, t(Xte), bte))
     assign(eset_te_cbt_str, eset_te_cbt)
     save(list=eset_te_cbt_str, file=paste0("data/", eset_te_cbt_str, ".Rda"))
 }

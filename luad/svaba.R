@@ -19,16 +19,16 @@ svaba <- function(x, batch, mod, mod0, algorithm="fast", controls=NULL) {
         # gammahat <- (t(x) %*% mod %*% solve(t(mod) %*% mod))[, (nmod + 1):(nmod + numsv)]
         # db = t(x) - gammahat %*% t(svobj$sv)
         # xadj <- t(db)
-        params <- list(xadj=xadj, xtrain=x, mod=mod, svobj=svobj, algorithm=algorithm)
+        sva_obj <- list(xadj=xadj, xtrain=x, mod=mod, svobj=svobj, algorithm=algorithm)
     }
     else {
         warning("Estimated number of factors was zero.")
-        params <- list(xadj=x, xtrain=x, mod=mod, svobj=NULL, algorithm=algorithm)
+        sva_obj <- list(xadj=x, xtrain=x, mod=mod, svobj=NULL, algorithm=algorithm)
     }
-    params$nbatches <- length(unique(batch))
-    params$batch <- batch
-    class(params) <- "svatrain"
-    return(params)
+    sva_obj$nbatches <- length(unique(batch))
+    sva_obj$batch <- batch
+    class(sva_obj) <- "svatrain"
+    return(sva_obj)
 }
 
 # regress surrogate vars out of exprs to get batch corrected exprs
@@ -41,17 +41,17 @@ svabaxadj <- function(exprs, mod, svobj) {
     return(t(exprsadj))
 }
 
-svabaaddon <- function(params, x) {
+svabaaddon <- function(sva_obj, x) {
     if(any(is.na(x)))
         stop("Data contains missing values.")
     if(!is.matrix(x))
         stop("'x' has to be of class 'matrix'.")
-    if(class(params) != "svatrain")
-        stop("Input parameter 'params' has to be of class 'svatrain'.")
-    if(ncol(params$xtrain) != ncol(x))
+    if(class(sva_obj) != "svatrain")
+        stop("Input parameter 'sva_obj' has to be of class 'svatrain'.")
+    if(ncol(sva_obj$xtrain) != ncol(x))
         stop("Number of variables in test data matrix different to that of training data matrix.")
-    if (!is.null(params$svobj)) {
-        fsvaobj <- sva::fsva(t(params$xtrain), params$mod, params$svobj, newdat=t(x), method=params$algorithm)
+    if (!is.null(sva_obj$svobj)) {
+        fsvaobj <- sva::fsva(t(sva_obj$xtrain), sva_obj$mod, sva_obj$svobj, newdat=t(x), method=sva_obj$algorithm)
         xadj <- t(fsvaobj$new)
     }
     else {
