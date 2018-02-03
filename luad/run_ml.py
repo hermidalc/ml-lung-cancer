@@ -34,7 +34,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--fs-splits', type=int, default=100, help='num fs splits')
 parser.add_argument('--fs-cv-size', type=float, default=0.3, help="fs cv size")
 parser.add_argument('--fs-dfx-min', type=int, default=5, help='fs min num dfx features')
-parser.add_argument('--fs-dfx-max', type=int, default=200, help='fs max num dfx features')
+parser.add_argument('--fs-dfx-max', type=int, default=100, help='fs max num dfx features')
 parser.add_argument('--fs-dfx-pval', type=float, default=0.001, help="min dfx adj p value")
 parser.add_argument('--fs-dfx-lfc', type=float, default=0, help="min dfx logfc")
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help="mean_coefs or mean_roc_aucs")
@@ -47,7 +47,7 @@ parser.add_argument('--tr-splits', type=int, default=10, help='num tr splits')
 parser.add_argument('--tr-cv-size', type=float, default=0.3, help="tr cv size")
 parser.add_argument('--tr-gscv-splits', type=int, default=20, help='num tr gscv splits')
 parser.add_argument('--tr-gscv-size', type=int, default=0.3, help='tr gscv size')
-parser.add_argument('--tr-gscv-verbose', type=int, default=2, help="tr gscv verbosity")
+parser.add_argument('--tr-gscv-verbose', type=int, default=0, help="tr gscv verbosity")
 parser.add_argument('--tr-rfecv-splits', type=int, default=32, help='num tr rfecv splits')
 parser.add_argument('--tr-rfecv-size', type=int, default=0.3, help='rfecv cv size')
 parser.add_argument('--tr-rfecv-jobs', type=int, default=-1, help="num tr rfecv parallel jobs")
@@ -70,12 +70,8 @@ def pipeline_1(eset_gex, fs_meth, tr_meth, color):
         print('TR:', '%3s' % tr_idxs.size, ' CV:', '%3s' % te_idxs.size)
         X_tr, y_tr, X_te, y_te = X[tr_idxs], y[tr_idxs], X[te_idxs], y[te_idxs]
         fs_data = fs_meth(X_tr, y_tr, eset_gex)
-        fs_feature_idxs, fs_feature_names, fs_rank_data = process_fs_data(fs_data)
-        tr_split_data = tr_meth(
-            X_tr[:,fs_feature_idxs], y_tr,
-            X_te[:,fs_feature_idxs], y_te,
-            eset_gex, fs_feature_names, color,
-        )
+        fs_feature_idxs, fs_feature_names, fs_rank_data = process_fs_data(fs_data, feature_names)
+        tr_split_data = tr_meth(X_tr, y_tr, X_te, y_te, eset_gex, fs_feature_idxs, fs_feature_names, color)
         tr_split_data['feature_idxs'] = fs_feature_idxs
         tr_split_data['feature_names'] = fs_feature_names
         tr_split_data['feature_ranks'] = fs_rank_data
@@ -83,8 +79,8 @@ def pipeline_1(eset_gex, fs_meth, tr_meth, color):
         tr_split_count += 1
         print(
             'TR split:', '%3s' % tr_split_count,
-            ' ROC AUC (Train):', '%.6f' % tr_split_data['gscv_clf'].best_score_,
-            ' ROC AUC (Test):', '%.6f' % tr_split_data['roc_auc'],
+            ' ROC AUC (Train):', '%.6f' % tr_split_data['tr_roc_auc'],
+            ' ROC AUC (Test):', '%.6f' % tr_split_data['te_roc_auc'],
         )
     # end for
     y_tests, y_scores = [], []
@@ -107,6 +103,32 @@ def pipeline_1(eset_gex, fs_meth, tr_meth, color):
     plt.title('ROC Curve')
     plt.legend(loc='lower right')
 # end pipeline1
+
+def pipeline_2(eset_gex_tr, eset_gex_te, fs_meth, tr_meth, color):
+    X_tr = np.array(base.t(biobase.exprs(eset_gex_tr)))
+    y_tr = np.array(r_filter_eset_relapse_labels(eset_gex_tr), dtype=int)
+    X_te = np.array(base.t(biobase.exprs(eset_gex_te)))
+    y_te = np.array(r_filter_eset_relapse_labels(eset_gex_te), dtype=int)
+    feature_names = np.array(biobase.featureNames(eset_gex_tr))
+    fs_data = fs_meth(X_tr, y_tr, eset_gex_tr)
+    fs_feature_idxs, fs_feature_names, fs_rank_data = process_fs_data(fs_data, feature_names)
+    tr_data = tr_meth(X_tr, y_tr, X_te, y_te, eset_gex_tr, fs_feature_idxs, fs_feature_names, color)
+    fpr, tpr, thres = roc_curve(tr_data['y_tests'], tr_data['y_scores'], pos_label=1)
+    roc_auc = roc_auc_score(tr_data['y_tests'], tr_data['y_scores'])
+    # roc_auc_std = np.std(aucs)
+    print ('ROC AUC (Overall):', '%.6f' % roc_auc)
+    # plot roc auc
+    plt.figure(2)
+    plt.rcParams['font.size'] = 20
+    plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=.8, label='Chance')
+    plt.plot(fpr, tpr, color=color, lw=2, label='ROC curve (area = %0.4f)' % roc_auc)
+    plt.xlim([0,1.01])
+    plt.ylim([0,1.01])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve')
+    plt.legend(loc='lower right')
+# end pipeline2
 
 def fs_meth_1(X_tr, y_tr, eset_gex_tr):
     fs_gscv_clf = GridSearchCV(
@@ -170,209 +192,7 @@ def fs_meth_1(X_tr, y_tr, eset_gex_tr):
     return(fs_data)
 # end fs_meth_1
 
-def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_gex_tr, fs_feature_names, color):
-    tr_gscv_clf = GridSearchCV(
-        Pipeline([
-            ('slr', StandardScaler()),
-            ('rfe', RFECV(
-                LinearSVC(class_weight='balanced'), step=args.tr_rfecv_step,
-                cv=StratifiedShuffleSplit(n_splits=args.tr_rfecv_splits, test_size=args.tr_rfecv_size),
-                scoring='roc_auc', n_jobs=args.tr_rfecv_jobs, verbose=args.tr_rfecv_verbose
-            )),
-            ('svc', LinearSVC(class_weight='balanced')),
-        ]),
-        param_grid=[
-            # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
-            { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
-        ],
-        cv=StratifiedShuffleSplit(n_splits=args.tr_gscv_splits, test_size=args.tr_gscv_size),
-        scoring='roc_auc', return_train_score=False, verbose=args.tr_gscv_verbose
-    )
-    y_score = tr_gscv_clf.fit(X_tr, y_tr).decision_function(X_te)
-    fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-    roc_auc = roc_auc_score(y_te, y_score)
-    rfe_feature_idxs = tr_gscv_clf.best_estimator_.named_steps['rfe'].get_support(indices=True)
-    coefs = np.square(tr_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
-    print('Num Features:', tr_gscv_clf.best_estimator_.named_steps['rfe'].n_features_)
-    for rank, feature, symbol in sorted(
-        zip(
-            coefs,
-            fs_feature_names[rfe_feature_idxs],
-            r_get_gene_symbols(eset_gex_tr, robjects.IntVector(rfe_feature_idxs + 1)),
-        ),
-        reverse=True
-    ): print(feature, "\t", symbol, "\t", rank)
-    tr_data = {
-        'gscv_clf': tr_gscv_clf,
-        'rfe_feature_idxs': rfe_feature_idxs,
-        'fprs': fpr,
-        'tprs': tpr,
-        'thres': thres,
-        'coefs': coefs,
-        'y_scores': y_score,
-        'y_tests': y_te,
-        'roc_auc': roc_auc,
-    }
-    # plot num features selected vs train roc auc
-    plt.figure(1)
-    plt.rcParams['font.size'] = 20
-    plt.title("Effect of Number of Features Selected on Training ROC AUC")
-    plt.xlabel("Number of features")
-    plt.ylabel("ROC AUC")
-    plt.plot(
-        range(1, len(tr_gscv_clf.best_estimator_.named_steps['rfe'].grid_scores_) + 1),
-        tr_gscv_clf.best_estimator_.named_steps['rfe'].grid_scores_,
-        color=color,
-    )
-    return(tr_data)
-# end tr_meth_1
-
-def tr_meth_2():
-    tr_gscv_clf = GridSearchCV(
-        Pipeline([
-            ('slr', StandardScaler()),
-            ('svc', LinearSVC(class_weight='balanced')),
-        ]),
-        param_grid=[
-            # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
-            { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
-        ],
-        cv=StratifiedShuffleSplit(n_splits=args.tr_gscv_splits, test_size=args.tr_gscv_size),
-        scoring='roc_auc', return_train_score=False, verbose=args.tr_gscv_verbose
-    )
-    tr_data = {
-        'feature_idxs': fs_feature_idxs,
-        'feature_names': fs_feature_names,
-        'feature_ranks': feature_rank_data,
-        'y_scores': [],
-        'y_tests': [],
-        'split_data': [],
-    }
-    tr_split_count = 0
-    for num_features in range(1, fs_feature_idxs.size + 1):
-        feature_idxs = fs_feature_idxs[:num_features]
-        feature_names = fs_feature_names[:num_features]
-        y_score = tr_gscv_clf.fit(X_tr[:,feature_idxs], y_tr).decision_function(X_te[:,feature_idxs])
-        fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-        roc_auc = roc_auc_score(y_te, y_score)
-        # for rank, feature, symbol in sorted(
-        #     zip(
-        #         np.square(tr_gscv_clf.best_estimator_.named_steps['svc'].coef_[0]),
-        #         feature_names,
-        #         r_get_gene_symbols(eset_gex_tr, robjects.IntVector(feature_idxs + 1)),
-        #     ),
-        #     reverse=True
-        # ): print(feature, "\t", symbol, "\t", rank)
-        tr_data['split_data'].append({
-            'fprs': fpr,
-            'tprs': tpr,
-            'thres': thres,
-            'y_scores': y_score,
-            'y_tests': y_te,
-            'tr_roc_auc': tr_gscv_clf.best_score_,
-            'te_roc_auc': roc_auc,
-        })
-        tr_split_count += 1
-        print(
-            'TR split:', '%3s' % tr_split_count,
-            ' ROC AUC (Train):', '%.4f' % tr_gscv_clf.best_score_,
-            ' ROC AUC (Test):', '%.4f' % roc_auc,
-        )
-    # end for
-    # Plot number of features vs scores
-    plt.figure(1)
-    plt.rcParams['font.size'] = 20
-    plt.title('Effect of Number Features Selected on ROC AUC')
-    plt.xlabel("Number of features selected")
-    plt.ylabel("ROC AUC Score")
-    plt.xticks(range(1, len(fs_feature_idxs) + 1))
-    plt.plot(
-        range(1, len(fs_feature_idxs) + 1),
-        [split['tr_roc_auc'] for split in tr_data['split_data']],
-        color='darkred', lw=2, label='Train',
-    )
-    plt.plot(
-        range(1, len(fs_feature_idxs) + 1),
-        [split['te_roc_auc'] for split in tr_data['split_data']],
-        color='darkblue', lw=2, label='Test'
-    )
-    plt.legend(loc='lower right')
-# end tr_meth_2
-
-def fs_meth_2(X_tr, y_tr, eset_gex_tr):
-    fs_gscv_clf = GridSearchCV(
-        Pipeline([
-            ('slr', StandardScaler()),
-            ('svc', LinearSVC()),
-        ]),
-        param_grid=[
-            # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
-            { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
-        ],
-        cv=StratifiedShuffleSplit(n_splits=args.fs_gscv_splits, test_size=args.fs_gscv_size),
-        scoring='roc_auc', return_train_score=False, n_jobs=args.fs_gscv_jobs,
-        verbose=args.fs_gscv_verbose
-    )
-    fs_data = {
-        'feature_idxs': [],
-        'split_data': [],
-    }
-    fs_split_count = 0
-    low_fs_count = 0
-    print_fs_header = True
-    while fs_split_count < args.fs_splits:
-        y_tr_r_idxs = shuffle(np.where(y_tr == 1)[0])
-        y_tr_n_idxs = shuffle(np.where(y_tr == 0)[0])
-        if args.fs_cv_size >= 1:
-            fs_num_r = args.fs_cv_size
-        else:
-            fs_num_r = math.ceil(y_tr_r_idxs.size * args.fs_cv_size)
-        fs_num_n = y_tr_n_idxs.size - y_tr_r_idxs.size + fs_num_r
-        tr_num = y_tr_r_idxs.size - (fs_num_r * 2)
-        cv_num = y_tr_r_idxs.size - fs_num_r - tr_num
-        fs_idxs = np.concatenate((y_tr_r_idxs[:fs_num_r], y_tr_n_idxs[:fs_num_n]))
-        tr_idxs = np.concatenate((y_tr_r_idxs[fs_num_r:(fs_num_r + tr_num)], y_tr_n_idxs[fs_num_n:(fs_num_n + tr_num)]))
-        cv_idxs = np.concatenate((y_tr_r_idxs[(fs_num_r + tr_num):], y_tr_n_idxs[(fs_num_n + tr_num):]))
-        if print_fs_header:
-            print('FS:', fs_num_r, '/', fs_num_n, ' TR:', tr_num, '/', tr_num, ' CV:', cv_num, '/', cv_num)
-            print_fs_header = False
-        feature_idxs = np.array(
-            r_get_dfx_features(
-                r_filter_eset(eset_gex_tr, robjects.NULL, robjects.IntVector(fs_idxs + 1)),
-                True,
-                args.fs_dfx_pval,
-                args.fs_dfx_lfc,
-                args.fs_dfx_max,
-            )
-        ) - 1
-        if feature_idxs.size < args.fs_dfx_min:
-            low_fs_count += 1
-            continue
-        X_ftr, y_ftr, X_cv, y_cv = X_tr[tr_idxs], y_tr[tr_idxs], X_tr[cv_idxs], y_tr[cv_idxs]
-        y_score = fs_gscv_clf.fit(X_ftr[:,feature_idxs], y_ftr).decision_function(X_cv[:,feature_idxs])
-        fpr, tpr, thres = roc_curve(y_cv, y_score, pos_label=1)
-        roc_auc = roc_auc_score(y_cv, y_score)
-        fs_data['feature_idxs'].extend(feature_idxs.tolist())
-        fs_data['split_data'].append({
-            'feature_idxs': feature_idxs,
-            'fprs': fpr,
-            'tprs': tpr,
-            'thres': thres,
-            'coefs': np.square(fs_gscv_clf.best_estimator_.named_steps['svc'].coef_[0]),
-            'y_scores': y_score,
-            'y_tests': y_cv,
-            'roc_auc': roc_auc,
-        })
-        fs_split_count += 1
-        print(
-            'Split:', '%3s' % fs_split_count, ' Fails:', '%3s' % low_fs_count,
-            ' FS:', '%3s' % feature_idxs.size, ' ROC AUC:', '%.4f' % roc_auc,
-        )
-    # end while
-    return(fs_data)
-# end fs2
-
-def process_fs_data(fs_data):
+def process_fs_data(fs_data, feature_names):
     fs_feature_idxs = sorted(list(set(fs_data['feature_idxs'])))
     fs_feature_names = feature_names[fs_feature_idxs]
     # print(*natsorted(fs_feature_names), sep="\n")
@@ -426,17 +246,144 @@ def process_fs_data(fs_data):
     return(fs_feature_idxs, fs_feature_names, fs_rank_data)
 # end process_fs_data
 
+def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_gex_tr, fs_feature_idxs, fs_feature_names, color):
+    tr_gscv_clf = GridSearchCV(
+        Pipeline([
+            ('slr', StandardScaler()),
+            ('rfe', RFECV(
+                LinearSVC(class_weight='balanced'), step=args.tr_rfecv_step,
+                cv=StratifiedShuffleSplit(n_splits=args.tr_rfecv_splits, test_size=args.tr_rfecv_size),
+                scoring='roc_auc', n_jobs=args.tr_rfecv_jobs, verbose=args.tr_rfecv_verbose
+            )),
+            ('svc', LinearSVC(class_weight='balanced')),
+        ]),
+        param_grid=[
+            # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
+            { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
+        ],
+        cv=StratifiedShuffleSplit(n_splits=args.tr_gscv_splits, test_size=args.tr_gscv_size),
+        scoring='roc_auc', return_train_score=False, verbose=args.tr_gscv_verbose
+    )
+    y_score = tr_gscv_clf.fit(X_tr[:,fs_feature_idxs], y_tr).decision_function(X_te[:,fs_feature_idxs])
+    fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
+    roc_auc = roc_auc_score(y_te, y_score)
+    rfe_feature_idxs = fs_feature_idxs[tr_gscv_clf.best_estimator_.named_steps['rfe'].get_support(indices=True)]
+    rfe_feature_names = fs_feature_names[tr_gscv_clf.best_estimator_.named_steps['rfe'].get_support(indices=True)]
+    coefs = np.square(tr_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
+    print('Num Features:', tr_gscv_clf.best_estimator_.named_steps['rfe'].n_features_)
+    for rank, feature, symbol in sorted(
+        zip(
+            coefs,
+            rfe_feature_names,
+            r_get_gene_symbols(eset_gex_tr, robjects.IntVector(rfe_feature_idxs + 1)),
+        ),
+        reverse=True
+    ): print(feature, "\t", symbol, "\t", rank)
+    tr_data = {
+        'gscv_clf': tr_gscv_clf,
+        'rfe_feature_idxs': rfe_feature_idxs,
+        'fprs': fpr,
+        'tprs': tpr,
+        'thres': thres,
+        'coefs': coefs,
+        'y_scores': y_score,
+        'y_tests': y_te,
+        'tr_roc_auc': tr_gscv_clf.best_score_,
+        'te_roc_auc': roc_auc,
+    }
+    # plot num features selected vs train roc auc
+    plt.figure(1)
+    plt.rcParams['font.size'] = 20
+    plt.title("Effect of Number of Features Selected on Training ROC AUC")
+    plt.xlabel("Number of features")
+    plt.ylabel("ROC AUC")
+    plt.plot(
+        range(1, len(tr_gscv_clf.best_estimator_.named_steps['rfe'].grid_scores_) + 1),
+        tr_gscv_clf.best_estimator_.named_steps['rfe'].grid_scores_,
+        color=color,
+    )
+    return(tr_data)
+# end tr_meth_1
+
+def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_gex_tr, fs_feature_idxs, fs_feature_names, color):
+    tr_gscv_clf = GridSearchCV(
+        Pipeline([
+            ('slr', StandardScaler()),
+            ('svc', LinearSVC(class_weight='balanced')),
+        ]),
+        param_grid=[
+            # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
+            { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
+        ],
+        cv=StratifiedShuffleSplit(n_splits=args.tr_gscv_splits, test_size=args.tr_gscv_size),
+        scoring='roc_auc', return_train_score=False, verbose=args.tr_gscv_verbose
+    )
+    tr_data = []
+    fs_split_count = 0
+    for num_features in range(1, fs_feature_idxs.size + 1):
+        feature_idxs = fs_feature_idxs[:num_features]
+        feature_names = fs_feature_names[:num_features]
+        y_score = tr_gscv_clf.fit(X_tr[:,feature_idxs], y_tr).decision_function(X_te[:,feature_idxs])
+        fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
+        roc_auc = roc_auc_score(y_te, y_score)
+        coefs = np.square(tr_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
+        tr_data.append({
+            'gscv_clf': tr_gscv_clf,
+            'sel_feature_idxs': feature_idxs,
+            'sel_feature_names': feature_names,
+            'fprs': fpr,
+            'tprs': tpr,
+            'thres': thres,
+            'coefs': coefs,
+            'y_scores': y_score,
+            'y_tests': y_te,
+            'tr_roc_auc': tr_gscv_clf.best_score_,
+            'te_roc_auc': roc_auc,
+        })
+        fs_split_count += 1
+        print(
+            'Split:', '%3s' % fs_split_count,
+            ' ROC AUC (Train):', '%.4f' % tr_gscv_clf.best_score_,
+            ' ROC AUC (Test):', '%.4f' % roc_auc,
+        )
+    # end for
+    # plot number of features vs scores
+    plt.figure(1)
+    plt.rcParams['font.size'] = 20
+    plt.title('Effect of Number Features Selected on ROC AUC')
+    plt.xlabel("Number of features")
+    plt.ylabel("ROC AUC")
+    plt.xticks(range(1, len(fs_feature_idxs) + 1))
+    plt.plot(
+        range(1, len(fs_feature_idxs) + 1),
+        [s['tr_roc_auc'] for s in tr_data],
+        lw=2, label='Train',
+    )
+    plt.plot(
+        range(1, len(fs_feature_idxs) + 1),
+        [s['te_roc_auc'] for s in tr_data],
+        lw=2, label='Test'
+    )
+    plt.legend(loc='lower right')
+    tr_data = sorted(tr_data, key=lambda k: k['te_roc_auc']).pop()
+    for rank, feature, symbol in sorted(
+        zip(
+            tr_data['coefs'],
+            tr_data['sel_feature_names'],
+            r_get_gene_symbols(eset_gex_tr, robjects.IntVector(tr_data['sel_feature_idxs'] + 1)),
+        ),
+        reverse=True
+    ): print(feature, "\t", symbol, "\t", rank)
+    return(tr_data)
+# end tr_meth_2
+
 base.load("data/" + args.eset_tr + ".Rda")
 eset_gex_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[args.eset_tr])
-X_tr = np.array(base.t(biobase.exprs(eset_gex_tr)))
-y_tr = np.array(r_filter_eset_relapse_labels(eset_gex_tr), dtype=int)
-feature_names = np.array(biobase.featureNames(eset_gex_tr))
+
 if (args.eset_te):
     base.load("data/" + args.eset_te + ".Rda")
     eset_gex_te = r_filter_eset_ctrl_probesets(robjects.globalenv[args.eset_te])
-    X_te = np.array(base.t(biobase.exprs(eset_gex_te)))
-    y_te = np.array(r_filter_eset_relapse_labels(eset_gex_te), dtype=int)
 
-pipeline_1(eset_gex_tr, fs_meth_1, tr_meth_1, 'green')
-# pipeline_1(eset_gex_tr, fs_meth_2, tr_meth_1, 'blue')
+# pipeline_1(eset_gex_tr, fs_meth_1, tr_meth_1, 'green')
+pipeline_2(eset_gex_tr, eset_gex_te, fs_meth_1, tr_meth_2, 'blue')
 plt.show()
