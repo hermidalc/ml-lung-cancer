@@ -5,9 +5,9 @@ suppressPackageStartupMessages(library("bapred"))
 source("config.R")
 
 for (i in 1:length(eset_merged_tr_names)) {
-    eset_tr_fab_name <- paste0(eset_merged_tr_names[i], "_tr_fab")
-    eset_te_fab_name <- paste0(eset_merged_te_names[i], "_te_fab")
-    print(paste(eset_tr_fab_name, "->", eset_te_fab_name))
+    eset_tr_std_name <- paste0(eset_merged_tr_names[i], "_tr_std")
+    eset_te_std_name <- paste0(eset_merged_te_names[i], "_te_std")
+    print(paste(eset_tr_std_name, "->", eset_te_std_name))
     load(paste0("data/", eset_merged_tr_names[i], ".Rda"))
     ptr <- pData(get(eset_merged_tr_names[i]))
     Xtr <- t(exprs(get(eset_merged_tr_names[i])))
@@ -20,14 +20,14 @@ for (i in 1:length(eset_merged_tr_names)) {
         }
     }
     btr <- as.factor(btr)
-    fab_obj <- fabatch(Xtr, ytr, btr)
-    eset_tr_fab <- get(eset_merged_tr_names[i])
-    exprs(eset_tr_fab) <- t(fab_obj$xadj)
-    assign(eset_tr_fab_name, eset_tr_fab)
-    save(list=eset_tr_fab_name, file=paste0("data/", eset_tr_fab_name, ".Rda"))
-    eset_tr_fab_obj_name <- paste0(eset_tr_fab_name, "_obj")
-    assign(eset_tr_fab_obj_name, fab_obj)
-    save(list=eset_tr_fab_obj_name, file=paste0("data/", eset_tr_fab_obj_name, ".Rda"))
+    std_obj <- standardize(Xtr, btr)
+    eset_tr_std <- get(eset_merged_tr_names[i])
+    exprs(eset_tr_std) <- t(std_obj$xadj)
+    assign(eset_tr_std_name, eset_tr_std)
+    save(list=eset_tr_std_name, file=paste0("data/", eset_tr_std_name, ".Rda"))
+    eset_tr_std_obj_name <- paste0(eset_tr_std_name, "_obj")
+    assign(eset_tr_std_obj_name, std_obj)
+    save(list=eset_tr_std_obj_name, file=paste0("data/", eset_tr_std_obj_name, ".Rda"))
     load(paste0("data/", eset_merged_te_names[i], ".Rda"))
     pte <- pData(get(eset_merged_te_names[i]))
     Xte <- t(exprs(get(eset_merged_te_names[i])))
@@ -39,8 +39,8 @@ for (i in 1:length(eset_merged_tr_names)) {
         }
     }
     bte <- as.factor(bte)
-    eset_te_fab <- get(eset_merged_te_names[i])
-    exprs(eset_te_fab) <- t(fabatchaddon(fab_obj, Xte, bte))
-    assign(eset_te_fab_name, eset_te_fab)
-    save(list=eset_te_fab_name, file=paste0("data/", eset_te_fab_name, ".Rda"))
+    eset_te_std <- get(eset_merged_te_names[i])
+    exprs(eset_te_std) <- t(standardizeaddon(std_obj, Xte, bte))
+    assign(eset_te_std_name, eset_te_std)
+    save(list=eset_te_std_name, file=paste0("data/", eset_te_std_name, ".Rda"))
 }
