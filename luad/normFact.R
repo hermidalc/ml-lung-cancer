@@ -30,8 +30,8 @@ normFact <- function(fact,X,ref,refType,k=20,t=0.5,ref2=NULL,refType2=NULL,t2=0.
 
     if (fact=='stICA') {
         obj = unbiased_stICA(X,k,...)
-        B=obj$B
-        A=obj$A
+        A = obj$A
+        B = obj$B
     }
     else if (fact == 'SVD') {
         obj = svd(X,nu=k,nv=k)
