@@ -222,6 +222,73 @@ def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     return(tr_data)
 # end tr_meth_2
 
+def fs_limma_svm_2(X_tr, y_tr, eset_tr):
+    fs_gscv_clf = GridSearchCV(
+        Pipeline([
+            ('slr', StandardScaler()),
+            ('svc', LinearSVC(class_weight='balanced')),
+        ]),
+        param_grid=[
+            # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
+            { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
+        ],
+        cv=StratifiedShuffleSplit(n_splits=args.fs_gscv_splits, test_size=args.fs_gscv_size),
+        scoring='roc_auc', return_train_score=False, n_jobs=args.fs_gscv_jobs,
+        verbose=args.fs_gscv_verbose
+    )
+    fs_data = {}
+    fs_split_count = 0
+    fs_fail_count = 0
+    print_fs_header = True
+    while fs_split_count < 1:
+        fs_idxs, cv_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_cv_size, stratify=y_tr)
+        if print_fs_header:
+            print('FS:', '%3s' % fs_idxs.size, ' CV:', '%3s' % cv_idxs.size)
+            print_fs_header = False
+        feature_idxs = np.array(
+            r_get_dfx_features(
+                r_filter_eset(eset_tr, robjects.NULL, robjects.IntVector(fs_idxs + 1)),
+                True,
+                args.fs_dfx_pval,
+                args.fs_dfx_lfc,
+                args.fs_top_cutoff,
+            )
+        ) - 1
+        if feature_idxs.size != args.fs_top_cutoff:
+            fs_fail_count += 1
+            continue
+        X_fs, y_fs, X_cv, y_cv = X_tr[fs_idxs], y_tr[fs_idxs], X_tr[cv_idxs], y_tr[cv_idxs]
+        y_score = fs_gscv_clf.fit(X_fs[:,feature_idxs], y_fs).decision_function(X_cv[:,feature_idxs])
+        fpr, tpr, thres = roc_curve(y_cv, y_score, pos_label=1)
+        roc_auc = roc_auc_score(y_cv, y_score)
+        coefs = np.square(fs_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
+        feature_names = np.array(biobase.featureNames(eset_tr))
+        feature_rank_data = sorted(
+            zip(
+                coefs,
+                feature_idxs,
+                feature_names[feature_idxs],
+            ),
+            reverse=True
+        )
+        fs_data = {
+            'feature_idxs': np.array([x for _, x, _ in feature_rank_data], dtype=int),
+            'feature_names': np.array([x for _, _, x in feature_rank_data], dtype=str),
+            'fprs': fpr,
+            'tprs': tpr,
+            'thres': thres,
+            'coefs': np.array([x for x, _, _ in feature_rank_data]),
+            'y_scores': y_score,
+            'y_tests': y_cv,
+            'roc_auc': roc_auc,
+        }
+        print(
+            'Features:', '%3s' % feature_idxs.size, ' Fails:', '%3s' % fs_fail_count,
+            ' ROC AUC:', '%.4f' % roc_auc,
+        )
+    # end while
+    return(fs_data)
+
 def fs_limma_svm(X_tr, y_tr, eset_tr):
     fs_gscv_clf = GridSearchCV(
         Pipeline([
@@ -240,7 +307,7 @@ def fs_limma_svm(X_tr, y_tr, eset_tr):
         'split_data': [],
     }
     fs_split_count = 0
-    low_fs_count = 0
+    fs_fail_count = 0
     print_fs_header = True
     while fs_split_count < args.fs_splits:
         fs_idxs, cv_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_cv_size, stratify=y_tr)
@@ -257,7 +324,7 @@ def fs_limma_svm(X_tr, y_tr, eset_tr):
             )
         ) - 1
         if feature_idxs.size < args.fs_dfx_min:
-            low_fs_count += 1
+            fs_fail_count += 1
             continue
         X_fs, y_fs, X_cv, y_cv = X_tr[fs_idxs], y_tr[fs_idxs], X_tr[cv_idxs], y_tr[cv_idxs]
         y_score = fs_gscv_clf.fit(X_fs[:,feature_idxs], y_fs).decision_function(X_cv[:,feature_idxs])
@@ -275,7 +342,7 @@ def fs_limma_svm(X_tr, y_tr, eset_tr):
         })
         fs_split_count += 1
         print(
-            'Split:', '%3s' % fs_split_count, ' Fails:', '%3s' % low_fs_count,
+            'Split:', '%3s' % fs_split_count, ' Fails:', '%3s' % fs_fail_count,
             ' FS:', '%3s' % feature_idxs.size, ' ROC AUC:', '%.4f' % roc_auc,
         )
     # end while
@@ -445,6 +512,7 @@ if (args.run == 1):
         #     feature_mean_coefs[idx], "\t",
         #     coef_mx[idx]
         # )
+    print('Top Classifier Features:')
     for rank, feature, symbol in sorted(
         zip(
             feature_mean_coefs,
@@ -452,7 +520,6 @@ if (args.run == 1):
             r_get_gene_symbols(eset_tr, robjects.IntVector(np.array(feature_idxs) + 1)),
         ),
         reverse=True
-
     ): print(feature, "\t", symbol, "\t", rank)
 elif args.run == 2:
     eset_tr_name = 'eset_gex_gse31210'
@@ -469,13 +536,13 @@ elif args.run == 2:
     plt.ylim([-0.01,1.01])
     tprs, roc_aucs = [], []
     mean_fpr = np.linspace(0, 1, 100)
-    for idx, tr_split in enumerate(results):
-        tprs.append(interp(mean_fpr, tr_split['fprs'], tr_split['tprs']))
+    for idx, split in enumerate(results):
+        tprs.append(interp(mean_fpr, split['fprs'], split['tprs']))
         tprs[-1][0] = 0.0
-        roc_aucs.append(tr_split['roc_auc_te'])
+        roc_aucs.append(split['roc_auc_te'])
         plt.plot(
-            tr_split['fprs'], tr_split['tprs'], lw=1, alpha=0.3,
-            label='ROC split %d (AUC = %0.4f)' % (idx + 1, tr_split['roc_auc_te']),
+            split['fprs'], split['tprs'], lw=1, alpha=0.3,
+            label='ROC split %d (AUC = %0.4f)' % (idx + 1, split['roc_auc_te']),
         )
     mean_tpr = np.mean(tprs, axis=0)
     mean_tpr[-1] = 1.0
@@ -498,8 +565,8 @@ elif args.run == 2:
     plt.grid('off')
     # plot num features selected vs train roc auc
     roc_aucs_tr = []
-    for tr_split in results:
-        for nf_idx, roc_auc_tr in enumerate(tr_split['gscv_clf'].best_estimator_.named_steps['rfe'].grid_scores_):
+    for split in results:
+        for nf_idx, roc_auc_tr in enumerate(split['gscv_clf'].best_estimator_.named_steps['rfe'].grid_scores_):
             if nf_idx < len(roc_aucs_tr):
                 roc_aucs_tr[nf_idx].append(roc_auc_tr)
             else:
@@ -527,6 +594,38 @@ elif args.run == 2:
         [m + s for m, s in zip(mean_roc_aucs_tr, std_roc_aucs_tr)],
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
+    # show final selected feature information
+    feature_idxs = []
+    for split in results: feature_idxs.extend(split['feature_idxs'])
+    feature_idxs = sorted(list(set(feature_idxs)))
+    feature_names = np.array(biobase.featureNames(eset_tr))
+    feature_names = feature_names[feature_idxs]
+    # print(*natsorted(feature_names), sep="\n")
+    feature_mx_idx = {}
+    for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
+    coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
+    for split_idx in range(len(results)):
+        split_data = results[split_idx]
+        for idx in range(len(split_data['feature_idxs'])):
+            coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                split_data['coefs'][idx]
+    feature_mean_coefs = []
+    for idx in range(len(feature_idxs)):
+        feature_mean_coefs.append(np.mean(coef_mx[idx]))
+        # print(
+        #     feature_names[idx], "\t",
+        #     feature_mean_coefs[idx], "\t",
+        #     coef_mx[idx]
+        # )
+    print('Top Classifier Features:')
+    for rank, feature, symbol in sorted(
+        zip(
+            feature_mean_coefs,
+            feature_names,
+            r_get_gene_symbols(eset_tr, robjects.IntVector(np.array(feature_idxs) + 1)),
+        ),
+        reverse=True
+    ): print(feature, "\t", symbol, "\t", rank)
 elif args.run == 3:
     eset_tr_name = 'eset_gex_gse31210'
     base.load("data/" + eset_tr_name + ".Rda")
@@ -599,7 +698,7 @@ elif args.run == 3:
     plt.xticks(plt_fig2_x_axis)
     plt.plot(
         plt_fig2_x_axis, [s['roc_auc_tr'] for s in results[0]['nf_split_data']],
-        lw=2, label='ROC AUC (Train) GSE31210',
+        lw=2, label='GSE31210 ROC AUC (Train)',
     )
     for idx, split in enumerate(results):
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
@@ -608,9 +707,22 @@ elif args.run == 3:
             lw=2, color=te_colors[idx], label='%s ROC AUC (Test)' % eset_te_name,
         )
     plt.legend(loc='lower right')
+    # display final selected feature information
+    for idx, split in enumerate(results):
+        eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
+        nf_split = sorted(split['nf_split_data'], key=lambda k: k['roc_auc_te']).pop()
+        print('%s Top Features:' % eset_te_name)
+        for rank, feature, symbol in sorted(
+            zip(
+                nf_split['coefs'],
+                nf_split['feature_names'],
+                r_get_gene_symbols(eset_tr, robjects.IntVector(np.array(nf_split['feature_idxs']) + 1)),
+            ),
+            reverse=True
+        ): print(feature, "\t", symbol, "\t", rank)
     # roc_aucs_tr, roc_aucs_te = [], []
-    # for tr_split in results:
-    #     for nf_idx, nf_split in enumerate(tr_split['nf_split_data']):
+    # for split in results:
+    #     for nf_idx, nf_split in enumerate(split['nf_split_data']):
     #         if nf_idx < len(roc_aucs_tr):
     #             roc_aucs_tr[nf_idx].append(nf_split['roc_auc_tr'])
     #             roc_aucs_te[nf_idx].append(nf_split['roc_auc_te'])
