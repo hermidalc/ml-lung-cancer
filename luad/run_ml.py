@@ -10,11 +10,11 @@ import numpy as np
 from natsort import natsorted
 from scipy import interp
 from sklearn.feature_selection import RFECV
-from sklearn.model_selection import train_test_split, StratifiedShuffleSplit, GridSearchCV
+from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, LinearSVC
-from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.externals import joblib
 from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
@@ -36,11 +36,12 @@ parser.add_argument('--run', type=int, help="run number")
 parser.add_argument('--fs-splits', type=int, default=100, help='num fs splits')
 parser.add_argument('--fs-cv-size', type=float, default=0.3, help="fs cv size")
 parser.add_argument('--fs-dfx-min', type=int, default=10, help='fs min num dfx features')
-parser.add_argument('--fs-dfx-max', type=int, default=50, help='fs max num dfx features')
+parser.add_argument('--fs-dfx-max', type=int, default=100, help='fs max num dfx features')
 parser.add_argument('--fs-dfx-pval', type=float, default=0.01, help="min dfx adj p value")
 parser.add_argument('--fs-dfx-lfc', type=float, default=0, help="min dfx logfc")
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help="mean_coefs or mean_roc_aucs")
 parser.add_argument('--fs-top-cutoff', type=int, default=30, help='fs top ranked features cutoff')
+parser.add_argument('--fs-top-final', type=int, default=20, help='fs top ranked features final')
 parser.add_argument('--fs-gscv-splits', type=int, default=50, help='num fs gscv splits')
 parser.add_argument('--fs-gscv-size', type=int, default=0.3, help='fs gscv cv size')
 parser.add_argument('--fs-gscv-jobs', type=int, default=-1, help="fs gscv parallel jobs")
@@ -67,36 +68,52 @@ def pipeline_one_eset(eset, fs_meth, tr_meth):
     y = np.array(r_filter_eset_relapse_labels(eset), dtype=int)
     results = []
     split_count = 0
-    sss = StratifiedShuffleSplit(n_splits=args.tr_splits, test_size=args.tr_cv_size)
-    for tr_idxs, te_idxs in sss.split(X, y):
-        print('TR:', '%3s' % tr_idxs.size, ' TE:', '%3s' % te_idxs.size)
-        X_tr, y_tr, X_te, y_te = X[tr_idxs], y[tr_idxs], X[te_idxs], y[te_idxs]
-        split_results = tr_meth(X_tr, y_tr, X_te, y_te, eset, fs_meth(X_tr, y_tr, eset))
-        results.append(split_results)
-        split_count += 1
-        # print(
-        #     'TR split:', '%3s' % split_count,
-        #     ' ROC AUC (Train):', '%.6f' % split_results['roc_auc_tr'],
-        #     ' ROC AUC (Test):', '%.6f' % split_results['roc_auc_te'],
-        # )
-    # end for
-    # print (
-    #     'Mean ROC AUC (Train):', '%.6f' % roc_auc_tr_mean,
-    #     ' Mean ROC AUC (Test):', '%.6f' % roc_auc,
-    # )
+    fs_fail_count = 0
+    print_header = True
+    while split_count < args.tr_splits:
+        tr_idxs, te_idxs = train_test_split(np.arange(y.size), test_size=args.tr_cv_size, stratify=y)
+        fs_idxs, cv_idxs = train_test_split(tr_idxs, test_size=args.fs_cv_size, stratify=y[tr_idxs])
+        if print_header:
+            print('TR:', '%3s' % tr_idxs.size, ' TE:', '%3s' % te_idxs.size)
+            print('FS:', '%3s' % fs_idxs.size, ' CV:', '%3s' % cv_idxs.size)
+            print_header = False
+        fs_data = fs_meth(X[fs_idxs], y[fs_idxs], X[cv_idxs], y[cv_idxs], fs_idxs, eset)
+        if fs_data:
+            split_results = tr_meth(X[tr_idxs], y[tr_idxs], X[te_idxs], y[te_idxs], eset, fs_data)
+            results.append(split_results)
+            split_count += 1
+            print(
+                'Split:', '%3s' % split_count, ' Fails:', '%3s' % fs_fail_count,
+            )
+        else:
+            fs_fail_count += 1
     return(results)
 # end pipeline
 
 def pipeline_one_tr_multi_te(eset_tr, eset_tes, fs_meth, tr_meth):
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
     y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
-    fs_data = fs_meth(X_tr, y_tr, eset_tr)
     results = []
-    for eset_te in eset_tes:
-        X_te = np.array(base.t(biobase.exprs(eset_te)))
-        y_te = np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
-        eset_results = tr_meth(X_tr, y_tr, X_te, y_te, eset_tr, fs_data)
-        results.append(eset_results)
+    split_count = 0
+    fs_fail_count = 0
+    print_header = True
+    while split_count < args.tr_splits:
+        fs_idxs, cv_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_cv_size, stratify=y_tr)
+        if print_header:
+            print('FS:', '%3s' % fs_idxs.size, ' CV:', '%3s' % cv_idxs.size)
+            print_header = False
+        fs_data = fs_meth(X_tr[fs_idxs], y_tr[fs_idxs], X_tr[cv_idxs], y_tr[cv_idxs], fs_idxs, eset_tr)
+        if fs_data:
+            for idx, eset_te in enumerate(eset_tes):
+                X_te = np.array(base.t(biobase.exprs(eset_te)))
+                y_te = np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
+                split_results = tr_meth(X_tr, y_tr, X_te, y_te, eset_tr, fs_data)
+                if idx < len(results):
+                    results[idx].append(split_results)
+                else:
+                    results.append([split_results])
+        else:
+            fs_fail_count += 1
     return(results)
 # end pipeline
 
@@ -125,7 +142,7 @@ def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     )
     feature_idxs = fs_data['feature_idxs']
     feature_names = fs_data['feature_names']
-    tr_data = {
+    results = {
         'fs_data': fs_data,
         'nf_split_data': [],
     }
@@ -137,7 +154,7 @@ def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
         fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
         roc_auc = roc_auc_score(y_te, y_score)
         coefs = np.square(tr_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
-        tr_data['nf_split_data'].append({
+        results['nf_split_data'].append({
             'gscv_clf': tr_gscv_clf,
             'feature_idxs': top_feature_idxs,
             'feature_names': top_feature_names,
@@ -152,22 +169,22 @@ def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
         })
         nf_split_count += 1
         print(
-            'Split:', '%3s' % nf_split_count,
+            'Features:', '%3s' % nf_split_count,
             ' ROC AUC (Train):', '%.4f' % tr_gscv_clf.best_score_,
             ' ROC AUC (Test):', '%.4f' % roc_auc,
         )
     # end for
-    # tr_data = sorted(tr_data, key=lambda k: k['roc_auc_te']).pop()
-    # print('Num Features:', tr_data['feature_idxs'].size)
+    # results = sorted(results, key=lambda k: k['roc_auc_te']).pop()
+    # print('Num Features:', results['feature_idxs'].size)
     # for rank, feature, symbol in sorted(
     #     zip(
-    #         tr_data['coefs'],
-    #         tr_data['feature_names'],
-    #         r_get_gene_symbols(eset_tr, robjects.IntVector(tr_data['feature_idxs'] + 1)),
+    #         results['coefs'],
+    #         results['feature_names'],
+    #         r_get_gene_symbols(eset_tr, robjects.IntVector(results['feature_idxs'] + 1)),
     #     ),
     #     reverse=True
     # ): print(feature, "\t", symbol, "\t", rank)
-    return(tr_data)
+    return(results)
 # end tr_meth_1
 
 def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
@@ -196,7 +213,7 @@ def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     rfe_feature_idxs = feature_idxs[tr_gscv_clf.best_estimator_.named_steps['rfe'].get_support(indices=True)]
     rfe_feature_names = feature_names[tr_gscv_clf.best_estimator_.named_steps['rfe'].get_support(indices=True)]
     coefs = np.square(tr_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
-    tr_data = {
+    results = {
         'gscv_clf': tr_gscv_clf,
         'fs_data': fs_data,
         'feature_idxs': rfe_feature_idxs,
@@ -219,10 +236,10 @@ def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
         ),
         reverse=True
     ): print(feature, "\t", symbol, "\t", rank)
-    return(tr_data)
+    return(results)
 # end tr_meth_2
 
-def fs_limma_svm_2(X_tr, y_tr, eset_tr):
+def fs_limma_svm_one(X_fs, y_fs, X_cv, y_cv, fs_idxs, eset_tr):
     fs_gscv_clf = GridSearchCV(
         Pipeline([
             ('slr', StandardScaler()),
@@ -236,60 +253,47 @@ def fs_limma_svm_2(X_tr, y_tr, eset_tr):
         scoring='roc_auc', return_train_score=False, n_jobs=args.fs_gscv_jobs,
         verbose=args.fs_gscv_verbose
     )
-    fs_data = {}
-    fs_split_count = 0
-    fs_fail_count = 0
-    print_fs_header = True
-    while fs_split_count < 1:
-        fs_idxs, cv_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_cv_size, stratify=y_tr)
-        if print_fs_header:
-            print('FS:', '%3s' % fs_idxs.size, ' CV:', '%3s' % cv_idxs.size)
-            print_fs_header = False
-        feature_idxs = np.array(
-            r_get_dfx_features(
-                r_filter_eset(eset_tr, robjects.NULL, robjects.IntVector(fs_idxs + 1)),
-                True,
-                args.fs_dfx_pval,
-                args.fs_dfx_lfc,
-                args.fs_top_cutoff,
-            )
-        ) - 1
-        if feature_idxs.size != args.fs_top_cutoff:
-            fs_fail_count += 1
-            continue
-        X_fs, y_fs, X_cv, y_cv = X_tr[fs_idxs], y_tr[fs_idxs], X_tr[cv_idxs], y_tr[cv_idxs]
-        y_score = fs_gscv_clf.fit(X_fs[:,feature_idxs], y_fs).decision_function(X_cv[:,feature_idxs])
-        fpr, tpr, thres = roc_curve(y_cv, y_score, pos_label=1)
-        roc_auc = roc_auc_score(y_cv, y_score)
-        coefs = np.square(fs_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
-        feature_names = np.array(biobase.featureNames(eset_tr))
-        feature_rank_data = sorted(
-            zip(
-                coefs,
-                feature_idxs,
-                feature_names[feature_idxs],
-            ),
-            reverse=True
+    feature_idxs = np.array(
+        r_get_dfx_features(
+            r_filter_eset(eset_tr, robjects.NULL, robjects.IntVector(fs_idxs + 1)),
+            True,
+            args.fs_dfx_pval,
+            args.fs_dfx_lfc,
+            args.fs_dfx_max,
         )
-        fs_data = {
-            'feature_idxs': np.array([x for _, x, _ in feature_rank_data], dtype=int),
-            'feature_names': np.array([x for _, _, x in feature_rank_data], dtype=str),
-            'fprs': fpr,
-            'tprs': tpr,
-            'thres': thres,
-            'coefs': np.array([x for x, _, _ in feature_rank_data]),
-            'y_scores': y_score,
-            'y_tests': y_cv,
-            'roc_auc': roc_auc,
-        }
-        print(
-            'Features:', '%3s' % feature_idxs.size, ' Fails:', '%3s' % fs_fail_count,
-            ' ROC AUC:', '%.4f' % roc_auc,
-        )
-    # end while
+    ) - 1
+    if feature_idxs.size < args.fs_dfx_min: return()
+    y_score = fs_gscv_clf.fit(X_fs[:,feature_idxs], y_fs).decision_function(X_cv[:,feature_idxs])
+    fpr, tpr, thres = roc_curve(y_cv, y_score, pos_label=1)
+    roc_auc = roc_auc_score(y_cv, y_score)
+    coefs = np.square(fs_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
+    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
+    feature_rank_data = sorted(
+        zip(
+            coefs,
+            feature_idxs,
+            feature_names[feature_idxs],
+        ),
+        reverse=True
+    )
+    fs_num_features = min(args.fs_top_cutoff, len(feature_idxs))
+    fs_data = {
+        'feature_idxs': np.array([x for _, x, _ in feature_rank_data[:fs_num_features]], dtype=int),
+        'feature_names': np.array([x for _, _, x in feature_rank_data[:fs_num_features]], dtype=str),
+        'feature_rank_data': feature_rank_data,
+        'fprs': fpr,
+        'tprs': tpr,
+        'thres': thres,
+        'coefs': np.array([x for x, _, _ in feature_rank_data[:fs_num_features]]),
+        'y_scores': y_score,
+        'y_tests': y_cv,
+        'roc_auc': roc_auc,
+    }
+    print('Features:', '%3s / %3s' % (fs_num_features, len(feature_idxs)), ' ROC AUC:', '%.4f' % roc_auc)
     return(fs_data)
+# end fs_limma_svm_one
 
-def fs_limma_svm(X_tr, y_tr, eset_tr):
+def fs_limma_svm_multi(X_tr, y_tr, eset_tr):
     fs_gscv_clf = GridSearchCV(
         Pipeline([
             ('slr', StandardScaler()),
@@ -349,7 +353,7 @@ def fs_limma_svm(X_tr, y_tr, eset_tr):
     feature_idxs = []
     for fs_split in fs_data['split_data']: feature_idxs.extend(fs_split['feature_idxs'])
     feature_idxs = sorted(list(set(feature_idxs)))
-    feature_names = np.array(biobase.featureNames(eset_tr))
+    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
     feature_names = feature_names[feature_idxs]
     # print(*natsorted(feature_names), sep="\n")
     feature_mx_idx = {}
@@ -390,19 +394,19 @@ def fs_limma_svm(X_tr, y_tr, eset_tr):
         ),
         reverse=True
     )
-    fs_top_cutoff = min(args.fs_top_cutoff, len(feature_idxs))
-    print('Num Features:', fs_top_cutoff, '/', len(feature_idxs))
-    top_rank_data = fs_data['feature_rank_data'][:fs_top_cutoff]
+    fs_num_features = min(args.fs_top_cutoff, len(feature_idxs))
+    print('Num Features:', fs_num_features, '/', len(feature_idxs))
+    top_rank_data = fs_data['feature_rank_data'][:fs_num_features]
     fs_data['feature_idxs'] = np.array([x for _, x, _ in top_rank_data], dtype=int)
     fs_data['feature_names'] = np.array([x for _, _, x in top_rank_data], dtype=str)
     return(fs_data)
-# end fs_limma_svm
+# end fs_limma_svm_multi
 
 if (args.run == 1):
     eset_tr_name = 'eset_gex_gse31210'
     base.load("data/" + eset_tr_name + ".Rda")
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-    results = pipeline_one_eset(eset_tr, fs_limma_svm, tr_meth_1)
+    results = pipeline_one_eset(eset_tr, fs_limma_svm_one, tr_meth_1)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
@@ -413,15 +417,15 @@ if (args.run == 1):
     plt.ylim([-0.01,1.01])
     tprs, roc_aucs = [], []
     mean_fpr = np.linspace(0, 1, 100)
-    for idx, tr_split in enumerate(results):
-        nf_split = tr_split['nf_split_data'][19]
+    for idx, split in enumerate(results):
+        nf_split = split['nf_split_data'][args.fs_top_final - 1]
         tprs.append(interp(mean_fpr, nf_split['fprs'], nf_split['tprs']))
         tprs[-1][0] = 0.0
         roc_aucs.append(nf_split['roc_auc_te'])
-        plt.plot(
-            nf_split['fprs'], nf_split['tprs'], lw=1, alpha=0.3,
-            label='ROC split %d (AUC = %0.4f)' % (idx + 1, nf_split['roc_auc_te']),
-        )
+        # plt.plot(
+        #     nf_split['fprs'], nf_split['tprs'], lw=1, alpha=0.3,
+        #     label='ROC split %d (AUC = %0.4f)' % (idx + 1, nf_split['roc_auc_te']),
+        # )
     mean_tpr = np.mean(tprs, axis=0)
     mean_tpr[-1] = 1.0
     mean_roc_auc = np.mean(roc_aucs)
@@ -443,8 +447,8 @@ if (args.run == 1):
     plt.grid('off')
     # plot num top ranked features selected vs mean roc auc
     roc_aucs_tr, roc_aucs_te = [], []
-    for tr_split in results:
-        for nf_idx, nf_split in enumerate(tr_split['nf_split_data']):
+    for split in results:
+        for nf_idx, nf_split in enumerate(split['nf_split_data']):
             if nf_idx < len(roc_aucs_tr):
                 roc_aucs_tr[nf_idx].append(nf_split['roc_auc_tr'])
                 roc_aucs_te[nf_idx].append(nf_split['roc_auc_te'])
@@ -491,16 +495,16 @@ if (args.run == 1):
     plt.legend(loc='lower right')
     # show final selected feature information
     feature_idxs = []
-    for split in results: feature_idxs.extend(split['nf_split_data'][19]['feature_idxs'])
+    for split in results: feature_idxs.extend(split['nf_split_data'][args.fs_top_final - 1]['feature_idxs'])
     feature_idxs = sorted(list(set(feature_idxs)))
-    feature_names = np.array(biobase.featureNames(eset_tr))
+    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
     feature_names = feature_names[feature_idxs]
     # print(*natsorted(feature_names), sep="\n")
     feature_mx_idx = {}
     for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
     coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
     for split_idx in range(len(results)):
-        split_data = results[split_idx]['nf_split_data'][19]
+        split_data = results[split_idx]['nf_split_data'][args.fs_top_final - 1]
         for idx in range(len(split_data['feature_idxs'])):
             coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
                 split_data['coefs'][idx]
@@ -517,7 +521,9 @@ if (args.run == 1):
         zip(
             feature_mean_coefs,
             feature_names,
-            r_get_gene_symbols(eset_tr, robjects.IntVector(np.array(feature_idxs) + 1)),
+            r_get_gene_symbols(
+                eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
+            ),
         ),
         reverse=True
     ): print(feature, "\t", symbol, "\t", rank)
@@ -525,7 +531,7 @@ elif args.run == 2:
     eset_tr_name = 'eset_gex_gse31210'
     base.load("data/" + eset_tr_name + ".Rda")
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-    results = pipeline_one_eset(eset_tr, fs_limma_svm, tr_meth_2)
+    results = pipeline_one_eset(eset_tr, fs_limma_svm_one, tr_meth_2)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
@@ -540,10 +546,10 @@ elif args.run == 2:
         tprs.append(interp(mean_fpr, split['fprs'], split['tprs']))
         tprs[-1][0] = 0.0
         roc_aucs.append(split['roc_auc_te'])
-        plt.plot(
-            split['fprs'], split['tprs'], lw=1, alpha=0.3,
-            label='ROC split %d (AUC = %0.4f)' % (idx + 1, split['roc_auc_te']),
-        )
+        # plt.plot(
+        #     split['fprs'], split['tprs'], lw=1, alpha=0.3,
+        #     label='ROC split %d (AUC = %0.4f)' % (idx + 1, split['roc_auc_te']),
+        # )
     mean_tpr = np.mean(tprs, axis=0)
     mean_tpr[-1] = 1.0
     mean_roc_auc = np.mean(roc_aucs)
@@ -598,7 +604,7 @@ elif args.run == 2:
     feature_idxs = []
     for split in results: feature_idxs.extend(split['feature_idxs'])
     feature_idxs = sorted(list(set(feature_idxs)))
-    feature_names = np.array(biobase.featureNames(eset_tr))
+    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
     feature_names = feature_names[feature_idxs]
     # print(*natsorted(feature_names), sep="\n")
     feature_mx_idx = {}
@@ -622,7 +628,9 @@ elif args.run == 2:
         zip(
             feature_mean_coefs,
             feature_names,
-            r_get_gene_symbols(eset_tr, robjects.IntVector(np.array(feature_idxs) + 1)),
+            r_get_gene_symbols(
+                eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
+            ),
         ),
         reverse=True
     ): print(feature, "\t", symbol, "\t", rank)
@@ -646,7 +654,7 @@ elif args.run == 3:
     for eset_te_name in eset_te_names:
         base.load("data/" + eset_te_name + ".Rda")
         eset_tes.append(r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name]))
-    results = pipeline_one_tr_multi_te(eset_tr, eset_tes, fs_limma_svm, tr_meth_1)
+    results = pipeline_one_tr_multi_te(eset_tr, eset_tes, fs_limma_svm_one, tr_meth_1)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
@@ -716,7 +724,9 @@ elif args.run == 3:
             zip(
                 nf_split['coefs'],
                 nf_split['feature_names'],
-                r_get_gene_symbols(eset_tr, robjects.IntVector(np.array(nf_split['feature_idxs']) + 1)),
+                r_get_gene_symbols(
+                    eset_tr, robjects.IntVector(np.array(nf_split['feature_idxs'], dtype=int) + 1)
+                ),
             ),
             reverse=True
         ): print(feature, "\t", symbol, "\t", rank)
