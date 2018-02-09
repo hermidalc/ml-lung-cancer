@@ -422,6 +422,38 @@ if (args.run == 1):
         color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
     )
     plt.legend(loc='lower right')
+    # show final selected feature information
+    feature_idxs = []
+    for split in results: feature_idxs.extend(split['nf_split_data'][19]['feature_idxs'])
+    feature_idxs = sorted(list(set(feature_idxs)))
+    feature_names = np.array(biobase.featureNames(eset_tr))
+    feature_names = feature_names[feature_idxs]
+    # print(*natsorted(feature_names), sep="\n")
+    feature_mx_idx = {}
+    for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
+    coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
+    for split_idx in range(len(results)):
+        split_data = results[split_idx]['nf_split_data'][19]
+        for idx in range(len(split_data['feature_idxs'])):
+            coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                split_data['coefs'][idx]
+    feature_mean_coefs = []
+    for idx in range(len(feature_idxs)):
+        feature_mean_coefs.append(np.mean(coef_mx[idx]))
+        # print(
+        #     feature_names[idx], "\t",
+        #     feature_mean_coefs[idx], "\t",
+        #     coef_mx[idx]
+        # )
+    for rank, feature, symbol in sorted(
+        zip(
+            feature_mean_coefs,
+            feature_names,
+            r_get_gene_symbols(eset_tr, robjects.IntVector(np.array(feature_idxs) + 1)),
+        ),
+        reverse=True
+
+    ): print(feature, "\t", symbol, "\t", rank)
 elif args.run == 2:
     eset_tr_name = 'eset_gex_gse31210'
     base.load("data/" + eset_tr_name + ".Rda")
