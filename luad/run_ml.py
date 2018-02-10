@@ -35,8 +35,8 @@ parser.add_argument('--analysis', type=int, help="analysis number")
 parser.add_argument('--splits', type=int, default=100, help='num splits')
 parser.add_argument('--fs-cv-size', type=float, default=0.3, help="fs cv size")
 parser.add_argument('--fs-dfx-min', type=int, default=10, help='fs min num dfx features')
-parser.add_argument('--fs-dfx-max', type=int, default=100, help='fs max num dfx features')
-parser.add_argument('--fs-dfx-pval', type=float, default=0.01, help="min dfx adj p value")
+parser.add_argument('--fs-dfx-max', type=int, default=500, help='fs max num dfx features')
+parser.add_argument('--fs-dfx-pval', type=float, default=0.05, help="min dfx adj p value")
 parser.add_argument('--fs-dfx-lfc', type=float, default=0, help="min dfx logfc")
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help="mean_coefs or mean_roc_aucs")
 parser.add_argument('--fs-top-cutoff', type=int, default=30, help='fs top ranked features cutoff')
@@ -72,26 +72,27 @@ def pipeline_one(eset, fs_meth, tr_meth):
         tr_idxs, te_idxs = train_test_split(np.arange(y.size), test_size=args.tr_cv_size, stratify=y)
         fs_idxs, cv_idxs = train_test_split(tr_idxs, test_size=args.fs_cv_size, stratify=y[tr_idxs])
         if print_header:
-            print('TR:', '%3s' % tr_idxs.size, ' TE:', '%3s' % te_idxs.size)
-            print('FS:', '%3s' % fs_idxs.size, ' CV:', '%3s' % cv_idxs.size)
+            print('TR: %3s' % tr_idxs.size, ' TE: %3s' % te_idxs.size)
+            print('FS: %3s' % fs_idxs.size, ' CV: %3s' % cv_idxs.size)
             print_header = False
         fs_data = fs_meth(X[fs_idxs], y[fs_idxs], X[cv_idxs], y[cv_idxs], fs_idxs, eset)
         if fs_data:
             split_results = tr_meth(X[tr_idxs], y[tr_idxs], X[te_idxs], y[te_idxs], eset, fs_data)
             results.append(split_results)
             split_count += 1
-            print('Split:', '%3s' % split_count, ' Fails:', '%3s' % fs_fail_count)
+            print('Split: %3s' % split_count, ' Fails: %3s' % fs_fail_count)
         else:
             fs_fail_count += 1
     return(results)
 # end pipeline
 
-def pipeline_one_vs_multi(eset_tr, eset_tes, fs_meth, tr_meth):
+def pipeline_one_vs_multi(eset_tr, esets_te, fs_meth, tr_meth):
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
     y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
-    data_tes = []
-    for eset_te in eset_tes:
-        data_tes.append((
+    Xys_te = []
+    for (eset_te_name, eset_te) in esets_te:
+        Xys_te.append((
+            eset_te_name,
             np.array(base.t(biobase.exprs(eset_te))),
             np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
         ))
@@ -102,19 +103,19 @@ def pipeline_one_vs_multi(eset_tr, eset_tes, fs_meth, tr_meth):
     while split_count < args.splits:
         fs_idxs, cv_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_cv_size, stratify=y_tr)
         if print_header:
-            print('FS:', '%3s' % fs_idxs.size, ' CV:', '%3s' % cv_idxs.size)
+            print('FS: %3s' % fs_idxs.size, ' CV: %3s' % cv_idxs.size)
             print_header = False
         fs_data = fs_meth(X_tr[fs_idxs], y_tr[fs_idxs], X_tr[cv_idxs], y_tr[cv_idxs], fs_idxs, eset_tr)
         if fs_data:
-            for idx, (X_te, y_te) in enumerate(data_tes):
-                print('TR:', '%3s' % y_tr.size, ' TE:', '%3s' % y_te.size)
+            for idx, (eset_te_name, X_te, y_te) in enumerate(Xys_te):
+                print('TR: %3s' % y_tr.size, ' TE: %3s [%s]' % (y_te.size, eset_te_name))
                 split_results = tr_meth(X_tr, y_tr, X_te, y_te, eset_tr, fs_data)
                 if idx < len(results):
                     results[idx].append(split_results)
                 else:
                     results.append([split_results])
-                split_count += 1
-                print('Split:', '%3s' % split_count, ' Fails:', '%3s' % fs_fail_count)
+            split_count += 1
+            print('Split: %3s' % split_count, ' Fails: %3s' % fs_fail_count)
         else:
             fs_fail_count += 1
     return(results)
@@ -132,15 +133,15 @@ def pipeline_one_vs_one(eset_tr, eset_te, fs_meth, tr_meth):
     while split_count < args.splits:
         fs_idxs, cv_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_cv_size, stratify=y_tr)
         if print_header:
-            print('TR:', '%3s' % y_tr.size, ' TE:', '%3s' % y_te.size)
-            print('FS:', '%3s' % fs_idxs.size, ' CV:', '%3s' % cv_idxs.size)
+            print('TR: %3s' % y_tr.size, ' TE: %3s' % y_te.size)
+            print('FS: %3s' % fs_idxs.size, ' CV: %3s' % cv_idxs.size)
             print_header = False
         fs_data = fs_meth(X_tr[fs_idxs], y_tr[fs_idxs], X_tr[cv_idxs], y_tr[cv_idxs], fs_idxs, eset_tr)
         if fs_data:
             split_results = tr_meth(X_tr, y_tr, X_te, y_te, eset_tr, fs_data)
             results.append(split_results)
             split_count += 1
-            print('Split:', '%3s' % split_count, ' Fails:', '%3s' % fs_fail_count)
+            print('Split: %3s' % split_count, ' Fails: %3s' % fs_fail_count)
         else:
             fs_fail_count += 1
     return(results)
@@ -189,9 +190,9 @@ def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
         })
         nf_split_count += 1
         print(
-            'Features:', '%3s' % nf_split_count,
-            ' ROC AUC (Train):', '%.4f' % tr_gscv_clf.best_score_,
-            ' ROC AUC (Test):', '%.4f' % roc_auc,
+            'Features: %3s' % nf_split_count,
+            ' ROC AUC (Train): %.4f' % tr_gscv_clf.best_score_,
+            ' ROC AUC (Test): %.4f' % roc_auc,
         )
     # end for
     # results = sorted(results, key=lambda k: k['roc_auc_te']).pop()
@@ -234,8 +235,8 @@ def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     rfe_feature_names = feature_names[tr_gscv_clf.best_estimator_.named_steps['rfe'].get_support(indices=True)]
     coefs = np.square(tr_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
     results = {
-        'gscv_clf': tr_gscv_clf,
         'fs_data': fs_data,
+        'gscv_clf': tr_gscv_clf,
         'feature_idxs': rfe_feature_idxs,
         'feature_names': rfe_feature_names,
         'fprs': fpr,
@@ -309,10 +310,11 @@ def fs_limma_svm(X_fs, y_fs, X_cv, y_cv, fs_idxs, eset_tr):
         'y_tests': y_cv,
         'roc_auc': roc_auc,
     }
-    print('Features:', '%3s / %3s' % (fs_num_features, len(feature_idxs)), ' ROC AUC:', '%.4f' % roc_auc)
+    print('Features: %3s / %3s' % (fs_num_features, len(feature_idxs)), ' ROC AUC: %.4f' % roc_auc)
     return(fs_data)
 # end fs limma svm
 
+# analyses
 if (args.analysis == 1):
     eset_tr_name = 'eset_gex_gse31210'
     base.load("data/" + eset_tr_name + ".Rda")
@@ -321,13 +323,13 @@ if (args.analysis == 1):
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train+Test\nROC Curves Using Limma+SVM Feature Selection (20 Top Ranked Features)')
+    plt.title('GSE31210 Train+Test ROC Curves\nUsing Limma+SVM Feature Selection (Top 10 Ranked Features)')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
     plt.ylim([-0.01,1.01])
     tprs, roc_aucs = [], []
-    mean_fpr = np.linspace(0, 1, 100)
+    mean_fpr = np.linspace(0, 1, 500)
     for idx, split in enumerate(results):
         nf_split = split['nf_split_data'][args.fs_top_final - 1]
         tprs.append(np.interp(mean_fpr, nf_split['fprs'], nf_split['tprs']))
@@ -366,8 +368,8 @@ if (args.analysis == 1):
             else:
                 roc_aucs_tr.append([nf_split['roc_auc_tr']])
                 roc_aucs_te.append([nf_split['roc_auc_te']])
-    mean_roc_aucs_tr, mean_roc_aucs_te = [], []
-    std_roc_aucs_tr, std_roc_aucs_te = [], []
+    mean_roc_aucs_tr, std_roc_aucs_tr = [], []
+    mean_roc_aucs_te, std_roc_aucs_te = [], []
     for nf_idx in range(len(roc_aucs_tr)):
         mean_roc_aucs_tr.append(np.mean(roc_aucs_tr[nf_idx]))
         mean_roc_aucs_te.append(np.mean(roc_aucs_te[nf_idx]))
@@ -383,7 +385,7 @@ if (args.analysis == 1):
     plt.xticks(plt_fig2_x_axis)
     plt.plot(
         plt_fig2_x_axis, mean_roc_aucs_tr,
-        lw=2, label='Mean ROC AUC (Train)',
+        lw=2, alpha=0.8, label='Mean ROC AUC (Train)',
         # label=r'Train Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (roc_auc_tr_mean, roc_auc_tr_std),
     )
     plt.fill_between(
@@ -394,7 +396,7 @@ if (args.analysis == 1):
     )
     plt.plot(
         plt_fig2_x_axis, mean_roc_aucs_te,
-        lw=2, label='Mean ROC AUC (Test)',
+        lw=2, alpha=0.8, label='Mean ROC AUC (Test)',
         # label=r'Test Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (roc_auc_te_mean, roc_auc_te_std),
     )
     plt.fill_between(
@@ -406,7 +408,8 @@ if (args.analysis == 1):
     plt.legend(loc='lower right')
     # show final selected feature information
     feature_idxs = []
-    for split in results: feature_idxs.extend(split['nf_split_data'][args.fs_top_final - 1]['feature_idxs'])
+    for split in results:
+        feature_idxs.extend(split['nf_split_data'][args.fs_top_final - 1]['feature_idxs'])
     feature_idxs = sorted(list(set(feature_idxs)))
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
     feature_names = feature_names[feature_idxs]
@@ -422,11 +425,7 @@ if (args.analysis == 1):
     feature_mean_coefs = []
     for idx in range(len(feature_idxs)):
         feature_mean_coefs.append(np.mean(coef_mx[idx]))
-        # print(
-        #     feature_names[idx], "\t",
-        #     feature_mean_coefs[idx], "\t",
-        #     coef_mx[idx]
-        # )
+        # print(feature_names[idx], "\t", feature_mean_coefs[idx], "\t", coef_mx[idx])
     print('Top Classifier Features:')
     for rank, feature, symbol in sorted(
         zip(
@@ -446,13 +445,13 @@ elif args.analysis == 2:
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train+Test\nROC Curves Using Limma+SVM+RFECV Feature Selection')
+    plt.title('GSE31210 Train+Test ROC Curves\nUsing Limma+SVM+RFECV Feature Selection')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
     plt.ylim([-0.01,1.01])
     tprs, roc_aucs = [], []
-    mean_fpr = np.linspace(0, 1, 100)
+    mean_fpr = np.linspace(0, 1, 500)
     for idx, split in enumerate(results):
         tprs.append(np.interp(mean_fpr, split['fprs'], split['tprs']))
         tprs[-1][0] = 0.0
@@ -502,9 +501,8 @@ elif args.analysis == 2:
     plt.xlim([0.5, max_features + 0.5])
     plt.xticks(plt_fig2_x_axis)
     plt.plot(
-        plt_fig2_x_axis,
-        mean_roc_aucs_tr,
-        lw=2, label='Mean ROC AUC (Train)',
+        plt_fig2_x_axis, mean_roc_aucs_tr,
+        lw=2, alpha=0.8, label='Mean ROC AUC (Train)',
     )
     plt.fill_between(
         plt_fig2_x_axis,
@@ -530,11 +528,7 @@ elif args.analysis == 2:
     feature_mean_coefs = []
     for idx in range(len(feature_idxs)):
         feature_mean_coefs.append(np.mean(coef_mx[idx]))
-        # print(
-        #     feature_names[idx], "\t",
-        #     feature_mean_coefs[idx], "\t",
-        #     coef_mx[idx]
-        # )
+        # print(feature_names[idx], "\t", feature_mean_coefs[idx], "\t",  coef_mx[idx])
     print('Top Classifier Features:')
     for rank, feature, symbol in sorted(
         zip(
@@ -556,44 +550,45 @@ elif args.analysis == 3:
         "eset_gex_gse37745",
         "eset_gex_gse50081",
     ]
-    te_colors = [
-        "red",
-        "blue",
-        "green",
-        "magenta",
-    ]
-    eset_tes = []
+    esets_te = []
     for eset_te_name in eset_te_names:
         base.load("data/" + eset_te_name + ".Rda")
-        eset_tes.append(r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name]))
-    results = pipeline_one_vs_multi(eset_tr, eset_tes, fs_limma_svm, tr_meth_1)
+        esets_te.append((
+            eset_te_name,
+            r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
+        ))
+    results = pipeline_one_vs_multi(eset_tr, esets_te, fs_limma_svm, tr_meth_1)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train Vs LUAD Test Datasets\nROC Curves Using Limma+SVM Feature Selection (Best Scoring Num Features)')
+    plt.title('GSE31210 Train Vs LUAD Test Datasets ROC Curves\nUsing Limma+SVM Feature Selection (Best Scoring Num Features)')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
     plt.ylim([-0.01,1.01])
     tprs, roc_aucs = [], []
-    mean_fpr = np.linspace(0, 1, 100)
+    mean_fpr = np.linspace(0, 1, 500)
     for idx, te_results in enumerate(results):
-        te_tprs, te_roc_aucs = [], []
+        te_tprs, te_roc_aucs, te_num_features = [], [], []
         for split in te_results:
             nf_split = sorted(split['nf_split_data'], key=lambda k: k['roc_auc_te']).pop()
             te_tprs.append(np.interp(mean_fpr, nf_split['fprs'], nf_split['tprs']))
             te_tprs[-1][0] = 0.0
             te_roc_aucs.append(nf_split['roc_auc_te'])
+            te_num_features.append(len(nf_split['feature_idxs']))
         te_mean_tpr = np.mean(te_tprs, axis=0)
         te_mean_tpr[-1] = 1.0
         te_mean_roc_auc = np.mean(te_roc_aucs)
         te_std_roc_auc = np.std(te_roc_aucs)
+        te_mean_num_features = np.mean(te_num_features)
+        te_std_num_features = np.std(te_num_features)
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         plt.plot(
-            te_mean_fpr, te_mean_tpr, lw=2, alpha=0.5,
-            label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (eset_te_name, te_mean_roc_auc, te_std_roc_auc),
+            mean_fpr, te_mean_tpr, lw=2, alpha=0.5,
+            label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Mean Features = %d $\pm$ %d)' %
+            (eset_te_name, te_mean_roc_auc, te_std_roc_auc, te_mean_num_features, te_std_num_features),
         )
-        tprs.append(np.interp(mean_fpr, te_mean_fpr, te_mean_tpr))
+        tprs.append(te_mean_tpr)
         tprs[-1][0] = 0.0
         roc_aucs.append(te_mean_roc_auc)
     mean_tpr = np.mean(tprs, axis=0)
@@ -625,32 +620,48 @@ elif args.analysis == 3:
     plt.xlim([0.5, max_features + 0.5])
     plt_fig2_x_axis = range(1, max_features + 1)
     plt.xticks(plt_fig2_x_axis)
-    plt.plot(
-        plt_fig2_x_axis, [s['roc_auc_tr'] for s in results[0][0]['nf_split_data']],
-        lw=2, label='GSE31210 ROC AUC (Train)',
-    )
+    roc_aucs_tr = []
     for idx, te_results in enumerate(results):
-        roc_aucs_tr, roc_aucs_te = [], []
+        roc_aucs_te = []
         for split in te_results:
             for nf_idx, nf_split in enumerate(split['nf_split_data']):
                 if nf_idx < len(roc_aucs_tr):
                     roc_aucs_tr[nf_idx].append(nf_split['roc_auc_tr'])
-                    roc_aucs_te[nf_idx].append(nf_split['roc_auc_te'])
                 else:
                     roc_aucs_tr.append([nf_split['roc_auc_tr']])
+                if nf_idx < len(roc_aucs_te):
+                    roc_aucs_te[nf_idx].append(nf_split['roc_auc_te'])
+                else:
                     roc_aucs_te.append([nf_split['roc_auc_te']])
-        mean_roc_aucs_tr, mean_roc_aucs_te = [], []
-        std_roc_aucs_tr, std_roc_aucs_te = [], []
-        for nf_idx in range(len(roc_aucs_tr)):
-            mean_roc_aucs_tr.append(np.mean(roc_aucs_tr[nf_idx]))
+        mean_roc_aucs_te, std_roc_aucs_te = [], []
+        for nf_idx in range(len(roc_aucs_te)):
             mean_roc_aucs_te.append(np.mean(roc_aucs_te[nf_idx]))
-            std_roc_aucs_tr.append(np.std(roc_aucs_tr[nf_idx]))
             std_roc_aucs_te.append(np.std(roc_aucs_te[nf_idx]))
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         plt.plot(
             plt_fig2_x_axis, mean_roc_aucs_te,
-            lw=2, color=te_colors[idx], label='%s ROC AUC (Test)' % eset_te_name,
+            lw=2, alpha=0.8, label='%s Mean ROC AUC (Test)' % eset_te_name,
         )
+        plt.fill_between(
+            plt_fig2_x_axis,
+            [m - s for m, s in zip(mean_roc_aucs_te, std_roc_aucs_te)],
+            [m + s for m, s in zip(mean_roc_aucs_te, std_roc_aucs_te)],
+            color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
+        )
+    mean_roc_aucs_tr, std_roc_aucs_tr = [], []
+    for nf_idx in range(len(roc_aucs_tr)):
+        mean_roc_aucs_tr.append(np.mean(roc_aucs_tr[nf_idx]))
+        std_roc_aucs_tr.append(np.std(roc_aucs_tr[nf_idx]))
+    plt.plot(
+        plt_fig2_x_axis, mean_roc_aucs_tr,
+        lw=2, alpha=0.8, label='GSE31210 Mean ROC AUC (Train)',
+    )
+    plt.fill_between(
+        plt_fig2_x_axis,
+        [m - s for m, s in zip(mean_roc_aucs_tr, std_roc_aucs_tr)],
+        [m + s for m, s in zip(mean_roc_aucs_tr, std_roc_aucs_tr)],
+        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+    )
     plt.legend(loc='lower right')
     # # display final selected feature information
     # for idx, split in enumerate(results):
