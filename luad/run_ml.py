@@ -19,46 +19,46 @@ from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 from matplotlib import style
 
-style.use("ggplot")
-base = importr("base")
-biobase = importr("Biobase")
-base.source("functions.R")
-r_rand_perm_sample_nums = robjects.globalenv["randPermSampleNums"]
-r_filter_eset = robjects.globalenv["filterEset"]
-r_filter_eset_ctrl_probesets = robjects.globalenv["filterEsetControlProbesets"]
-r_filter_eset_relapse_labels = robjects.globalenv["filterEsetRelapseLabels"]
-r_get_gene_symbols = robjects.globalenv["getGeneSymbols"]
-r_get_dfx_features = robjects.globalenv["getDfxFeatures"]
+style.use('ggplot')
+base = importr('base')
+biobase = importr('Biobase')
+base.source('functions.R')
+r_rand_perm_sample_nums = robjects.globalenv['randPermSampleNums']
+r_filter_eset = robjects.globalenv['filterEset']
+r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']
+r_filter_eset_relapse_labels = robjects.globalenv['filterEsetRelapseLabels']
+r_get_gene_symbols = robjects.globalenv['getGeneSymbols']
+r_get_dfx_features = robjects.globalenv['getDfxFeatures']
 # config
 parser = argparse.ArgumentParser()
-parser.add_argument('--analysis', type=int, help="analysis number")
+parser.add_argument('--analysis', type=int, help='analysis number')
 parser.add_argument('--splits', type=int, default=100, help='num splits')
-parser.add_argument('--fs-cv-size', type=float, default=0.3, help="fs cv size")
+parser.add_argument('--fs-cv-size', type=float, default=0.3, help='fs cv size')
 parser.add_argument('--fs-dfx-min', type=int, default=10, help='fs min num dfx features')
 parser.add_argument('--fs-dfx-max', type=int, default=500, help='fs max num dfx features')
-parser.add_argument('--fs-dfx-pval', type=float, default=0.05, help="min dfx adj p value")
-parser.add_argument('--fs-dfx-lfc', type=float, default=0, help="min dfx logfc")
-parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help="mean_coefs or mean_roc_aucs")
-parser.add_argument('--fs-top-cutoff', type=int, default=30, help='fs top ranked features cutoff')
+parser.add_argument('--fs-dfx-pval', type=float, default=0.05, help='fs min dfx adj p-value')
+parser.add_argument('--fs-dfx-lfc', type=float, default=0, help='fs min dfx logfc')
+parser.add_argument('--fs-dfx-cutoff', type=int, default=30, help='fs dfx top cutoff')
+parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='mean_coefs or mean_roc_aucs')
 parser.add_argument('--fs-top-final', type=int, default=20, help='fs top ranked features final')
 parser.add_argument('--fs-gscv-splits', type=int, default=50, help='num fs gscv splits')
 parser.add_argument('--fs-gscv-size', type=int, default=0.3, help='fs gscv cv size')
-parser.add_argument('--fs-gscv-jobs', type=int, default=-1, help="fs gscv parallel jobs")
-parser.add_argument('--fs-gscv-verbose', type=int, default=0, help="gscv verbosity")
-parser.add_argument('--tr-cv-size', type=float, default=0.3, help="tr cv size")
+parser.add_argument('--fs-gscv-jobs', type=int, default=-1, help='fs gscv parallel jobs')
+parser.add_argument('--fs-gscv-verbose', type=int, default=0, help='gscv verbosity')
+parser.add_argument('--tr-cv-size', type=float, default=0.3, help='tr cv size')
 parser.add_argument('--tr-gscv-splits', type=int, default=50, help='num tr gscv splits')
 parser.add_argument('--tr-gscv-size', type=int, default=0.3, help='tr gscv size')
-parser.add_argument('--tr-gscv-jobs', type=int, default=-1, help="tr gscv parallel jobs")
-parser.add_argument('--tr-gscv-verbose', type=int, default=0, help="tr gscv verbosity")
+parser.add_argument('--tr-gscv-jobs', type=int, default=-1, help='tr gscv parallel jobs')
+parser.add_argument('--tr-gscv-verbose', type=int, default=0, help='tr gscv verbosity')
 parser.add_argument('--tr-rfecv-splits', type=int, default=32, help='num tr rfecv splits')
 parser.add_argument('--tr-rfecv-size', type=int, default=0.3, help='rfecv cv size')
-parser.add_argument('--tr-rfecv-jobs', type=int, default=-1, help="num tr rfecv parallel jobs")
-parser.add_argument('--tr-rfecv-step', type=float, default=1, help="tr rfecv step")
-parser.add_argument('--tr-rfecv-verbose', type=int, default=0, help="tr rfecv verbosity")
+parser.add_argument('--tr-rfecv-jobs', type=int, default=-1, help='num tr rfecv parallel jobs')
+parser.add_argument('--tr-rfecv-step', type=float, default=1, help='tr rfecv step')
+parser.add_argument('--tr-rfecv-verbose', type=int, default=0, help='tr rfecv verbosity')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
-parser.add_argument('--svm-alg', type=str, default='liblinear', help="svm algorithm (liblinear or libsvm)")
-parser.add_argument('--eset-tr', type=str, help="R eset for fs/tr")
-parser.add_argument('--eset-te', type=str, help="R eset for te")
+parser.add_argument('--svm-alg', type=str, default='liblinear', help='svm algorithm (liblinear or libsvm)')
+parser.add_argument('--eset-tr', type=str, help='R eset for fs/tr')
+parser.add_argument('--eset-te', type=str, help='R eset for te')
 args = parser.parse_args()
 
 def pipeline_one(eset, fs_meth, tr_meth):
@@ -86,7 +86,7 @@ def pipeline_one(eset, fs_meth, tr_meth):
     return(results)
 # end pipeline
 
-def pipeline_one_vs_multi(eset_tr, esets_te, fs_meth, tr_meth):
+def pipeline_one_vs_many(eset_tr, esets_te, fs_meth, tr_meth):
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
     y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
     Xys_te = []
@@ -204,7 +204,7 @@ def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     #         r_get_gene_symbols(eset_tr, robjects.IntVector(results['feature_idxs'] + 1)),
     #     ),
     #     reverse=True
-    # ): print(feature, "\t", symbol, "\t", rank)
+    # ): print(feature, '\t', symbol, '\t', rank)
     return(results)
 # end tr meth
 
@@ -256,7 +256,7 @@ def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
             r_get_gene_symbols(eset_tr, robjects.IntVector(rfe_feature_idxs + 1)),
         ),
         reverse=True
-    ): print(feature, "\t", symbol, "\t", rank)
+    ): print(feature, '\t', symbol, '\t', rank)
     return(results)
 # end tr meth
 
@@ -297,7 +297,7 @@ def fs_limma_svm(X_fs, y_fs, X_cv, y_cv, fs_idxs, eset_tr):
         ),
         reverse=True
     )
-    fs_num_features = min(args.fs_top_cutoff, len(feature_idxs))
+    fs_num_features = min(args.fs_dfx_cutoff, len(feature_idxs))
     fs_data = {
         'feature_idxs': np.array([x for _, x, _ in feature_rank_data[:fs_num_features]], dtype=int),
         'feature_names': np.array([x for _, _, x in feature_rank_data[:fs_num_features]], dtype=str),
@@ -317,13 +317,16 @@ def fs_limma_svm(X_fs, y_fs, X_cv, y_cv, fs_idxs, eset_tr):
 # analyses
 if (args.analysis == 1):
     eset_tr_name = 'eset_gex_gse31210'
-    base.load("data/" + eset_tr_name + ".Rda")
+    base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     results = pipeline_one(eset_tr, fs_limma_svm, tr_meth_1)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train+Test ROC Curves\nUsing Limma+SVM Feature Selection (Top 10 Ranked Features)')
+    plt.title(
+        'GSE31210 Train+Test ROC Curves\n' +
+        'Using Limma+SVM Feature Selection (Top ' + args.fs_top_final + ' Ranked Features)'
+    )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
@@ -377,8 +380,8 @@ if (args.analysis == 1):
     plt.figure(2)
     plt.rcParams['font.size'] = 20
     plt.title('GSE31210 Train+Test\nEffect of Number Top Ranked Features Selected on ROC AUC')
-    plt.xlabel("Number of top-ranked features selected")
-    plt.ylabel("ROC AUC")
+    plt.xlabel('Number of top-ranked features selected')
+    plt.ylabel('ROC AUC')
     plt.xlim([0.5, len(mean_roc_aucs_tr) + 0.5])
     plt_fig2_x_axis = range(1, len(mean_roc_aucs_tr) + 1)
     plt.xticks(plt_fig2_x_axis)
@@ -412,7 +415,7 @@ if (args.analysis == 1):
     feature_idxs = sorted(list(set(feature_idxs)))
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
     feature_names = feature_names[feature_idxs]
-    # print(*natsorted(feature_names), sep="\n")
+    # print(*natsorted(feature_names), sep='\n')
     feature_mx_idx = {}
     for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
     coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
@@ -424,7 +427,7 @@ if (args.analysis == 1):
     feature_mean_coefs = []
     for idx in range(len(feature_idxs)):
         feature_mean_coefs.append(np.mean(coef_mx[idx]))
-        # print(feature_names[idx], "\t", feature_mean_coefs[idx], "\t", coef_mx[idx])
+        # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
     print('Top Classifier Features:')
     for rank, feature, symbol in sorted(
         zip(
@@ -435,10 +438,10 @@ if (args.analysis == 1):
             ),
         ),
         reverse=True
-    ): print(feature, "\t", symbol, "\t", rank)
+    ): print(feature, '\t', symbol, '\t', rank)
 elif args.analysis == 2:
     eset_tr_name = 'eset_gex_gse31210'
-    base.load("data/" + eset_tr_name + ".Rda")
+    base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     results = pipeline_one(eset_tr, fs_limma_svm, tr_meth_2)
     # plot roc curves
@@ -469,7 +472,7 @@ elif args.analysis == 2:
     plt.plot(
         mean_fpr, mean_tpr, color='darkblue', lw=2, alpha=0.8,
         label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
-        % (mean_roc_auc, std_roc_auc, mean_num_features, std_num_features),
+        (mean_roc_auc, std_roc_auc, mean_num_features, std_num_features),
     )
     std_tpr = np.std(tprs, axis=0)
     tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
@@ -518,7 +521,7 @@ elif args.analysis == 2:
     feature_idxs = sorted(list(set(feature_idxs)))
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
     feature_names = feature_names[feature_idxs]
-    # print(*natsorted(feature_names), sep="\n")
+    # print(*natsorted(feature_names), sep='\n')
     feature_mx_idx = {}
     for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
     coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
@@ -530,7 +533,7 @@ elif args.analysis == 2:
     feature_mean_coefs = []
     for idx in range(len(feature_idxs)):
         feature_mean_coefs.append(np.mean(coef_mx[idx]))
-        # print(feature_names[idx], "\t", feature_mean_coefs[idx], "\t",  coef_mx[idx])
+        # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t',  coef_mx[idx])
     print('Top Classifier Features:')
     for rank, feature, symbol in sorted(
         zip(
@@ -541,25 +544,25 @@ elif args.analysis == 2:
             ),
         ),
         reverse=True
-    ): print(feature, "\t", symbol, "\t", rank)
+    ): print(feature, '\t', symbol, '\t', rank)
 elif args.analysis == 3:
     eset_tr_name = 'eset_gex_gse31210'
-    base.load("data/" + eset_tr_name + ".Rda")
+    base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     eset_te_names = [
-        "eset_gex_gse8894",
-        "eset_gex_gse30219",
-        "eset_gex_gse37745",
-        "eset_gex_gse50081",
+        'eset_gex_gse8894',
+        'eset_gex_gse30219',
+        'eset_gex_gse37745',
+        'eset_gex_gse50081',
     ]
     esets_te = []
     for eset_te_name in eset_te_names:
-        base.load("data/" + eset_te_name + ".Rda")
+        base.load('data/' + eset_te_name + '.Rda')
         esets_te.append((
             eset_te_name,
             r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         ))
-    results = pipeline_one_vs_multi(eset_tr, esets_te, fs_limma_svm, tr_meth_1)
+    results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_meth_1)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
@@ -615,8 +618,8 @@ elif args.analysis == 3:
     plt.figure(2)
     plt.rcParams['font.size'] = 20
     plt.title('GSE31210 Train Vs LUAD Test Datasets\nEffect of Number Top Ranked Features Selected on ROC AUC')
-    plt.xlabel("Number of top-ranked features selected")
-    plt.ylabel("ROC AUC")
+    plt.xlabel('Number of top-ranked features selected')
+    plt.ylabel('ROC AUC')
     max_features = len(results[0][0]['nf_split_data'])
     plt.xlim([0.5, max_features + 0.5])
     plt_fig2_x_axis = range(1, max_features + 1)
@@ -673,7 +676,7 @@ elif args.analysis == 3:
             feature_idxs.extend(nf_split['feature_idxs'])
         feature_idxs = sorted(list(set(feature_idxs)))
         feature_names = feature_names[feature_idxs]
-        # print(*natsorted(feature_names), sep="\n")
+        # print(*natsorted(feature_names), sep='\n')
         feature_mx_idx = {}
         for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
         coef_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
@@ -685,7 +688,7 @@ elif args.analysis == 3:
         feature_mean_coefs = []
         for idx in range(len(feature_idxs)):
             feature_mean_coefs.append(np.mean(coef_mx[idx]))
-            # print(feature_names[idx], "\t", feature_mean_coefs[idx], "\t", coef_mx[idx])
+            # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         print('%s Best Scoring Features:' % eset_te_name)
         for rank, feature, symbol in sorted(
@@ -697,25 +700,25 @@ elif args.analysis == 3:
                 ),
             ),
             reverse=True
-        ): print(feature, "\t", symbol, "\t", rank)
+        ): print(feature, '\t', symbol, '\t', rank)
 elif args.analysis == 4:
     eset_tr_name = 'eset_gex_gse31210'
-    base.load("data/" + eset_tr_name + ".Rda")
+    base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     eset_te_names = [
-        "eset_gex_gse8894",
-        "eset_gex_gse30219",
-        "eset_gex_gse37745",
-        "eset_gex_gse50081",
+        'eset_gex_gse8894',
+        'eset_gex_gse30219',
+        'eset_gex_gse37745',
+        'eset_gex_gse50081',
     ]
     esets_te = []
     for eset_te_name in eset_te_names:
-        base.load("data/" + eset_te_name + ".Rda")
+        base.load('data/' + eset_te_name + '.Rda')
         esets_te.append((
             eset_te_name,
             r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         ))
-    results = pipeline_one_vs_multi(eset_tr, esets_te, fs_limma_svm, tr_meth_2)
+    results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_meth_2)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
@@ -773,7 +776,7 @@ elif args.analysis == 4:
         for split in te_results: feature_idxs.extend(split['feature_idxs'])
         feature_idxs = sorted(list(set(feature_idxs)))
         feature_names = feature_names[feature_idxs]
-        # print(*natsorted(feature_names), sep="\n")
+        # print(*natsorted(feature_names), sep='\n')
         feature_mx_idx = {}
         for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
         coef_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
@@ -785,7 +788,7 @@ elif args.analysis == 4:
         feature_mean_coefs = []
         for idx in range(len(feature_idxs)):
             feature_mean_coefs.append(np.mean(coef_mx[idx]))
-            # print(feature_names[idx], "\t", feature_mean_coefs[idx], "\t", coef_mx[idx])
+            # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         print('%s Selected Features:' % eset_te_name)
         for rank, feature, symbol in sorted(
@@ -797,55 +800,105 @@ elif args.analysis == 4:
                 ),
             ),
             reverse=True
-        ): print(feature, "\t", symbol, "\t", rank)
+        ): print(feature, '\t', symbol, '\t', rank)
+elif args.analysis == 5:
+    eset_pair_names = [
+        ('eset_gex_gse31210_gse8894_gse30219_gse37745', 'eset_gex_gse50081'),
+        ('eset_gex_gse31210_gse8894_gse30219_gse50081', 'eset_gex_gse37745'),
+        #('eset_gex_gse31210_gse8894_gse37745_gse50081', 'eset_gex_gse30219'),
+        #('eset_gex_gse31210_gse30219_gse37745_gse50081', 'eset_gex_gse8894'),
+        #('eset_gex_gse8894_gse30219_gse37745_gse50081', 'eset_gex_gse31210'),
+    ]
+    bc_methods = [
+        #'none',
+        #'std',
+        'cbt',
+        #'fab',
+        #'sva',
+        #'stica0',
+        #'stica025',
+        'stica05',
+        #'stica1',
+        'svd',
+    ]
+    te_results, bc_results = [], []
+    for te_idx, (eset_tr_name, eset_te_name) in enumerate(eset_pair_names):
+        for bc_idx, bc_method in enumerate(bc_methods):
+            bc_ext_tr, bc_ext_te = '', ''
+            if bc_method != 'none':
+                bc_ext_tr, bc_ext_te = '_tr_' + bc_method, '_te_' + bc_method
+            print(eset_tr_name + bc_ext_tr, '->', eset_te_name + bc_ext_te)
+            base.load('data/' + eset_tr_name + bc_ext_tr + '.Rda')
+            eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name + bc_ext_tr])
+            base.load('data/' + eset_te_name + bc_ext_te + '.Rda')
+            eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name + bc_ext_te])
+            results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_meth_1)
+            if te_idx < len(te_results):
+                te_results[te_idx].append(results)
+            else:
+                te_results.append([results])
+            if bc_idx < len(bc_results):
+                bc_results[bc_idx].append(results)
+            else:
+                bc_results.append([results])
 
+    pp = pprint.PrettyPrinter(indent=4)
 
-# if args.eset_te:
-#     base.load("data/" + args.eset_te + ".Rda")
-#     eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[args.eset_te])
-
-# eset_tr_strs = [
-#     "eset_gex_gse31210_gse8894_gse30219_gse37745",
-#     "eset_gex_gse31210_gse8894_gse30219_gse50081",
-#     "eset_gex_gse31210_gse8894_gse37745_gse50081",
-#     "eset_gex_gse31210_gse30219_gse37745_gse50081",
-#     "eset_gex_gse8894_gse30219_gse37745_gse50081"
-# ]
-# eset_te_strs = [
-#     "eset_gex_gse50081",
-#     "eset_gex_gse37745",
-#     "eset_gex_gse30219",
-#     "eset_gex_gse8894",
-#     "eset_gex_gse31210"
-# ]
-
-# pipeline 3
-# eset_tr_str = "eset_gex_gse31210_tr_qnorm"
-# eset_te_strs = [
-#     "eset_gex_gse8894_te_qnorm",
-#     "eset_gex_gse30219_te_qnorm",
-#     "eset_gex_gse37745_te_qnorm",
-#     "eset_gex_gse50081_te_qnorm",
-# ]
-# colors = [
-#     'blue',
-#     'green',
-#     'red',
-#     'magenta',
-# ]
-# base.load("data/" + eset_tr_str + ".Rda")
-# eset_gex_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_str])
-# plt_attrs = {
-#     'label_tr': eset_tr_str,
-#     'label_te': [],
-#     'color': [],
-# }
-# eset_gex_te_s = []
-# for idx, eset_te_str in enumerate(eset_te_strs):
-#     base.load("data/" + eset_te_str + ".Rda")
-#     eset_gex_te_s.append(r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_str]))
-#     plt_attrs['label_te'].append(eset_te_str)
-#     plt_attrs['color'].append(colors[idx])
-# pipeline_3(eset_gex_tr, eset_gex_te_s, fs_meth_1, tr_meth_1, plt_attrs)
+    # plot effect bc method vs test dataset roc auc
+    plt.figure(1)
+    plt.rcParams['font.size'] = 20
+    plt.title(
+        'Effect of Batch Effect Correction Method on Classifier Performance\n' +
+        'Using Limma+SVM Feature Selection (Top ' + args.fs_top_final + ' Ranked Features)'
+    )
+    plt.xlabel('Batch Effect Correction Method')
+    plt.ylabel('ROC AUC')
+    plt_fig1_x_axis = range(1, len(bc_methods) + 1)
+    plt.xticks(plt_fig1_x_axis, bc_methods, rotation=60)
+    for te_idx, bc_results in enumerate(te_results):
+        mean_roc_aucs_bc, range_roc_aucs_bc = [], [[], []]
+        for results in bc_results:
+            roc_aucs_bc = []
+            for split in results:
+                nf_split = split['nf_split_data'][args.fs_top_final - 1]
+                roc_aucs_bc.append(nf_split['roc_auc_te'])
+            mean_roc_aucs_bc.append(np.mean(roc_aucs_bc))
+        range_roc_aucs_bc[0].append(mean_roc_aucs_bc - min(mean_roc_aucs_bc))
+        range_roc_aucs_bc[1].append(max(mean_roc_aucs_bc) - mean_roc_aucs_bc)
+        _, eset_te_name = eset_pair_names[te_idx]
+        eset_te_name.replace('eset_gex_', '').upper()
+        plt.errorbar(
+            plt_fig2_x_axis, mean_roc_aucs_bc, yerr=range_roc_aucs_bc, lw=2, alpha=0.8,
+            capsize=50, elinewidth=2, markeredgewidth=2, marker='s', label=eset_te_name,
+        )
+        pp.pprint(mean_roc_aucs_bc)
+        pp.pprint(range_roc_aucs_bc)
+    # plot effect test dataset vs bc roc auc
+    plt.figure(2)
+    plt.rcParams['font.size'] = 20
+    plt.title(
+        'Effect of Test Dataset on Classifier Performance\n' +
+        'Using Limma+SVM Feature Selection (Top ' + args.fs_top_final + ' Ranked Features)'
+    )
+    plt.xlabel('Test Dataset')
+    plt.ylabel('ROC AUC')
+    plt_fig2_x_axis = range(1, len([t for _, t in eset_pair_names]) + 1)
+    plt.xticks(plt_fig2_x_axis, [t for _, t in eset_pair_names], rotation=60)
+    for bc_idx, te_results in enumerate(bc_results):
+        mean_roc_aucs_te, range_roc_aucs_te = [], [[], []]
+        for results in te_results:
+            roc_aucs_te = []
+            for split in results:
+                nf_split = split['nf_split_data'][args.fs_top_final - 1]
+                roc_aucs_te.append(nf_split['roc_auc_te'])
+            mean_roc_aucs_te.append(np.mean(roc_aucs_te))
+        range_roc_aucs_te[0].append(mean_roc_aucs_te - min(mean_roc_aucs_te))
+        range_roc_aucs_te[1].append(max(mean_roc_aucs_te) - mean_roc_aucs_te)
+        plt.errorbar(
+            plt_fig2_x_axis, mean_roc_aucs_te, yerr=range_roc_aucs_te, lw=2, alpha=0.8,
+            capsize=50, elinewidth=2, markeredgewidth=2, marker='s', label=bc_methods[bc_idx],
+        )
+        pp.pprint(mean_roc_aucs_te)
+        pp.pprint(range_roc_aucs_te)
 
 plt.show()
