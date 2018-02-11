@@ -352,8 +352,7 @@ if (args.analysis == 1):
     tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
     plt.fill_between(
         mean_fpr, tprs_lower, tprs_upper,
-        color='grey', alpha=0.2,
-        label=r'$\pm$ 1 std. dev.'
+        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
     plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=0.8, label='Chance')
     plt.legend(loc='lower right')
@@ -406,7 +405,7 @@ if (args.analysis == 1):
         color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
     )
     plt.legend(loc='lower right')
-    # show final selected feature information
+    # print final selected feature information
     feature_idxs = []
     for split in results:
         feature_idxs.extend(split['nf_split_data'][args.fs_top_final - 1]['feature_idxs'])
@@ -450,12 +449,13 @@ elif args.analysis == 2:
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
     plt.ylim([-0.01,1.01])
-    tprs, roc_aucs = [], []
+    tprs, roc_aucs, num_features = [], [], []
     mean_fpr = np.linspace(0, 1, 500)
     for idx, split in enumerate(results):
         tprs.append(np.interp(mean_fpr, split['fprs'], split['tprs']))
         tprs[-1][0] = 0.0
         roc_aucs.append(split['roc_auc_te'])
+        num_features.append(len(split['feature_idxs']))
         plt.plot(
             split['fprs'], split['tprs'], lw=1, alpha=0.3,
             # label='ROC split %d (AUC = %0.4f)' % (idx + 1, split['roc_auc_te']),
@@ -464,17 +464,19 @@ elif args.analysis == 2:
     mean_tpr[-1] = 1.0
     mean_roc_auc = np.mean(roc_aucs)
     std_roc_auc = np.std(roc_aucs)
+    mean_num_features = np.mean(num_features)
+    std_num_features = np.std(num_features)
     plt.plot(
         mean_fpr, mean_tpr, color='darkblue', lw=2, alpha=0.8,
-        label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (mean_roc_auc, std_roc_auc),
+        label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
+        % (mean_roc_auc, std_roc_auc, mean_num_features, std_num_features),
     )
     std_tpr = np.std(tprs, axis=0)
     tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
     tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
     plt.fill_between(
         mean_fpr, tprs_lower, tprs_upper,
-        color='grey', alpha=0.2,
-        label=r'$\pm$ 1 std. dev.'
+        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
     plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=0.8, label='Chance')
     plt.legend(loc='lower right')
@@ -496,7 +498,7 @@ elif args.analysis == 2:
     plt.title('GSE31210 Train+Test\nEffect of Number of RFECV Features Selected on Train ROC AUC')
     plt.xlabel('Number of features selected')
     plt.ylabel('ROC AUC')
-    max_features = len(results[0]['gscv_clf'].best_estimator_.named_steps['rfe'].grid_scores_)
+    max_features = max([len(s['feature_idxs']) for s in results])
     plt_fig2_x_axis = range(1, max_features + 1)
     plt.xlim([0.5, max_features + 0.5])
     plt.xticks(plt_fig2_x_axis)
@@ -510,7 +512,7 @@ elif args.analysis == 2:
         [m + s for m, s in zip(mean_roc_aucs_tr, std_roc_aucs_tr)],
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
-    # show final selected feature information
+    # print final selected feature information
     feature_idxs = []
     for split in results: feature_idxs.extend(split['feature_idxs'])
     feature_idxs = sorted(list(set(feature_idxs)))
@@ -585,7 +587,7 @@ elif args.analysis == 3:
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         plt.plot(
             mean_fpr, te_mean_tpr, lw=2, alpha=0.5,
-            label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Mean Features = %d $\pm$ %d)' %
+            label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
             (eset_te_name, te_mean_roc_auc, te_std_roc_auc, te_mean_num_features, te_std_num_features),
         )
         tprs.append(te_mean_tpr)
@@ -604,8 +606,7 @@ elif args.analysis == 3:
     tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
     plt.fill_between(
         mean_fpr, tprs_lower, tprs_upper,
-        color='grey', alpha=0.2,
-        label=r'$\pm$ 1 std. dev.'
+        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
     plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=0.8, label='Chance')
     plt.legend(loc='lower right')
@@ -663,51 +664,141 @@ elif args.analysis == 3:
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
     plt.legend(loc='lower right')
-    # # display final selected feature information
-    # for idx, split in enumerate(results):
-    #     eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
-    #     nf_split = sorted(split['nf_split_data'], key=lambda k: k['roc_auc_te']).pop()
-    #     print('%s Top Features:' % eset_te_name)
-    #     for rank, feature, symbol in sorted(
-    #         zip(
-    #             nf_split['coefs'],
-    #             nf_split['feature_names'],
-    #             r_get_gene_symbols(
-    #                 eset_tr, robjects.IntVector(np.array(nf_split['feature_idxs'], dtype=int) + 1)
-    #             ),
-    #         ),
-    #         reverse=True
-    #     ): print(feature, "\t", symbol, "\t", rank)
+    # print final selected feature information
+    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
+    for idx, te_results in enumerate(results):
+        feature_idxs = []
+        for split in te_results:
+            nf_split = sorted(split['nf_split_data'], key=lambda k: k['roc_auc_te']).pop()
+            feature_idxs.extend(nf_split['feature_idxs'])
+        feature_idxs = sorted(list(set(feature_idxs)))
+        feature_names = feature_names[feature_idxs]
+        # print(*natsorted(feature_names), sep="\n")
+        feature_mx_idx = {}
+        for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
+        coef_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
+        for split_idx in range(len(te_results)):
+            split_data = sorted(te_results[split_idx]['nf_split_data'], key=lambda k: k['roc_auc_te']).pop()
+            for idx in range(len(split_data['feature_idxs'])):
+                coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                    split_data['coefs'][idx]
+        feature_mean_coefs = []
+        for idx in range(len(feature_idxs)):
+            feature_mean_coefs.append(np.mean(coef_mx[idx]))
+            # print(feature_names[idx], "\t", feature_mean_coefs[idx], "\t", coef_mx[idx])
+        eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
+        print('%s Best Scoring Features:' % eset_te_name)
+        for rank, feature, symbol in sorted(
+            zip(
+                feature_mean_coefs,
+                feature_names,
+                r_get_gene_symbols(
+                    eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
+                ),
+            ),
+            reverse=True
+        ): print(feature, "\t", symbol, "\t", rank)
+elif args.analysis == 4:
+    eset_tr_name = 'eset_gex_gse31210'
+    base.load("data/" + eset_tr_name + ".Rda")
+    eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
+    eset_te_names = [
+        "eset_gex_gse8894",
+        "eset_gex_gse30219",
+        "eset_gex_gse37745",
+        "eset_gex_gse50081",
+    ]
+    esets_te = []
+    for eset_te_name in eset_te_names:
+        base.load("data/" + eset_te_name + ".Rda")
+        esets_te.append((
+            eset_te_name,
+            r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
+        ))
+    results = pipeline_one_vs_multi(eset_tr, esets_te, fs_limma_svm, tr_meth_2)
+    # plot roc curves
+    plt.figure(1)
+    plt.rcParams['font.size'] = 20
+    plt.title('GSE31210 Train Vs LUAD Test Datasets ROC Curves\nUsing Limma+SVM+RFECV Feature Selection')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.xlim([-0.01,1.01])
+    plt.ylim([-0.01,1.01])
+    tprs, roc_aucs = [], []
+    mean_fpr = np.linspace(0, 1, 500)
+    for idx, te_results in enumerate(results):
+        te_tprs, te_roc_aucs, te_num_features = [], [], []
+        for split in te_results:
+            te_tprs.append(np.interp(mean_fpr, split['fprs'], split['tprs']))
+            te_tprs[-1][0] = 0.0
+            te_roc_aucs.append(split['roc_auc_te'])
+            te_num_features.append(len(split['feature_idxs']))
+        te_mean_tpr = np.mean(te_tprs, axis=0)
+        te_mean_tpr[-1] = 1.0
+        te_mean_roc_auc = np.mean(te_roc_aucs)
+        te_std_roc_auc = np.std(te_roc_aucs)
+        te_mean_num_features = np.mean(te_num_features)
+        te_std_num_features = np.std(te_num_features)
+        eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
+        plt.plot(
+            mean_fpr, te_mean_tpr, lw=2, alpha=0.5,
+            label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
+            (eset_te_name, te_mean_roc_auc, te_std_roc_auc, te_mean_num_features, te_std_num_features),
+        )
+        tprs.append(te_mean_tpr)
+        tprs[-1][0] = 0.0
+        roc_aucs.append(te_mean_roc_auc)
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_roc_auc = np.mean(roc_aucs)
+    std_roc_auc = np.std(roc_aucs)
+    plt.plot(
+        mean_fpr, mean_tpr, color='darkblue', lw=2, alpha=0.8,
+        label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (mean_roc_auc, std_roc_auc),
+    )
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    plt.fill_between(
+        mean_fpr, tprs_lower, tprs_upper,
+        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+    )
+    plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=0.8, label='Chance')
+    plt.legend(loc='lower right')
+    plt.grid('off')
+    # print final selected feature information
+    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
+    for idx, te_results in enumerate(results):
+        feature_idxs = []
+        for split in te_results: feature_idxs.extend(split['feature_idxs'])
+        feature_idxs = sorted(list(set(feature_idxs)))
+        feature_names = feature_names[feature_idxs]
+        # print(*natsorted(feature_names), sep="\n")
+        feature_mx_idx = {}
+        for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
+        coef_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
+        for split_idx in range(len(te_results)):
+            split_data = te_results[split_idx]
+            for idx in range(len(split_data['feature_idxs'])):
+                coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                    split_data['coefs'][idx]
+        feature_mean_coefs = []
+        for idx in range(len(feature_idxs)):
+            feature_mean_coefs.append(np.mean(coef_mx[idx]))
+            # print(feature_names[idx], "\t", feature_mean_coefs[idx], "\t", coef_mx[idx])
+        eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
+        print('%s Selected Features:' % eset_te_name)
+        for rank, feature, symbol in sorted(
+            zip(
+                feature_mean_coefs,
+                feature_names,
+                r_get_gene_symbols(
+                    eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
+                ),
+            ),
+            reverse=True
+        ): print(feature, "\t", symbol, "\t", rank)
 
-
-    # roc_aucs_tr, roc_aucs_te = [], []
-    # for split in results:
-    #     for nf_idx, nf_split in enumerate(split['nf_split_data']):
-    #         if nf_idx < len(roc_aucs_tr):
-    #             roc_aucs_tr[nf_idx].append(nf_split['roc_auc_tr'])
-    #             roc_aucs_te[nf_idx].append(nf_split['roc_auc_te'])
-    #         else:
-    #             roc_aucs_tr.append([nf_split['roc_auc_tr']])
-    #             roc_aucs_te.append([nf_split['roc_auc_te']])
-    # mean_roc_aucs_tr, mean_roc_aucs_te = [], []
-    # std_roc_aucs_tr, std_roc_aucs_te = [], []
-    # for nf_idx in range(len(roc_aucs_tr)):
-    #     mean_roc_aucs_tr.append(np.mean(roc_aucs_tr[nf_idx]))
-    #     mean_roc_aucs_te.append(np.mean(roc_aucs_te[nf_idx]))
-    #     std_roc_aucs_tr.append(np.std(roc_aucs_tr[nf_idx]))
-    #     std_roc_aucs_te.append(np.std(roc_aucs_te[nf_idx]))
-    # plt.fill_between(
-    #     plt_fig2_x_axis,
-    #     [m - s for m, s in zip(mean_roc_aucs_tr, std_roc_aucs_tr)],
-    #     [m + s for m, s in zip(mean_roc_aucs_tr, std_roc_aucs_tr)],
-    #     color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
-    # )
-    # plt.fill_between(
-    #     plt_fig2_x_axis,
-    #     [m - s for m, s in zip(mean_roc_aucs_te, std_roc_aucs_te)],
-    #     [m + s for m, s in zip(mean_roc_aucs_te, std_roc_aucs_te)],
-    #     color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
-    # )
 
 # if args.eset_te:
 #     base.load("data/" + args.eset_te + ".Rda")
