@@ -34,13 +34,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis number')
 parser.add_argument('--splits', type=int, default=100, help='num splits')
 parser.add_argument('--fs-size', type=float, default=0.5, help='fs size')
-parser.add_argument('--fs-dfx-min', type=int, default=10, help='fs min num dfx features')
 parser.add_argument('--fs-dfx-max', type=int, default=500, help='fs max num dfx features')
 parser.add_argument('--fs-dfx-pval', type=float, default=0.05, help='fs min dfx adj p-value')
 parser.add_argument('--fs-dfx-lfc', type=float, default=0, help='fs min dfx logfc')
-parser.add_argument('--fs-dfx-cutoff', type=int, default=30, help='fs dfx top cutoff')
+parser.add_argument('--fs-dfx-select', type=int, default=30, help='fs dfx top select')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='mean_coefs or mean_roc_aucs')
-parser.add_argument('--fs-top-final', type=int, default=20, help='fs top ranked features final')
+parser.add_argument('--fs-final-select', type=int, default=20, help='fs final top select')
 parser.add_argument('--fs-gscv-splits', type=int, default=50, help='num fs gscv splits')
 parser.add_argument('--fs-gscv-size', type=int, default=0.3, help='fs gscv cv size')
 parser.add_argument('--fs-gscv-jobs', type=int, default=-1, help='fs gscv parallel jobs')
@@ -85,7 +84,7 @@ def pipeline_one(eset, fs_meth, tr_meth):
         else:
             fs_fail_count += 1
     return(results)
-# end pipeline
+# end pipeline_one
 
 def pipeline_one_vs_many(eset_tr, esets_te, fs_meth, tr_meth):
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
@@ -122,7 +121,7 @@ def pipeline_one_vs_many(eset_tr, esets_te, fs_meth, tr_meth):
         else:
             fs_fail_count += 1
     return(results)
-# end pipeline
+# end pipeline_one_vs_many
 
 def pipeline_one_vs_one(eset_tr, eset_te, fs_meth, tr_meth):
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
@@ -149,16 +148,15 @@ def pipeline_one_vs_one(eset_tr, eset_te, fs_meth, tr_meth):
         else:
             fs_fail_count += 1
     return(results)
-# end pipeline
+# end pipeline_one_vs_one
 
-def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
+def tr_topfwd_svm(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     tr_gscv_clf = GridSearchCV(
         Pipeline([
             ('slr', StandardScaler()),
             ('svc', LinearSVC(class_weight='balanced')),
         ]),
         param_grid=[
-            # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
             { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
         ],
         cv=StratifiedShuffleSplit(n_splits=args.tr_gscv_splits, test_size=args.tr_gscv_size),
@@ -199,20 +197,20 @@ def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
             ' ROC AUC (Test): %.4f' % roc_auc,
         )
     # end for
-    # results = sorted(results, key=lambda k: k['roc_auc_te']).pop()
-    # print('Num Features:', results['feature_idxs'].size)
+    # best_result = sorted(results, key=lambda k: k['roc_auc_te']).pop()
+    # print('Num Features:', best_result['feature_idxs'].size)
     # for rank, feature, symbol in sorted(
     #     zip(
-    #         results['coefs'],
-    #         results['feature_names'],
-    #         r_get_gene_symbols(eset_tr, robjects.IntVector(results['feature_idxs'] + 1)),
+    #         best_result['coefs'],
+    #         best_result['feature_names'],
+    #         r_get_gene_symbols(eset_tr, robjects.IntVector(best_result['feature_idxs'] + 1)),
     #     ),
     #     reverse=True
     # ): print(feature, '\t', symbol, '\t', rank)
     return(results)
-# end tr meth
+# end tr_topfwd_svm
 
-def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
+def tr_rfecv_svm(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     tr_gscv_clf = GridSearchCV(
         Pipeline([
             ('slr', StandardScaler()),
@@ -224,7 +222,6 @@ def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
             ('svc', LinearSVC(class_weight='balanced')),
         ]),
         param_grid=[
-            # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
             { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
         ],
         cv=StratifiedShuffleSplit(n_splits=args.tr_gscv_splits, test_size=args.tr_gscv_size),
@@ -266,7 +263,7 @@ def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
         ' ROC AUC (Test): %.4f' % roc_auc,
     )
     return(results)
-# end tr meth
+# end tr_rfecv_svm
 
 def fs_limma_svm(X_fs, y_fs, eset_fs):
     feature_idxs = np.array(
@@ -278,14 +275,13 @@ def fs_limma_svm(X_fs, y_fs, eset_fs):
             args.fs_dfx_max,
         )
     ) - 1
-    if feature_idxs.size < args.fs_dfx_min: return()
+    if feature_idxs.size < args.fs_dfx_select: return()
     fs_gscv_clf = GridSearchCV(
         Pipeline([
             ('slr', StandardScaler()),
             ('svc', LinearSVC(class_weight='balanced')),
         ]),
         param_grid=[
-            # { 'svc__kernel': ['linear'], 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
             { 'svc__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000] },
         ],
         cv=StratifiedShuffleSplit(n_splits=args.fs_gscv_splits, test_size=args.fs_gscv_size),
@@ -296,7 +292,7 @@ def fs_limma_svm(X_fs, y_fs, eset_fs):
     coefs = np.square(fs_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
     feature_names = np.array(biobase.featureNames(eset_fs), dtype=str)
     feature_rank_data = sorted(zip(coefs, feature_idxs, feature_names[feature_idxs]), reverse=True)
-    fs_num_features = min(args.fs_dfx_cutoff, len(feature_idxs))
+    fs_num_features = min(args.fs_dfx_select, len(feature_idxs))
     fs_data = {
         'coefs': np.array([x for x, _, _ in feature_rank_data[:fs_num_features]]),
         'feature_idxs': np.array([x for _, x, _ in feature_rank_data[:fs_num_features]], dtype=int),
@@ -315,13 +311,13 @@ if (args.analysis == 1):
     eset_tr_name = 'eset_gex_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-    results = pipeline_one(eset_tr, fs_limma_svm, tr_meth_1)
+    results = pipeline_one(eset_tr, fs_limma_svm, tr_topfwd_svm)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train+Test ROC Curves\n' +
-        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
+        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
     )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
@@ -330,7 +326,7 @@ if (args.analysis == 1):
     tprs, roc_aucs = [], []
     mean_fpr = np.linspace(0, 1, 500)
     for idx, split in enumerate(results):
-        nf_split = split['nf_split_data'][args.fs_top_final - 1]
+        nf_split = split['nf_split_data'][args.fs_final_select - 1]
         tprs.append(np.interp(mean_fpr, nf_split['fprs'], nf_split['tprs']))
         tprs[-1][0] = 0.0
         roc_aucs.append(nf_split['roc_auc_te'])
@@ -407,7 +403,7 @@ if (args.analysis == 1):
     # print final selected feature information
     feature_idxs = []
     for split in results:
-        feature_idxs.extend(split['nf_split_data'][args.fs_top_final - 1]['feature_idxs'])
+        feature_idxs.extend(split['nf_split_data'][args.fs_final_select - 1]['feature_idxs'])
     feature_idxs = sorted(list(set(feature_idxs)))
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
     feature_names = feature_names[feature_idxs]
@@ -416,7 +412,7 @@ if (args.analysis == 1):
     for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
     coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
     for split_idx in range(len(results)):
-        split_data = results[split_idx]['nf_split_data'][args.fs_top_final - 1]
+        split_data = results[split_idx]['nf_split_data'][args.fs_final_select - 1]
         for idx in range(len(split_data['feature_idxs'])):
             coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
                 split_data['coefs'][idx]
@@ -439,7 +435,7 @@ elif args.analysis == 2:
     eset_tr_name = 'eset_gex_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-    results = pipeline_one(eset_tr, fs_limma_svm, tr_meth_2)
+    results = pipeline_one(eset_tr, fs_limma_svm, tr_rfecv_svm)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
@@ -483,7 +479,9 @@ elif args.analysis == 2:
     # plot num features selected vs train roc auc
     roc_aucs_tr = []
     for split in results:
-        for nf_idx, roc_auc_tr in enumerate(split['gscv_clf'].best_estimator_.named_steps['rfe'].grid_scores_):
+        for nf_idx, roc_auc_tr in enumerate(
+            split['gscv_clf'].best_estimator_.named_steps['rfe'].grid_scores_
+        ):
             if nf_idx < len(roc_aucs_tr):
                 roc_aucs_tr[nf_idx].append(roc_auc_tr)
             else:
@@ -557,7 +555,7 @@ elif args.analysis == 3:
             eset_te_name,
             r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         ))
-    results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_meth_1)
+    results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_topfwd_svm)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
@@ -716,7 +714,7 @@ elif args.analysis == 4:
             eset_te_name,
             r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         ))
-    results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_meth_2)
+    results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_rfecv_svm)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
@@ -830,7 +828,7 @@ elif args.analysis == 5:
             eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name + bc_ext_tr])
             base.load('data/' + eset_te_name + bc_ext_te + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name + bc_ext_te])
-            results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_meth_1)
+            results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_topfwd_svm)
             if te_idx < len(te_results):
                 te_results[te_idx].append(results)
             else:
@@ -844,7 +842,7 @@ elif args.analysis == 5:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on Classifier Performance\n' +
-        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
+        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
@@ -856,7 +854,7 @@ elif args.analysis == 5:
         for results in te_bc_results:
             roc_aucs_tr_bc, roc_aucs_te_bc = [], []
             for split in results:
-                nf_split = split['nf_split_data'][args.fs_top_final - 1]
+                nf_split = split['nf_split_data'][args.fs_final_select - 1]
                 roc_aucs_tr_bc.append(nf_split['roc_auc_tr'])
                 roc_aucs_te_bc.append(nf_split['roc_auc_te'])
             mean_roc_aucs_tr_bc.append(np.mean(roc_aucs_tr_bc))
@@ -886,7 +884,7 @@ elif args.analysis == 5:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Test Dataset on Classifier Performance\n' +
-        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
+        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
@@ -899,7 +897,7 @@ elif args.analysis == 5:
         for results in bc_te_results:
             roc_aucs_bc_tr, roc_aucs_bc_te = [], []
             for split in results:
-                nf_split = split['nf_split_data'][args.fs_top_final - 1]
+                nf_split = split['nf_split_data'][args.fs_final_select - 1]
                 roc_aucs_bc_tr.append(nf_split['roc_auc_tr'])
                 roc_aucs_bc_te.append(nf_split['roc_auc_te'])
             mean_roc_aucs_bc_tr.append(np.mean(roc_aucs_bc_tr))
@@ -951,7 +949,7 @@ elif args.analysis == 6:
             eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name + bc_ext_tr])
             base.load('data/' + eset_te_name + bc_ext_te + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name + bc_ext_te])
-            results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_meth_1)
+            results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_rfecv_svm)
             if te_idx < len(te_results):
                 te_results[te_idx].append(results)
             else:
@@ -1006,7 +1004,7 @@ elif args.analysis == 6:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Test Dataset on Classifier Performance\n' +
-        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
+        'Using Limma+SVM+RFECV Feature Selection'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
