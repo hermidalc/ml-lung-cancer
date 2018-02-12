@@ -28,12 +28,12 @@ r_filter_eset = robjects.globalenv['filterEset']
 r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']
 r_filter_eset_relapse_labels = robjects.globalenv['filterEsetRelapseLabels']
 r_get_gene_symbols = robjects.globalenv['getGeneSymbols']
-r_get_dfx_features = robjects.globalenv['getDfxFeatures']
+r_get_limma_features = robjects.globalenv['getLimmaFeatures']
 # config
 parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis number')
 parser.add_argument('--splits', type=int, default=100, help='num splits')
-parser.add_argument('--fs-cv-size', type=float, default=0.3, help='fs cv size')
+parser.add_argument('--fs-size', type=float, default=0.5, help='fs size')
 parser.add_argument('--fs-dfx-min', type=int, default=10, help='fs min num dfx features')
 parser.add_argument('--fs-dfx-max', type=int, default=500, help='fs max num dfx features')
 parser.add_argument('--fs-dfx-pval', type=float, default=0.05, help='fs min dfx adj p-value')
@@ -45,7 +45,6 @@ parser.add_argument('--fs-gscv-splits', type=int, default=50, help='num fs gscv 
 parser.add_argument('--fs-gscv-size', type=int, default=0.3, help='fs gscv cv size')
 parser.add_argument('--fs-gscv-jobs', type=int, default=-1, help='fs gscv parallel jobs')
 parser.add_argument('--fs-gscv-verbose', type=int, default=0, help='gscv verbosity')
-parser.add_argument('--tr-cv-size', type=float, default=0.3, help='tr cv size')
 parser.add_argument('--tr-gscv-splits', type=int, default=50, help='num tr gscv splits')
 parser.add_argument('--tr-gscv-size', type=int, default=0.3, help='tr gscv size')
 parser.add_argument('--tr-gscv-jobs', type=int, default=-1, help='tr gscv parallel jobs')
@@ -55,6 +54,7 @@ parser.add_argument('--tr-rfecv-size', type=int, default=0.3, help='rfecv cv siz
 parser.add_argument('--tr-rfecv-jobs', type=int, default=-1, help='num tr rfecv parallel jobs')
 parser.add_argument('--tr-rfecv-step', type=float, default=1, help='tr rfecv step')
 parser.add_argument('--tr-rfecv-verbose', type=int, default=0, help='tr rfecv verbosity')
+parser.add_argument('--te-size', type=float, default=0.3, help='te size')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
 parser.add_argument('--svm-alg', type=str, default='liblinear', help='svm algorithm (liblinear or libsvm)')
 parser.add_argument('--eset-tr', type=str, help='R eset for fs/tr')
@@ -69,13 +69,14 @@ def pipeline_one(eset, fs_meth, tr_meth):
     fs_fail_count = 0
     print_header = True
     while split_count < args.splits:
-        tr_idxs, te_idxs = train_test_split(np.arange(y.size), test_size=args.tr_cv_size, stratify=y)
-        fs_idxs, cv_idxs = train_test_split(tr_idxs, test_size=args.fs_cv_size, stratify=y[tr_idxs])
+        tr_fs_idxs, te_idxs = train_test_split(np.arange(y.size), test_size=args.te_size, stratify=y)
+        tr_idxs, fs_idxs = train_test_split(tr_fs_idxs, test_size=args.fs_size, stratify=y[tr_fs_idxs])
         if print_header:
-            print('TR: %3s' % tr_idxs.size, ' TE: %3s' % te_idxs.size)
-            print('FS: %3s' % fs_idxs.size, ' CV: %3s' % cv_idxs.size)
+            print('FS: %3s' % fs_idxs.size, ' TR: %3s' % tr_idxs.size, ' TE: %3s' % te_idxs.size)
             print_header = False
-        fs_data = fs_meth(X[fs_idxs], y[fs_idxs], X[cv_idxs], y[cv_idxs], fs_idxs, eset)
+        fs_data = fs_meth(
+            X[fs_idxs], y[fs_idxs], r_filter_eset(eset, robjects.NULL, robjects.IntVector(fs_idxs + 1))
+        )
         if fs_data:
             split_results = tr_meth(X[tr_idxs], y[tr_idxs], X[te_idxs], y[te_idxs], eset, fs_data)
             results.append(split_results)
@@ -101,15 +102,17 @@ def pipeline_one_vs_many(eset_tr, esets_te, fs_meth, tr_meth):
     fs_fail_count = 0
     print_header = True
     while split_count < args.splits:
-        fs_idxs, cv_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_cv_size, stratify=y_tr)
+        tr_idxs, fs_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_size, stratify=y_tr)
         if print_header:
-            print('FS: %3s' % fs_idxs.size, ' CV: %3s' % cv_idxs.size)
+            print('FS: %3s' % fs_idxs.size, ' TR: %3s' % tr_idxs.size)
             print_header = False
-        fs_data = fs_meth(X_tr[fs_idxs], y_tr[fs_idxs], X_tr[cv_idxs], y_tr[cv_idxs], fs_idxs, eset_tr)
+        fs_data = fs_meth(
+            X_tr[fs_idxs], y_tr[fs_idxs], r_filter_eset(eset_tr, robjects.NULL, robjects.IntVector(fs_idxs + 1))
+        )
         if fs_data:
             for idx, (eset_te_name, X_te, y_te) in enumerate(Xys_te):
-                print('TR: %3s' % y_tr.size, ' TE: %3s [%s]' % (y_te.size, eset_te_name))
-                split_results = tr_meth(X_tr, y_tr, X_te, y_te, eset_tr, fs_data)
+                print('TE: %3s [%s]' % (y_te.size, eset_te_name))
+                split_results = tr_meth(X_tr[tr_idxs], y_tr[tr_idxs], X_te, y_te, eset_tr, fs_data)
                 if idx < len(results):
                     results[idx].append(split_results)
                 else:
@@ -131,14 +134,15 @@ def pipeline_one_vs_one(eset_tr, eset_te, fs_meth, tr_meth):
     fs_fail_count = 0
     print_header = True
     while split_count < args.splits:
-        fs_idxs, cv_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_cv_size, stratify=y_tr)
+        tr_idxs, fs_idxs = train_test_split(np.arange(y_tr.size), test_size=args.fs_size, stratify=y_tr)
         if print_header:
-            print('TR: %3s' % y_tr.size, ' TE: %3s' % y_te.size)
-            print('FS: %3s' % fs_idxs.size, ' CV: %3s' % cv_idxs.size)
+            print('FS: %3s' % fs_idxs.size, ' TR: %3s' % tr_idxs.size, ' TE: %3s' % y_te.size)
             print_header = False
-        fs_data = fs_meth(X_tr[fs_idxs], y_tr[fs_idxs], X_tr[cv_idxs], y_tr[cv_idxs], fs_idxs, eset_tr)
+        fs_data = fs_meth(
+            X_tr[fs_idxs], y_tr[fs_idxs], r_filter_eset(eset_tr, robjects.NULL, robjects.IntVector(fs_idxs + 1))
+        )
         if fs_data:
-            split_results = tr_meth(X_tr, y_tr, X_te, y_te, eset_tr, fs_data)
+            split_results = tr_meth(X_tr[tr_idxs], y_tr[tr_idxs], X_te, y_te, eset_tr, fs_data)
             results.append(split_results)
             split_count += 1
             print('Split: %3s' % split_count, ' Fails: %3s' % fs_fail_count)
@@ -161,12 +165,12 @@ def tr_meth_1(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
         scoring='roc_auc', return_train_score=False, n_jobs=args.tr_gscv_jobs,
         verbose=args.tr_gscv_verbose
     )
-    feature_idxs = fs_data['feature_idxs']
-    feature_names = fs_data['feature_names']
     results = {
         'fs_data': fs_data,
         'nf_split_data': [],
     }
+    feature_idxs = fs_data['feature_idxs']
+    feature_names = fs_data['feature_names']
     nf_split_count = 0
     for num_features in range(1, feature_idxs.size + 1):
         top_feature_idxs = feature_idxs[:num_features]
@@ -260,7 +264,17 @@ def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     return(results)
 # end tr meth
 
-def fs_limma_svm(X_fs, y_fs, X_cv, y_cv, fs_idxs, eset_tr):
+def fs_limma_svm(X_fs, y_fs, eset_fs):
+    feature_idxs = np.array(
+        r_get_limma_features(
+            eset_fs,
+            True,
+            args.fs_dfx_pval,
+            args.fs_dfx_lfc,
+            args.fs_dfx_max,
+        )
+    ) - 1
+    if feature_idxs.size < args.fs_dfx_min: return()
     fs_gscv_clf = GridSearchCV(
         Pipeline([
             ('slr', StandardScaler()),
@@ -274,43 +288,21 @@ def fs_limma_svm(X_fs, y_fs, X_cv, y_cv, fs_idxs, eset_tr):
         scoring='roc_auc', return_train_score=False, n_jobs=args.fs_gscv_jobs,
         verbose=args.fs_gscv_verbose
     )
-    feature_idxs = np.array(
-        r_get_dfx_features(
-            r_filter_eset(eset_tr, robjects.NULL, robjects.IntVector(fs_idxs + 1)),
-            True,
-            args.fs_dfx_pval,
-            args.fs_dfx_lfc,
-            args.fs_dfx_max,
-        )
-    ) - 1
-    if feature_idxs.size < args.fs_dfx_min: return()
-    y_score = fs_gscv_clf.fit(X_fs[:,feature_idxs], y_fs).decision_function(X_cv[:,feature_idxs])
-    fpr, tpr, thres = roc_curve(y_cv, y_score, pos_label=1)
-    roc_auc = roc_auc_score(y_cv, y_score)
+    fs_gscv_clf.fit(X_fs[:,feature_idxs], y_fs)
     coefs = np.square(fs_gscv_clf.best_estimator_.named_steps['svc'].coef_[0])
-    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
-    feature_rank_data = sorted(
-        zip(
-            coefs,
-            feature_idxs,
-            feature_names[feature_idxs],
-        ),
-        reverse=True
-    )
+    feature_names = np.array(biobase.featureNames(eset_fs), dtype=str)
+    feature_rank_data = sorted(zip(coefs, feature_idxs, feature_names[feature_idxs]), reverse=True)
     fs_num_features = min(args.fs_dfx_cutoff, len(feature_idxs))
     fs_data = {
+        'coefs': np.array([x for x, _, _ in feature_rank_data[:fs_num_features]]),
         'feature_idxs': np.array([x for _, x, _ in feature_rank_data[:fs_num_features]], dtype=int),
         'feature_names': np.array([x for _, _, x in feature_rank_data[:fs_num_features]], dtype=str),
         'feature_rank_data': feature_rank_data,
-        'fprs': fpr,
-        'tprs': tpr,
-        'thres': thres,
-        'coefs': np.array([x for x, _, _ in feature_rank_data[:fs_num_features]]),
-        'y_scores': y_score,
-        'y_tests': y_cv,
-        'roc_auc': roc_auc,
     }
-    print('Features: %3s / %3s' % (fs_num_features, len(feature_idxs)), ' ROC AUC: %.4f' % roc_auc)
+    print(
+        'Features: %3s / %3s' % (fs_num_features, len(feature_idxs)),
+        ' ROC AUC: %.4f' % fs_gscv_clf.best_score_
+    )
     return(fs_data)
 # end fs limma svm
 
