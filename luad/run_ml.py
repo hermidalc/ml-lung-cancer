@@ -261,6 +261,10 @@ def tr_meth_2(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
         ),
         reverse=True
     ): print(feature, '\t', symbol, '\t', rank)
+    print(
+        'ROC AUC (Train): %.4f' % tr_gscv_clf.best_score_,
+        ' ROC AUC (Test): %.4f' % roc_auc,
+    )
     return(results)
 # end tr meth
 
@@ -493,9 +497,8 @@ elif args.analysis == 2:
     plt.title('GSE31210 Train+Test\nEffect of Number of RFECV Features Selected on Train ROC AUC')
     plt.xlabel('Number of features selected')
     plt.ylabel('ROC AUC')
-    max_features = max([len(s['feature_idxs']) for s in results])
-    plt_fig2_x_axis = range(1, max_features + 1)
-    plt.xlim([0.5, max_features + 0.5])
+    plt_fig2_x_axis = range(1, len(roc_aucs_tr) + 1)
+    plt.xlim([0.5, len(roc_aucs_tr) + 0.5])
     plt.xticks(plt_fig2_x_axis)
     plt.plot(
         plt_fig2_x_axis, mean_roc_aucs_tr,
@@ -660,13 +663,13 @@ elif args.analysis == 3:
     )
     plt.legend(loc='lower right')
     # print final selected feature information
-    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
-    for idx, te_results in enumerate(results):
+    for te_idx, te_results in enumerate(results):
         feature_idxs = []
         for split in te_results:
             nf_split = sorted(split['nf_split_data'], key=lambda k: k['roc_auc_te']).pop()
             feature_idxs.extend(nf_split['feature_idxs'])
         feature_idxs = sorted(list(set(feature_idxs)))
+        feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
         feature_names = feature_names[feature_idxs]
         # print(*natsorted(feature_names), sep='\n')
         feature_mx_idx = {}
@@ -681,7 +684,7 @@ elif args.analysis == 3:
         for idx in range(len(feature_idxs)):
             feature_mean_coefs.append(np.mean(coef_mx[idx]))
             # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
-        eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
+        eset_te_name = eset_te_names[te_idx].replace('eset_gex_', '').upper()
         print('%s Best Scoring Features:' % eset_te_name)
         for rank, feature, symbol in sorted(
             zip(
@@ -762,11 +765,11 @@ elif args.analysis == 4:
     plt.legend(loc='lower right')
     plt.grid('off')
     # print final selected feature information
-    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
-    for idx, te_results in enumerate(results):
+    for te_idx, te_results in enumerate(results):
         feature_idxs = []
         for split in te_results: feature_idxs.extend(split['feature_idxs'])
         feature_idxs = sorted(list(set(feature_idxs)))
+        feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
         feature_names = feature_names[feature_idxs]
         # print(*natsorted(feature_names), sep='\n')
         feature_mx_idx = {}
@@ -781,7 +784,7 @@ elif args.analysis == 4:
         for idx in range(len(feature_idxs)):
             feature_mean_coefs.append(np.mean(coef_mx[idx]))
             # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
-        eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
+        eset_te_name = eset_te_names[te_idx].replace('eset_gex_', '').upper()
         print('%s Selected Features:' % eset_te_name)
         for rank, feature, symbol in sorted(
             zip(
@@ -844,21 +847,41 @@ elif args.analysis == 5:
     plt.ylabel('ROC AUC')
     plt_fig1_x_axis = range(1, len(bc_methods) + 1)
     plt.xticks(plt_fig1_x_axis, bc_methods)
+
+    colors = [
+        'red',
+        'green',
+        'blue',
+        'orange',
+        'magenta',
+    ]
+
     for te_idx, te_bc_results in enumerate(te_results):
-        mean_roc_aucs_bc, range_roc_aucs_bc = [], [[], []]
+        mean_roc_aucs_tr_bc, range_roc_aucs_tr_bc = [], [[], []]
+        mean_roc_aucs_te_bc, range_roc_aucs_te_bc = [], [[], []]
         for results in te_bc_results:
-            roc_aucs_bc = []
+            roc_aucs_tr_bc, roc_aucs_te_bc = [], []
             for split in results:
                 nf_split = split['nf_split_data'][args.fs_top_final - 1]
-                roc_aucs_bc.append(nf_split['roc_auc_te'])
-            mean_roc_aucs_bc.append(np.mean(roc_aucs_bc))
-            range_roc_aucs_bc[0].append(np.mean(roc_aucs_bc) - min(roc_aucs_bc))
-            range_roc_aucs_bc[1].append(max(roc_aucs_bc) - np.mean(roc_aucs_bc))
+                roc_aucs_tr_bc.append(nf_split['roc_auc_tr'])
+                roc_aucs_te_bc.append(nf_split['roc_auc_te'])
+            mean_roc_aucs_tr_bc.append(np.mean(roc_aucs_tr_bc))
+            range_roc_aucs_tr_bc[0].append(np.mean(roc_aucs_tr_bc) - min(roc_aucs_tr_bc))
+            range_roc_aucs_tr_bc[1].append(max(roc_aucs_tr_bc) - np.mean(roc_aucs_tr_bc))
+            mean_roc_aucs_te_bc.append(np.mean(roc_aucs_te_bc))
+            range_roc_aucs_te_bc[0].append(np.mean(roc_aucs_te_bc) - min(roc_aucs_te_bc))
+            range_roc_aucs_te_bc[1].append(max(roc_aucs_te_bc) - np.mean(roc_aucs_te_bc))
         _, eset_te_name = eset_pair_names[te_idx]
         eset_te_name = eset_te_name.replace('eset_gex_', '').upper()
         plt.errorbar(
-            plt_fig1_x_axis, mean_roc_aucs_bc, yerr=range_roc_aucs_bc, lw=2, alpha=0.8,
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label=eset_te_name,
+            plt_fig1_x_axis, mean_roc_aucs_tr_bc, yerr=range_roc_aucs_tr_bc, lw=2, alpha=0.8, linestyle='--',
+            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % eset_te_name,
+            color=colors[te_idx]
+        )
+        plt.errorbar(
+            plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=2, alpha=0.8,
+            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % eset_te_name,
+            color=colors[te_idx]
         )
     plt.legend(loc='best')
     # plot effect test dataset vs bc roc auc
@@ -870,22 +893,33 @@ elif args.analysis == 5:
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
-    eset_te_names = [t.replace('eset_gex_', '').upper() for t in eset_pair_names]
+    eset_te_names = [te_name.replace('eset_gex_', '').upper() for _, te_name in eset_pair_names]
     plt_fig2_x_axis = range(1, len(eset_te_names) + 1)
     plt.xticks(plt_fig2_x_axis, eset_te_names)
     for bc_idx, bc_te_results in enumerate(bc_results):
-        mean_roc_aucs_te, range_roc_aucs_te = [], [[], []]
+        mean_roc_aucs_bc_tr, range_roc_aucs_bc_tr = [], [[], []]
+        mean_roc_aucs_bc_te, range_roc_aucs_bc_te = [], [[], []]
         for results in bc_te_results:
-            roc_aucs_te = []
+            roc_aucs_bc_tr, roc_aucs_bc_te = [], []
             for split in results:
                 nf_split = split['nf_split_data'][args.fs_top_final - 1]
-                roc_aucs_te.append(nf_split['roc_auc_te'])
-            mean_roc_aucs_te.append(np.mean(roc_aucs_te))
-            range_roc_aucs_te[0].append(np.mean(roc_aucs_te) - min(roc_aucs_te))
-            range_roc_aucs_te[1].append(max(roc_aucs_te) - np.mean(roc_aucs_te))
+                roc_aucs_bc_tr.append(nf_split['roc_auc_tr'])
+                roc_aucs_bc_te.append(nf_split['roc_auc_te'])
+            mean_roc_aucs_bc_tr.append(np.mean(roc_aucs_bc_tr))
+            range_roc_aucs_bc_tr[0].append(np.mean(roc_aucs_bc_tr) - min(roc_aucs_bc_tr))
+            range_roc_aucs_bc_tr[1].append(max(roc_aucs_bc_tr) - np.mean(roc_aucs_bc_tr))
+            mean_roc_aucs_bc_te.append(np.mean(roc_aucs_bc_te))
+            range_roc_aucs_bc_te[0].append(np.mean(roc_aucs_bc_te) - min(roc_aucs_bc_te))
+            range_roc_aucs_bc_te[1].append(max(roc_aucs_bc_te) - np.mean(roc_aucs_bc_te))
         plt.errorbar(
-            plt_fig2_x_axis, mean_roc_aucs_te, yerr=range_roc_aucs_te, lw=2, alpha=0.8,
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label=bc_methods[bc_idx],
+            plt_fig2_x_axis, mean_roc_aucs_bc_tr, yerr=range_roc_aucs_bc_tr, lw=2, alpha=0.8, linestyle='--',
+            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % bc_methods[bc_idx],
+            color=colors[bc_idx]
+        )
+        plt.errorbar(
+            plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=2, alpha=0.8,
+            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % bc_methods[bc_idx],
+            color=colors[bc_idx]
         )
     plt.legend(loc='best')
 
