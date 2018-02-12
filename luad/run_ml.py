@@ -321,7 +321,7 @@ if (args.analysis == 1):
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train+Test ROC Curves\n' +
-        'Using Limma+SVM Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
+        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
     )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
@@ -561,7 +561,10 @@ elif args.analysis == 3:
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train Vs LUAD Test Datasets ROC Curves\nUsing Limma+SVM Feature Selection (Best Scoring Num Features)')
+    plt.title(
+        'GSE31210 Train Vs LUAD Test Datasets ROC Curves\n' +
+        'Using Limma+SVM+TopForward Feature Selection (Best Scoring Num Features)'
+    )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
@@ -841,21 +844,12 @@ elif args.analysis == 5:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on Classifier Performance\n' +
-        'Using Limma+SVM Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
+        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
     plt_fig1_x_axis = range(1, len(bc_methods) + 1)
     plt.xticks(plt_fig1_x_axis, bc_methods)
-
-    colors = [
-        'red',
-        'green',
-        'blue',
-        'orange',
-        'magenta',
-    ]
-
     for te_idx, te_bc_results in enumerate(te_results):
         mean_roc_aucs_tr_bc, range_roc_aucs_tr_bc = [], [[], []]
         mean_roc_aucs_te_bc, range_roc_aucs_te_bc = [], [[], []]
@@ -871,17 +865,20 @@ elif args.analysis == 5:
             mean_roc_aucs_te_bc.append(np.mean(roc_aucs_te_bc))
             range_roc_aucs_te_bc[0].append(np.mean(roc_aucs_te_bc) - min(roc_aucs_te_bc))
             range_roc_aucs_te_bc[1].append(max(roc_aucs_te_bc) - np.mean(roc_aucs_te_bc))
-        _, eset_te_name = eset_pair_names[te_idx]
+        eset_tr_name, eset_te_name = eset_pair_names[te_idx]
+        eset_tr_name = eset_tr_name.replace('eset_gex_', '').upper()
+        eset_tr_name = eset_tr_name.replace('_', '/')
         eset_te_name = eset_te_name.replace('eset_gex_', '').upper()
+        color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.errorbar(
             plt_fig1_x_axis, mean_roc_aucs_tr_bc, yerr=range_roc_aucs_tr_bc, lw=2, alpha=0.8, linestyle='--',
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % eset_te_name,
-            color=colors[te_idx]
+            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % eset_tr_name,
+            color=color
         )
         plt.errorbar(
             plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=2, alpha=0.8,
             capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % eset_te_name,
-            color=colors[te_idx]
+            color=color
         )
     plt.legend(loc='best')
     # plot effect test dataset vs bc roc auc
@@ -889,7 +886,7 @@ elif args.analysis == 5:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Test Dataset on Classifier Performance\n' +
-        'Using Limma+SVM Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
+        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
@@ -911,15 +908,135 @@ elif args.analysis == 5:
             mean_roc_aucs_bc_te.append(np.mean(roc_aucs_bc_te))
             range_roc_aucs_bc_te[0].append(np.mean(roc_aucs_bc_te) - min(roc_aucs_bc_te))
             range_roc_aucs_bc_te[1].append(max(roc_aucs_bc_te) - np.mean(roc_aucs_bc_te))
+        color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.errorbar(
             plt_fig2_x_axis, mean_roc_aucs_bc_tr, yerr=range_roc_aucs_bc_tr, lw=2, alpha=0.8, linestyle='--',
             capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % bc_methods[bc_idx],
-            color=colors[bc_idx]
+            color=color
         )
         plt.errorbar(
             plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=2, alpha=0.8,
             capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % bc_methods[bc_idx],
-            color=colors[bc_idx]
+            color=color
+        )
+    plt.legend(loc='best')
+elif args.analysis == 6:
+    eset_pair_names = [
+        #('eset_gex_gse31210_gse30219_gse37745_gse50081', 'eset_gex_gse8894'),
+        #('eset_gex_gse31210_gse8894_gse37745_gse50081', 'eset_gex_gse30219'),
+        #('eset_gex_gse8894_gse30219_gse37745_gse50081', 'eset_gex_gse31210'),
+        ('eset_gex_gse31210_gse8894_gse30219_gse50081', 'eset_gex_gse37745'),
+        ('eset_gex_gse31210_gse8894_gse30219_gse37745', 'eset_gex_gse50081'),
+    ]
+    bc_methods = [
+        #'none',
+        #'std',
+        'cbt',
+        #'fab',
+        #'sva',
+        #'stica0',
+        #'stica025',
+        #'stica05',
+        #'stica1',
+        'svd',
+    ]
+    te_results, bc_results = [], []
+    for te_idx, (eset_tr_name, eset_te_name) in enumerate(eset_pair_names):
+        for bc_idx, bc_method in enumerate(bc_methods):
+            bc_ext_tr, bc_ext_te = '', ''
+            if bc_method != 'none':
+                bc_ext_tr, bc_ext_te = '_tr_' + bc_method, '_te_' + bc_method
+            print(eset_tr_name + bc_ext_tr, '->', eset_te_name + bc_ext_te)
+            base.load('data/' + eset_tr_name + bc_ext_tr + '.Rda')
+            eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name + bc_ext_tr])
+            base.load('data/' + eset_te_name + bc_ext_te + '.Rda')
+            eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name + bc_ext_te])
+            results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_meth_1)
+            if te_idx < len(te_results):
+                te_results[te_idx].append(results)
+            else:
+                te_results.append([results])
+            if bc_idx < len(bc_results):
+                bc_results[bc_idx].append(results)
+            else:
+                bc_results.append([results])
+    # plot effect bc method vs test dataset roc auc
+    plt.figure(1)
+    plt.rcParams['font.size'] = 20
+    plt.title(
+        'Effect of Batch Effect Correction Method on Classifier Performance\n' +
+        'Using Limma+SVM+RFECV Feature Selection'
+    )
+    plt.xlabel('Batch Effect Correction Method')
+    plt.ylabel('ROC AUC')
+    plt_fig1_x_axis = range(1, len(bc_methods) + 1)
+    plt.xticks(plt_fig1_x_axis, bc_methods)
+    for te_idx, te_bc_results in enumerate(te_results):
+        mean_roc_aucs_tr_bc, range_roc_aucs_tr_bc = [], [[], []]
+        mean_roc_aucs_te_bc, range_roc_aucs_te_bc = [], [[], []]
+        for results in te_bc_results:
+            roc_aucs_tr_bc, roc_aucs_te_bc = [], []
+            for split in results:
+                roc_aucs_tr_bc.append(split['roc_auc_tr'])
+                roc_aucs_te_bc.append(split['roc_auc_te'])
+            mean_roc_aucs_tr_bc.append(np.mean(roc_aucs_tr_bc))
+            range_roc_aucs_tr_bc[0].append(np.mean(roc_aucs_tr_bc) - min(roc_aucs_tr_bc))
+            range_roc_aucs_tr_bc[1].append(max(roc_aucs_tr_bc) - np.mean(roc_aucs_tr_bc))
+            mean_roc_aucs_te_bc.append(np.mean(roc_aucs_te_bc))
+            range_roc_aucs_te_bc[0].append(np.mean(roc_aucs_te_bc) - min(roc_aucs_te_bc))
+            range_roc_aucs_te_bc[1].append(max(roc_aucs_te_bc) - np.mean(roc_aucs_te_bc))
+        eset_tr_name, eset_te_name = eset_pair_names[te_idx]
+        eset_tr_name = eset_tr_name.replace('eset_gex_', '').upper()
+        eset_tr_name = eset_tr_name.replace('_', '/')
+        eset_te_name = eset_te_name.replace('eset_gex_', '').upper()
+        color = next(plt.gca()._get_lines.prop_cycler)['color']
+        plt.errorbar(
+            plt_fig1_x_axis, mean_roc_aucs_tr_bc, yerr=range_roc_aucs_tr_bc, lw=2, alpha=0.8, linestyle='--',
+            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % eset_tr_name,
+            color=color
+        )
+        plt.errorbar(
+            plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=2, alpha=0.8,
+            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % eset_te_name,
+            color=color
+        )
+    plt.legend(loc='best')
+    # plot effect test dataset vs bc roc auc
+    plt.figure(2)
+    plt.rcParams['font.size'] = 20
+    plt.title(
+        'Effect of Test Dataset on Classifier Performance\n' +
+        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_top_final) + ' Ranked Features)'
+    )
+    plt.xlabel('Test Dataset')
+    plt.ylabel('ROC AUC')
+    eset_te_names = [te_name.replace('eset_gex_', '').upper() for _, te_name in eset_pair_names]
+    plt_fig2_x_axis = range(1, len(eset_te_names) + 1)
+    plt.xticks(plt_fig2_x_axis, eset_te_names)
+    for bc_idx, bc_te_results in enumerate(bc_results):
+        mean_roc_aucs_bc_tr, range_roc_aucs_bc_tr = [], [[], []]
+        mean_roc_aucs_bc_te, range_roc_aucs_bc_te = [], [[], []]
+        for results in bc_te_results:
+            roc_aucs_bc_tr, roc_aucs_bc_te = [], []
+            for split in results:
+                roc_aucs_bc_tr.append(split['roc_auc_tr'])
+                roc_aucs_bc_te.append(split['roc_auc_te'])
+            mean_roc_aucs_bc_tr.append(np.mean(roc_aucs_bc_tr))
+            range_roc_aucs_bc_tr[0].append(np.mean(roc_aucs_bc_tr) - min(roc_aucs_bc_tr))
+            range_roc_aucs_bc_tr[1].append(max(roc_aucs_bc_tr) - np.mean(roc_aucs_bc_tr))
+            mean_roc_aucs_bc_te.append(np.mean(roc_aucs_bc_te))
+            range_roc_aucs_bc_te[0].append(np.mean(roc_aucs_bc_te) - min(roc_aucs_bc_te))
+            range_roc_aucs_bc_te[1].append(max(roc_aucs_bc_te) - np.mean(roc_aucs_bc_te))
+        color = next(plt.gca()._get_lines.prop_cycler)['color']
+        plt.errorbar(
+            plt_fig2_x_axis, mean_roc_aucs_bc_tr, yerr=range_roc_aucs_bc_tr, lw=2, alpha=0.8, linestyle='--',
+            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % bc_methods[bc_idx],
+            color=color
+        )
+        plt.errorbar(
+            plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=2, alpha=0.8,
+            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % bc_methods[bc_idx],
+            color=color
         )
     plt.legend(loc='best')
 
