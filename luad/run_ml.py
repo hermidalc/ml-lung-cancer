@@ -265,7 +265,7 @@ def tr_rfecv_svm(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     return(results)
 # end tr_rfecv_svm
 
-def fs_limma(_, _, eset_fs):
+def fs_limma(X_fs, y_fs, eset_fs):
     feature_idxs = np.array(
         r_get_limma_features(
             eset_fs,
