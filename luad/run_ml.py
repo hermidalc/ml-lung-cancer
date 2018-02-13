@@ -904,7 +904,7 @@ elif args.analysis == 5:
         plt.errorbar(
             plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=4, alpha=0.8,
             capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
-            label=r'%s (Train/Test, Num Features = %d $\pm$ %d)' %
+            label=r'%s (Num Features = %d $\pm$ %d)' %
             (eset_te_name, mean_num_features_te, std_num_features_te)
         )
     plt.legend(loc='best')
@@ -948,7 +948,7 @@ elif args.analysis == 5:
         plt.errorbar(
             plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=4, alpha=0.8,
             capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
-            label=r'%s (Train/Test, Num Features = %d $\pm$ %d)' %
+            label=r'%s (Num Features = %d $\pm$ %d)' %
             (bc_methods[bc_idx], mean_num_features_bc, std_num_features_bc)
         )
     plt.legend(loc='best')
@@ -1036,7 +1036,7 @@ elif args.analysis == 6:
         plt.errorbar(
             plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=4, alpha=0.8,
             capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
-            label=r'%s (Train/Test, Num Features = %d $\pm$ %d)' %
+            label=r'%s (Num Features = %d $\pm$ %d)' %
             (eset_te_name, mean_num_features_te, std_num_features_te)
         )
     plt.legend(loc='best')
@@ -1079,7 +1079,7 @@ elif args.analysis == 6:
         plt.errorbar(
             plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=4, alpha=0.8,
             capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
-            label=r'%s (Train/Test, Num Features = %d $\pm$ %d)' %
+            label=r'%s (Num Features = %d $\pm$ %d)' %
             (bc_methods[bc_idx], mean_num_features_bc, std_num_features_bc)
         )
     plt.legend(loc='best')
