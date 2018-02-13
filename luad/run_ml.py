@@ -331,7 +331,7 @@ if (args.analysis == 1):
         tprs[-1][0] = 0.0
         roc_aucs.append(nf_split['roc_auc_te'])
         plt.plot(
-            nf_split['fprs'], nf_split['tprs'], lw=1, alpha=0.3,
+            nf_split['fprs'], nf_split['tprs'], lw=2, alpha=0.3,
             # label='ROC split %d (AUC = %0.4f)' % (idx + 1, nf_split['roc_auc_te']),
         )
     mean_tpr = np.mean(tprs, axis=0)
@@ -339,7 +339,7 @@ if (args.analysis == 1):
     mean_roc_auc = np.mean(roc_aucs)
     std_roc_auc = np.std(roc_aucs)
     plt.plot(
-        mean_fpr, mean_tpr, color='darkblue', lw=2, alpha=0.8,
+        mean_fpr, mean_tpr, color='darkblue', lw=4, alpha=0.8,
         label=r'Test Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (mean_roc_auc, std_roc_auc),
     )
     std_tpr = np.std(tprs, axis=0)
@@ -349,7 +349,7 @@ if (args.analysis == 1):
         mean_fpr, tprs_lower, tprs_upper,
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
-    plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=0.8, label='Chance')
+    plt.plot([0,1], [0,1], color='darkred', lw=4, linestyle='--', alpha=0.8, label='Chance')
     plt.legend(loc='lower right')
     plt.grid('off')
     # plot num top ranked features selected vs mean roc auc
@@ -382,7 +382,7 @@ if (args.analysis == 1):
     plt.xticks(plt_fig2_x_axis)
     plt.plot(
         plt_fig2_x_axis, mean_roc_aucs_tr,
-        lw=2, alpha=0.8, label='Mean ROC AUC (Train CV)',
+        lw=4, alpha=0.8, label='Mean ROC AUC (Train CV)',
         # label=r'Train Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (roc_auc_tr_mean, roc_auc_tr_std),
     )
     plt.fill_between(
@@ -393,7 +393,7 @@ if (args.analysis == 1):
     )
     plt.plot(
         plt_fig2_x_axis, mean_roc_aucs_te,
-        lw=2, alpha=0.8, label='Mean ROC AUC (Test)',
+        lw=4, alpha=0.8, label='Mean ROC AUC (Test)',
         # label=r'Test Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (roc_auc_te_mean, roc_auc_te_std),
     )
     plt.fill_between(
@@ -458,7 +458,7 @@ elif args.analysis == 2:
         roc_aucs.append(split['roc_auc_te'])
         num_features.append(len(split['feature_idxs']))
         plt.plot(
-            split['fprs'], split['tprs'], lw=1, alpha=0.3,
+            split['fprs'], split['tprs'], lw=2, alpha=0.3,
             # label='ROC split %d (AUC = %0.4f)' % (idx + 1, split['roc_auc_te']),
         )
     mean_tpr = np.mean(tprs, axis=0)
@@ -468,7 +468,7 @@ elif args.analysis == 2:
     mean_num_features = np.mean(num_features)
     std_num_features = np.std(num_features)
     plt.plot(
-        mean_fpr, mean_tpr, color='darkblue', lw=2, alpha=0.8,
+        mean_fpr, mean_tpr, color='darkblue', lw=4, alpha=0.8,
         label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
         (mean_roc_auc, std_roc_auc, mean_num_features, std_num_features),
     )
@@ -479,7 +479,7 @@ elif args.analysis == 2:
         mean_fpr, tprs_lower, tprs_upper,
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
-    plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=0.8, label='Chance')
+    plt.plot([0,1], [0,1], color='darkred', lw=4, linestyle='--', alpha=0.8, label='Chance')
     plt.legend(loc='lower right')
     plt.grid('off')
     # plot num features selected vs train roc auc
@@ -509,7 +509,7 @@ elif args.analysis == 2:
     plt.xticks(plt_fig2_x_axis)
     plt.plot(
         plt_fig2_x_axis, mean_roc_aucs_tr,
-        lw=2, alpha=0.8, label='Mean ROC AUC (Train CV)',
+        lw=4, alpha=0.8, label='Mean ROC AUC (Train CV)',
     )
     plt.fill_between(
         plt_fig2_x_axis,
@@ -594,7 +594,7 @@ elif args.analysis == 3:
         te_std_num_features = np.std(te_num_features)
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         plt.plot(
-            mean_fpr, te_mean_tpr, lw=2, alpha=0.5,
+            mean_fpr, te_mean_tpr, lw=4, alpha=0.5,
             label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
             (eset_te_name, te_mean_roc_auc, te_std_roc_auc, te_mean_num_features, te_std_num_features),
         )
@@ -606,7 +606,7 @@ elif args.analysis == 3:
     mean_roc_auc = np.mean(roc_aucs)
     std_roc_auc = np.std(roc_aucs)
     plt.plot(
-        mean_fpr, mean_tpr, color='darkblue', lw=2, alpha=0.8,
+        mean_fpr, mean_tpr, color='darkblue', lw=4, alpha=0.8,
         label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (mean_roc_auc, std_roc_auc),
     )
     std_tpr = np.std(tprs, axis=0)
@@ -616,7 +616,7 @@ elif args.analysis == 3:
         mean_fpr, tprs_lower, tprs_upper,
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
-    plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=0.8, label='Chance')
+    plt.plot([0,1], [0,1], color='darkred', lw=4, linestyle='--', alpha=0.8, label='Chance')
     plt.legend(loc='lower right')
     plt.grid('off')
     # plot num top ranked features selected vs mean roc auc
@@ -652,7 +652,7 @@ elif args.analysis == 3:
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         plt.plot(
             plt_fig2_x_axis, mean_roc_aucs_te,
-            lw=2, alpha=0.8, label='%s Mean ROC AUC (Test)' % eset_te_name,
+            lw=4, alpha=0.8, label='%s Mean ROC AUC (Test)' % eset_te_name,
         )
         plt.fill_between(
             plt_fig2_x_axis,
@@ -666,7 +666,7 @@ elif args.analysis == 3:
         std_roc_aucs_tr.append(np.std(roc_aucs_tr[nf_idx]))
     plt.plot(
         plt_fig2_x_axis, mean_roc_aucs_tr,
-        lw=2, alpha=0.8, label='GSE31210 Mean ROC AUC (Train)',
+        lw=4, alpha=0.8, label='GSE31210 Mean ROC AUC (Train CV)',
     )
     plt.fill_between(
         plt_fig2_x_axis,
@@ -755,7 +755,7 @@ elif args.analysis == 4:
         te_std_num_features = np.std(te_num_features)
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         plt.plot(
-            mean_fpr, te_mean_tpr, lw=2, alpha=0.5,
+            mean_fpr, te_mean_tpr, lw=4, alpha=0.5,
             label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
             (eset_te_name, te_mean_roc_auc, te_std_roc_auc, te_mean_num_features, te_std_num_features),
         )
@@ -767,7 +767,7 @@ elif args.analysis == 4:
     mean_roc_auc = np.mean(roc_aucs)
     std_roc_auc = np.std(roc_aucs)
     plt.plot(
-        mean_fpr, mean_tpr, color='darkblue', lw=2, alpha=0.8,
+        mean_fpr, mean_tpr, color='darkblue', lw=4, alpha=0.8,
         label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (mean_roc_auc, std_roc_auc),
     )
     std_tpr = np.std(tprs, axis=0)
@@ -777,7 +777,7 @@ elif args.analysis == 4:
         mean_fpr, tprs_lower, tprs_upper,
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
-    plt.plot([0,1], [0,1], color='darkred', lw=2, linestyle='--', alpha=0.8, label='Chance')
+    plt.plot([0,1], [0,1], color='darkred', lw=4, linestyle='--', alpha=0.8, label='Chance')
     plt.legend(loc='lower right')
     plt.grid('off')
     # print final selected feature information
@@ -884,13 +884,13 @@ elif args.analysis == 5:
         eset_te_name = eset_te_name.replace('eset_gex_', '').upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.errorbar(
-            plt_fig1_x_axis, mean_roc_aucs_tr_bc, yerr=range_roc_aucs_tr_bc, lw=2, alpha=0.8, linestyle='--',
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % eset_tr_name,
+            plt_fig1_x_axis, mean_roc_aucs_tr_bc, yerr=range_roc_aucs_tr_bc, lw=4, alpha=0.8, linestyle='--',
+            capsize=25, elinewidth=4, markeredgewidth=4, marker='s', label='%s (Train CV)' % eset_tr_name,
             color=color
         )
         plt.errorbar(
-            plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=2, alpha=0.8,
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % eset_te_name,
+            plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=4, alpha=0.8,
+            capsize=25, elinewidth=4, markeredgewidth=4, marker='s', label='%s (Test)' % eset_te_name,
             color=color
         )
     plt.legend(loc='best')
@@ -923,13 +923,13 @@ elif args.analysis == 5:
             range_roc_aucs_bc_te[1].append(max(roc_aucs_bc_te) - np.mean(roc_aucs_bc_te))
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.errorbar(
-            plt_fig2_x_axis, mean_roc_aucs_bc_tr, yerr=range_roc_aucs_bc_tr, lw=2, alpha=0.8, linestyle='--',
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % bc_methods[bc_idx],
+            plt_fig2_x_axis, mean_roc_aucs_bc_tr, yerr=range_roc_aucs_bc_tr, lw=4, alpha=0.8, linestyle='--',
+            capsize=25, elinewidth=4, markeredgewidth=4, marker='s', label='%s (Train CV)' % bc_methods[bc_idx],
             color=color
         )
         plt.errorbar(
-            plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=2, alpha=0.8,
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % bc_methods[bc_idx],
+            plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=4, alpha=0.8,
+            capsize=25, elinewidth=4, markeredgewidth=4, marker='s', label='%s (Test)' % bc_methods[bc_idx],
             color=color
         )
     plt.legend(loc='best')
@@ -1004,13 +1004,13 @@ elif args.analysis == 6:
         eset_te_name = eset_te_name.replace('eset_gex_', '').upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.errorbar(
-            plt_fig1_x_axis, mean_roc_aucs_tr_bc, yerr=range_roc_aucs_tr_bc, lw=2, alpha=0.8, linestyle='--',
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % eset_tr_name,
+            plt_fig1_x_axis, mean_roc_aucs_tr_bc, yerr=range_roc_aucs_tr_bc, lw=4, alpha=0.8, linestyle='--',
+            capsize=25, elinewidth=4, markeredgewidth=4, marker='s', label='%s (Train CV)' % eset_tr_name,
             color=color
         )
         plt.errorbar(
-            plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=2, alpha=0.8,
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % eset_te_name,
+            plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=4, alpha=0.8,
+            capsize=25, elinewidth=4, markeredgewidth=4, marker='s', label='%s (Test)' % eset_te_name,
             color=color
         )
     plt.legend(loc='best')
@@ -1042,13 +1042,13 @@ elif args.analysis == 6:
             range_roc_aucs_bc_te[1].append(max(roc_aucs_bc_te) - np.mean(roc_aucs_bc_te))
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.errorbar(
-            plt_fig2_x_axis, mean_roc_aucs_bc_tr, yerr=range_roc_aucs_bc_tr, lw=2, alpha=0.8, linestyle='--',
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Train)' % bc_methods[bc_idx],
+            plt_fig2_x_axis, mean_roc_aucs_bc_tr, yerr=range_roc_aucs_bc_tr, lw=4, alpha=0.8, linestyle='--',
+            capsize=25, elinewidth=4, markeredgewidth=4, marker='s', label='%s (Train CV)' % bc_methods[bc_idx],
             color=color
         )
         plt.errorbar(
-            plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=2, alpha=0.8,
-            capsize=25, elinewidth=2, markeredgewidth=2, marker='s', label='%s (Test)' % bc_methods[bc_idx],
+            plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=4, alpha=0.8,
+            capsize=25, elinewidth=4, markeredgewidth=4, marker='s', label='%s (Test)' % bc_methods[bc_idx],
             color=color
         )
     plt.legend(loc='best')
