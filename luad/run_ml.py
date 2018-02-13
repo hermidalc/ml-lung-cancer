@@ -316,8 +316,8 @@ if (args.analysis == 1):
     plt.figure(1)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'GSE31210 Train+Test ROC Curves\n' +
-        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
+        'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
+        'Limma-SVM-TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
     )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
@@ -340,7 +340,7 @@ if (args.analysis == 1):
     std_roc_auc = np.std(roc_aucs)
     plt.plot(
         mean_fpr, mean_tpr, color='darkblue', lw=2, alpha=0.8,
-        label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (mean_roc_auc, std_roc_auc),
+        label=r'Test Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (mean_roc_auc, std_roc_auc),
     )
     std_tpr = np.std(tprs, axis=0)
     tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
@@ -371,7 +371,10 @@ if (args.analysis == 1):
         std_roc_aucs_te.append(np.std(roc_aucs_te[nf_idx]))
     plt.figure(2)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train+Test\nEffect of Number Top Ranked Features Selected on ROC AUC')
+    plt.title(
+        'GSE31210 Train SVM Classifier Vs GSE31210 Test (Limma-SVM-TopForward FS)\n' +
+        'Effect of Number of Top-Ranked Features Selected on ROC AUC'
+    )
     plt.xlabel('Number of top-ranked features selected')
     plt.ylabel('ROC AUC')
     plt.xlim([0.5, len(mean_roc_aucs_tr) + 0.5])
@@ -379,7 +382,7 @@ if (args.analysis == 1):
     plt.xticks(plt_fig2_x_axis)
     plt.plot(
         plt_fig2_x_axis, mean_roc_aucs_tr,
-        lw=2, alpha=0.8, label='Mean ROC AUC (Train)',
+        lw=2, alpha=0.8, label='Mean ROC AUC (Train CV)',
         # label=r'Train Mean ROC (AUC = %0.4f $\pm$ %0.2f)' % (roc_auc_tr_mean, roc_auc_tr_std),
     )
     plt.fill_between(
@@ -439,7 +442,10 @@ elif args.analysis == 2:
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train+Test ROC Curves\nUsing Limma+SVM+RFECV Feature Selection')
+    plt.title(
+        'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
+        'Limma-SVM-RFECV Feature Selection (Best Scoring Number of Features)'
+    )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
@@ -492,7 +498,10 @@ elif args.analysis == 2:
         std_roc_aucs_tr.append(np.std(roc_aucs_tr[nf_idx]))
     plt.figure(2)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train+Test\nEffect of Number of RFECV Features Selected on Train ROC AUC')
+    plt.title(
+        'GSE31210 Train SVM Classifier Vs GSE31210 Test (Limma-SVM-RFECV FS)\n' +
+        'Effect of Number of RFECV Features Selected on ROC AUC'
+    )
     plt.xlabel('Number of features selected')
     plt.ylabel('ROC AUC')
     plt_fig2_x_axis = range(1, len(roc_aucs_tr) + 1)
@@ -500,7 +509,7 @@ elif args.analysis == 2:
     plt.xticks(plt_fig2_x_axis)
     plt.plot(
         plt_fig2_x_axis, mean_roc_aucs_tr,
-        lw=2, alpha=0.8, label='Mean ROC AUC (Train)',
+        lw=2, alpha=0.8, label='Mean ROC AUC (Train CV)',
     )
     plt.fill_between(
         plt_fig2_x_axis,
@@ -560,8 +569,8 @@ elif args.analysis == 3:
     plt.figure(1)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'GSE31210 Train Vs LUAD Test Datasets ROC Curves\n' +
-        'Using Limma+SVM+TopForward Feature Selection (Best Scoring Num Features)'
+        'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets ROC Curves\n' +
+        'Limma-SVM-TopForward Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
@@ -613,7 +622,10 @@ elif args.analysis == 3:
     # plot num top ranked features selected vs mean roc auc
     plt.figure(2)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train Vs LUAD Test Datasets\nEffect of Number Top Ranked Features Selected on ROC AUC')
+    plt.title(
+        'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets (Limma-SVM-TopForward FS)\n' +
+        'Effect of Number of Top-Ranked Features Selected on ROC AUC'
+    )
     plt.xlabel('Number of top-ranked features selected')
     plt.ylabel('ROC AUC')
     max_features = len(results[0][0]['nf_split_data'])
@@ -718,7 +730,10 @@ elif args.analysis == 4:
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    plt.title('GSE31210 Train Vs LUAD Test Datasets ROC Curves\nUsing Limma+SVM+RFECV Feature Selection')
+    plt.title(
+        'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets ROC Curves\n' +
+        'Limma-SVM-RFECV Feature Selection (Best Scoring Number of Features)'
+    )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
@@ -842,7 +857,7 @@ elif args.analysis == 5:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on Classifier Performance\n' +
-        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
+        'Limma-SVM-TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
@@ -883,8 +898,8 @@ elif args.analysis == 5:
     plt.figure(2)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'Effect of Test Dataset on Classifier Performance\n' +
-        'Using Limma+SVM+TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
+        'Effect of Training/Held-Out Test Dataset on Classifier Performance\n' +
+        'Limma-SVM-TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
@@ -963,7 +978,7 @@ elif args.analysis == 6:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on Classifier Performance\n' +
-        'Using Limma+SVM+RFECV Feature Selection'
+        'Limma-SVM-RFECV Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
@@ -1003,8 +1018,8 @@ elif args.analysis == 6:
     plt.figure(2)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'Effect of Test Dataset on Classifier Performance\n' +
-        'Using Limma+SVM+RFECV Feature Selection'
+        'Effect of Training/Held-Out Test Dataset on Classifier Performance\n' +
+        'Limma-SVM-RFECV Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
