@@ -34,7 +34,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis number')
 parser.add_argument('--splits', type=int, default=100, help='num splits')
 parser.add_argument('--fs-size', type=float, default=0.5, help='fs size')
-parser.add_argument('--fs-dfx-max', type=int, default=500, help='fs max num dfx features')
+parser.add_argument('--fs-dfx-max', type=int, default=100, help='fs max num dfx features')
 parser.add_argument('--fs-dfx-pval', type=float, default=0.05, help='fs min dfx adj p-value')
 parser.add_argument('--fs-dfx-lfc', type=float, default=0, help='fs min dfx logfc')
 parser.add_argument('--fs-dfx-select', type=int, default=30, help='fs dfx top select')
@@ -54,7 +54,7 @@ parser.add_argument('--tr-rfecv-jobs', type=int, default=-1, help='num tr rfecv 
 parser.add_argument('--tr-rfecv-step', type=float, default=1, help='tr rfecv step')
 parser.add_argument('--tr-rfecv-verbose', type=int, default=0, help='tr rfecv verbosity')
 parser.add_argument('--te-size', type=float, default=0.3, help='te size')
-parser.add_argument('--svm-cache-size', type=int, default=2000, help='svm cache size')
+parser.add_argument('--svm-cache-size', type=int, default=2000, help='libsvm cache size')
 parser.add_argument('--svm-alg', type=str, default='liblinear', help='svm algorithm (liblinear or libsvm)')
 parser.add_argument('--eset-tr', type=str, help='R eset for fs/tr')
 parser.add_argument('--eset-te', type=str, help='R eset for te')
@@ -198,7 +198,7 @@ def tr_topfwd_svm(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
         )
     # end for
     # best_result = sorted(results, key=lambda k: k['roc_auc_te']).pop()
-    # print('Num Features:', best_result['feature_idxs'].size)
+    # print('Features:', best_result['feature_idxs'].size)
     # for rank, feature, symbol in sorted(
     #     zip(
     #         best_result['coefs'],
@@ -469,7 +469,7 @@ elif args.analysis == 2:
     std_num_features = np.std(num_features)
     plt.plot(
         mean_fpr, mean_tpr, color='darkblue', lw=4, alpha=0.8,
-        label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
+        label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' %
         (mean_roc_auc, std_roc_auc, mean_num_features, std_num_features),
     )
     std_tpr = np.std(tprs, axis=0)
@@ -595,7 +595,7 @@ elif args.analysis == 3:
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         plt.plot(
             mean_fpr, te_mean_tpr, lw=4, alpha=0.5,
-            label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
+            label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' %
             (eset_te_name, te_mean_roc_auc, te_std_roc_auc, te_mean_num_features, te_std_num_features),
         )
         tprs.append(te_mean_tpr)
@@ -756,7 +756,7 @@ elif args.analysis == 4:
         eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
         plt.plot(
             mean_fpr, te_mean_tpr, lw=4, alpha=0.5,
-            label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Num Features = %d $\pm$ %d)' %
+            label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' %
             (eset_te_name, te_mean_roc_auc, te_std_roc_auc, te_mean_num_features, te_std_num_features),
         )
         tprs.append(te_mean_tpr)
@@ -904,7 +904,7 @@ elif args.analysis == 5:
         plt.errorbar(
             plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=4, alpha=0.8,
             capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
-            label=r'%s (Num Features = %d $\pm$ %d)' %
+            label=r'%s (Features = %d $\pm$ %d)' %
             (eset_te_name, mean_num_features_te, std_num_features_te)
         )
     plt.legend(loc='best')
@@ -948,7 +948,7 @@ elif args.analysis == 5:
         plt.errorbar(
             plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=4, alpha=0.8,
             capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
-            label=r'%s (Num Features = %d $\pm$ %d)' %
+            label=r'%s (Features = %d $\pm$ %d)' %
             (bc_methods[bc_idx], mean_num_features_bc, std_num_features_bc)
         )
     plt.legend(loc='best')
@@ -1036,7 +1036,7 @@ elif args.analysis == 6:
         plt.errorbar(
             plt_fig1_x_axis, mean_roc_aucs_te_bc, yerr=range_roc_aucs_te_bc, lw=4, alpha=0.8,
             capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
-            label=r'%s (Num Features = %d $\pm$ %d)' %
+            label=r'%s (Features = %d $\pm$ %d)' %
             (eset_te_name, mean_num_features_te, std_num_features_te)
         )
     plt.legend(loc='best')
@@ -1079,7 +1079,7 @@ elif args.analysis == 6:
         plt.errorbar(
             plt_fig2_x_axis, mean_roc_aucs_bc_te, yerr=range_roc_aucs_bc_te, lw=4, alpha=0.8,
             capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
-            label=r'%s (Num Features = %d $\pm$ %d)' %
+            label=r'%s (Features = %d $\pm$ %d)' %
             (bc_methods[bc_idx], mean_num_features_bc, std_num_features_bc)
         )
     plt.legend(loc='best')
