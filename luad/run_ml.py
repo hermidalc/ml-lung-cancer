@@ -265,6 +265,27 @@ def tr_rfecv_svm(X_tr, y_tr, X_te, y_te, eset_tr, fs_data):
     return(results)
 # end tr_rfecv_svm
 
+def fs_limma(_, _, eset_fs):
+    feature_idxs = np.array(
+        r_get_limma_features(
+            eset_fs,
+            True,
+            args.fs_dfx_pval,
+            args.fs_dfx_lfc,
+            args.fs_dfx_max,
+        )
+    ) - 1
+    if feature_idxs.size < args.fs_dfx_select: return()
+    feature_names = np.array(biobase.featureNames(eset_fs), dtype=str)
+    fs_num_features = min(args.fs_dfx_select, len(feature_idxs))
+    fs_data = {
+        'feature_idxs': feature_idxs[:fs_num_features],
+        'feature_names': feature_names[:fs_num_features],
+    }
+    print('Features: %3s / %3s' % (fs_num_features, len(feature_idxs)))
+    return(fs_data)
+# end fs limma
+
 def fs_limma_svm(X_fs, y_fs, eset_fs):
     feature_idxs = np.array(
         r_get_limma_features(
@@ -307,18 +328,27 @@ def fs_limma_svm(X_fs, y_fs, eset_fs):
 # end fs limma svm
 
 # analyses
-if (args.analysis == 1):
+if args.analysis in (1, 7):
     eset_tr_name = 'eset_gex_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-    results = pipeline_one(eset_tr, fs_limma_svm, tr_topfwd_svm)
+    if args.analysis == 1:
+        results = pipeline_one(eset_tr, fs_limma_svm, tr_topfwd_svm)
+    elif args.analysis == 7:
+        results = pipeline_one(eset_tr, fs_limma, tr_topfwd_svm)
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    plt.title(
-        'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
-        'Limma-SVM-TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
-    )
+    if args.analysis == 1:
+        plt.title(
+            'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
+            'Limma-SVM-TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
+        )
+    elif args.analysis == 7:
+        plt.title(
+            'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
+            'Limma-TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
+        )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
@@ -371,10 +401,16 @@ if (args.analysis == 1):
         std_roc_aucs_te.append(np.std(roc_aucs_te[nf_idx]))
     plt.figure(2)
     plt.rcParams['font.size'] = 20
-    plt.title(
-        'GSE31210 Train SVM Classifier Vs GSE31210 Test (Limma-SVM-TopForward FS)\n' +
-        'Effect of Number of Top-Ranked Features Selected on ROC AUC'
-    )
+    if args.analysis == 1:
+        plt.title(
+            'GSE31210 Train SVM Classifier Vs GSE31210 Test (Limma-SVM-TopForward FS)\n' +
+            'Effect of Number of Top-Ranked Features Selected on ROC AUC'
+        )
+    elif args.analysis == 7:
+        plt.title(
+            'GSE31210 Train SVM Classifier Vs GSE31210 Test (Limma-TopForward FS)\n' +
+            'Effect of Number of Top-Ranked Features Selected on ROC AUC'
+        )
     plt.xlabel('Number of top-ranked features selected')
     plt.ylabel('ROC AUC')
     plt.xlim([0.5, len(mean_roc_aucs_tr) + 0.5])
@@ -440,7 +476,7 @@ elif args.analysis == 2:
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     results = pipeline_one(eset_tr, fs_limma_svm, tr_rfecv_svm)
     # plot roc curves
-    plt.figure(1)
+    plt.figure(3)
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
@@ -496,7 +532,7 @@ elif args.analysis == 2:
     for nf_idx in range(len(roc_aucs_tr)):
         mean_roc_aucs_tr.append(np.mean(roc_aucs_tr[nf_idx]))
         std_roc_aucs_tr.append(np.std(roc_aucs_tr[nf_idx]))
-    plt.figure(2)
+    plt.figure(4)
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train SVM Classifier Vs GSE31210 Test (Limma-SVM-RFECV FS)\n' +
@@ -517,6 +553,7 @@ elif args.analysis == 2:
         [m + s for m, s in zip(mean_roc_aucs_tr, std_roc_aucs_tr)],
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
+    plt.legend(loc='lower right')
     # print final selected feature information
     feature_idxs = []
     for split in results: feature_idxs.extend(split['feature_idxs'])
@@ -566,7 +603,7 @@ elif args.analysis == 3:
         ))
     results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_topfwd_svm)
     # plot roc curves
-    plt.figure(1)
+    plt.figure(5)
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets ROC Curves\n' +
@@ -620,7 +657,7 @@ elif args.analysis == 3:
     plt.legend(loc='lower right')
     plt.grid('off')
     # plot num top ranked features selected vs mean roc auc
-    plt.figure(2)
+    plt.figure(6)
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets (Limma-SVM-TopForward FS)\n' +
@@ -728,7 +765,7 @@ elif args.analysis == 4:
         ))
     results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_rfecv_svm)
     # plot roc curves
-    plt.figure(1)
+    plt.figure(7)
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets ROC Curves\n' +
@@ -862,7 +899,7 @@ elif args.analysis == 5:
     te_results_fh.close()
     bc_results_fh.close()
     # plot effect bc method vs test dataset roc auc
-    plt.figure(1)
+    plt.figure(8)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on Classifier Performance\n' +
@@ -909,7 +946,7 @@ elif args.analysis == 5:
         )
     plt.legend(loc='best')
     # plot effect test dataset vs bc roc auc
-    plt.figure(2)
+    plt.figure(9)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on Classifier Performance\n' +
@@ -994,8 +1031,15 @@ elif args.analysis == 6:
                 bc_results.append([results])
             base.remove(eset_tr_name + bc_ext_tr)
             base.remove(eset_te_name + bc_ext_te)
+    # save results
+    te_results_fh = open('data/analysis_6_te_results.pkl', 'wb')
+    bc_results_fh = open('data/analysis_6_bc_results.pkl', 'wb')
+    pickle.dump(te_results, te_results_fh, pickle.HIGHEST_PROTOCOL)
+    pickle.dump(bc_results, bc_results_fh, pickle.HIGHEST_PROTOCOL)
+    te_results_fh.close()
+    bc_results_fh.close()
     # plot effect bc method vs test dataset roc auc
-    plt.figure(1)
+    plt.figure(10)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on Classifier Performance\n' +
@@ -1041,7 +1085,7 @@ elif args.analysis == 6:
         )
     plt.legend(loc='best')
     # plot effect test dataset vs bc roc auc
-    plt.figure(2)
+    plt.figure(11)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on Classifier Performance\n' +
