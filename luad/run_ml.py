@@ -464,13 +464,18 @@ elif args.analysis in (3, 4):
     eset_tr_name = 'eset_gex_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-    results = pipeline_one(eset_tr, fs_limma_svm, tr_rfecv_svm)
+    if args.analysis == 3:
+        results = pipeline_one(eset_tr, fs_limma, tr_rfecv_svm)
+        fs_title = 'Limma-RFECV'
+    elif args.analysis == 4:
+        results = pipeline_one(eset_tr, fs_limma_svm, tr_rfecv_svm)
+        fs_title = 'Limma-SVM-RFECV'
     # plot roc curves
     plt.figure(3)
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
-        'Limma-SVM-RFECV Feature Selection (Best Scoring Number of Features)'
+        fs_title + ' Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
@@ -495,7 +500,7 @@ elif args.analysis in (3, 4):
     std_num_features = np.std(num_features)
     plt.plot(
         mean_fpr, mean_tpr, color='darkblue', lw=4, alpha=0.8,
-        label=r'Mean ROC (AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' %
+        label=r'Test Mean ROC (AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' %
         (mean_roc_auc, std_roc_auc, mean_num_features, std_num_features),
     )
     std_tpr = np.std(tprs, axis=0)
@@ -525,7 +530,7 @@ elif args.analysis in (3, 4):
     plt.figure(4)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'GSE31210 Train SVM Classifier Vs GSE31210 Test (Limma-SVM-RFECV FS)\n' +
+        'GSE31210 Train SVM Classifier Vs GSE31210 Test (' + fs_title + ' FS)\n' +
         'Effect of Number of RFECV Features Selected on ROC AUC'
     )
     plt.xlabel('Number of features selected')
@@ -758,13 +763,18 @@ elif args.analysis in (7, 8):
             eset_te_name,
             r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         ))
-    results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_rfecv_svm)
+    if args.analysis == 7:
+        results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma, tr_rfecv_svm)
+        fs_title = 'Limma-RFECV'
+    elif args.analysis = 8:
+        results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_rfecv_svm)
+        fs_title = 'Limma-SVM-RFECV'
     # plot roc curves
     plt.figure(7)
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets ROC Curves\n' +
-        'Limma-SVM-RFECV Feature Selection (Best Scoring Number of Features)'
+        fs_title + ' Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
