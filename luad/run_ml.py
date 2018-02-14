@@ -31,7 +31,7 @@ r_get_gene_symbols = robjects.globalenv['getGeneSymbols']
 r_get_limma_features = robjects.globalenv['getLimmaFeatures']
 # config
 parser = argparse.ArgumentParser()
-parser.add_argument('--analysis', type=int, help='analysis number')
+parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--splits', type=int, default=100, help='num splits')
 parser.add_argument('--fs-size', type=float, default=0.5, help='fs size')
 parser.add_argument('--fs-dfx-max', type=int, default=100, help='fs max num dfx features')
@@ -328,27 +328,23 @@ def fs_limma_svm(X_fs, y_fs, eset_fs):
 # end fs limma svm
 
 # analyses
-if args.analysis in (1, 7):
+if args.analysis in (1, 2):
     eset_tr_name = 'eset_gex_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     if args.analysis == 1:
-        results = pipeline_one(eset_tr, fs_limma_svm, tr_topfwd_svm)
-    elif args.analysis == 7:
         results = pipeline_one(eset_tr, fs_limma, tr_topfwd_svm)
+        fs_title = 'Limma-TopForward'
+    elif args.analysis == 2:
+        results = pipeline_one(eset_tr, fs_limma_svm, tr_topfwd_svm)
+        fs_title = 'Limma-SVM-TopForward'
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    if args.analysis == 1:
-        plt.title(
-            'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
-            'Limma-SVM-TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
-        )
-    elif args.analysis == 7:
-        plt.title(
-            'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
-            'Limma-TopForward Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
-        )
+    plt.title(
+        'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' + fs_title +
+        ' Feature Selection (Top ' + str(args.fs_final_select) + ' Ranked Features)'
+    )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
@@ -401,16 +397,10 @@ if args.analysis in (1, 7):
         std_roc_aucs_te.append(np.std(roc_aucs_te[nf_idx]))
     plt.figure(2)
     plt.rcParams['font.size'] = 20
-    if args.analysis == 1:
-        plt.title(
-            'GSE31210 Train SVM Classifier Vs GSE31210 Test (Limma-SVM-TopForward FS)\n' +
-            'Effect of Number of Top-Ranked Features Selected on ROC AUC'
-        )
-    elif args.analysis == 7:
-        plt.title(
-            'GSE31210 Train SVM Classifier Vs GSE31210 Test (Limma-TopForward FS)\n' +
-            'Effect of Number of Top-Ranked Features Selected on ROC AUC'
-        )
+    plt.title(
+        'GSE31210 Train SVM Classifier Vs GSE31210 Test (' + fs_title + ' FS)\n' +
+        'Effect of Number of Top-Ranked Features Selected on ROC AUC'
+    )
     plt.xlabel('Number of top-ranked features selected')
     plt.ylabel('ROC AUC')
     plt.xlim([0.5, len(mean_roc_aucs_tr) + 0.5])
@@ -470,7 +460,7 @@ if args.analysis in (1, 7):
         ),
         reverse=True
     ): print(feature, '\t', symbol, '\t', rank)
-elif args.analysis == 2:
+elif args.analysis in (3, 4):
     eset_tr_name = 'eset_gex_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
@@ -584,7 +574,7 @@ elif args.analysis == 2:
         ),
         reverse=True
     ): print(feature, '\t', symbol, '\t', rank)
-elif args.analysis == 3:
+elif args.analysis in (5, 6):
     eset_tr_name = 'eset_gex_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
@@ -601,13 +591,18 @@ elif args.analysis == 3:
             eset_te_name,
             r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         ))
-    results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_topfwd_svm)
+    if args.analysis == 5:
+        results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma, tr_topfwd_svm)
+        fs_title = 'Limma-TopForward'
+    elif args.analysis == 6:
+        results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_topfwd_svm)
+        fs_title = 'Limma-SVM-TopForward'
     # plot roc curves
     plt.figure(5)
     plt.rcParams['font.size'] = 20
     plt.title(
         'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets ROC Curves\n' +
-        'Limma-SVM-TopForward Feature Selection (Best Scoring Number of Features)'
+        fs_title + ' Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
@@ -660,7 +655,7 @@ elif args.analysis == 3:
     plt.figure(6)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets (Limma-SVM-TopForward FS)\n' +
+        'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets (' + fs_title + ' FS)\n' +
         'Effect of Number of Top-Ranked Features Selected on ROC AUC'
     )
     plt.xlabel('Number of top-ranked features selected')
@@ -746,7 +741,7 @@ elif args.analysis == 3:
             ),
             reverse=True
         ): print(feature, '\t', symbol, '\t', rank)
-elif args.analysis == 4:
+elif args.analysis in (7, 8):
     eset_tr_name = 'eset_gex_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
@@ -849,7 +844,7 @@ elif args.analysis == 4:
             ),
             reverse=True
         ): print(feature, '\t', symbol, '\t', rank)
-elif args.analysis == 5:
+elif args.analysis in (9, 10):
     eset_pair_names = [
         ('eset_gex_gse31210_gse30219_gse37745_gse50081', 'eset_gex_gse8894'),
         ('eset_gex_gse31210_gse8894_gse37745_gse50081', 'eset_gex_gse30219'),
@@ -892,8 +887,8 @@ elif args.analysis == 5:
             base.remove(eset_tr_name + bc_ext_tr)
             base.remove(eset_te_name + bc_ext_te)
     # save results
-    te_results_fh = open('data/analysis_5_te_results.pkl', 'wb')
-    bc_results_fh = open('data/analysis_5_bc_results.pkl', 'wb')
+    te_results_fh = open('data/analysis_' + args.analysis + '_te_results.pkl', 'wb')
+    bc_results_fh = open('data/analysis_' + args.analysis + '_bc_results.pkl', 'wb')
     pickle.dump(te_results, te_results_fh, pickle.HIGHEST_PROTOCOL)
     pickle.dump(bc_results, bc_results_fh, pickle.HIGHEST_PROTOCOL)
     te_results_fh.close()
@@ -989,7 +984,7 @@ elif args.analysis == 5:
             (bc_methods[bc_idx], mean_num_features_bc, std_num_features_bc)
         )
     plt.legend(loc='best')
-elif args.analysis == 6:
+elif args.analysis in (11, 12):
     eset_pair_names = [
         #('eset_gex_gse31210_gse30219_gse37745_gse50081', 'eset_gex_gse8894'),
         #('eset_gex_gse31210_gse8894_gse37745_gse50081', 'eset_gex_gse30219'),
@@ -1032,8 +1027,8 @@ elif args.analysis == 6:
             base.remove(eset_tr_name + bc_ext_tr)
             base.remove(eset_te_name + bc_ext_te)
     # save results
-    te_results_fh = open('data/analysis_6_te_results.pkl', 'wb')
-    bc_results_fh = open('data/analysis_6_bc_results.pkl', 'wb')
+    te_results_fh = open('data/analysis_' + args.analysis + '_te_results.pkl', 'wb')
+    bc_results_fh = open('data/analysis_' + args.analysis + '_bc_results.pkl', 'wb')
     pickle.dump(te_results, te_results_fh, pickle.HIGHEST_PROTOCOL)
     pickle.dump(bc_results, bc_results_fh, pickle.HIGHEST_PROTOCOL)
     te_results_fh.close()
