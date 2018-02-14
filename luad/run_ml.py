@@ -338,6 +338,9 @@ if args.analysis in (1, 2):
     elif args.analysis == 2:
         results = pipeline_one(eset_tr, fs_limma_svm, tr_topfwd_svm)
         fs_title = 'Limma-SVM-TopForward'
+    results_fh = open('data/analysis_' + args.analysis + '_results.pkl', 'wb')
+    pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
+    results_fh.close()
     # plot roc curves
     plt.figure(1)
     plt.rcParams['font.size'] = 20
@@ -440,19 +443,28 @@ if args.analysis in (1, 2):
     feature_mx_idx = {}
     for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
     coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
+    roc_auc_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
     for split_idx in range(len(results)):
         split_data = results[split_idx]['nf_split_data'][args.fs_final_select - 1]
         for idx in range(len(split_data['feature_idxs'])):
             coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
                 split_data['coefs'][idx]
-    feature_mean_coefs = []
+            roc_auc_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                split_data['roc_auc_te']
+    feature_mean_coefs, feature_mean_roc_aucs = [], []
     for idx in range(len(feature_idxs)):
         feature_mean_coefs.append(np.mean(coef_mx[idx]))
+        feature_mean_roc_aucs.append(np.mean(roc_auc_mx[idx]))
         # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
+        # print(feature_names[idx], '\t', feature_mean_roc_aucs[idx], '\t', roc_auc_mx[idx])
+    if args.fs_rank_meth == 'mean_coefs':
+        feature_ranks = feature_mean_coefs
+    else:
+        feature_ranks = feature_mean_roc_aucs
     print('Top Classifier Features:')
     for rank, feature, symbol in sorted(
         zip(
-            feature_mean_coefs,
+            feature_ranks,
             feature_names,
             r_get_gene_symbols(
                 eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
@@ -470,6 +482,9 @@ elif args.analysis in (3, 4):
     elif args.analysis == 4:
         results = pipeline_one(eset_tr, fs_limma_svm, tr_rfecv_svm)
         fs_title = 'Limma-SVM-RFECV'
+    results_fh = open('data/analysis_' + args.analysis + '_results.pkl', 'wb')
+    pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
+    results_fh.close()
     # plot roc curves
     plt.figure(3)
     plt.rcParams['font.size'] = 20
@@ -559,19 +574,28 @@ elif args.analysis in (3, 4):
     feature_mx_idx = {}
     for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
     coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
+    roc_auc_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
     for split_idx in range(len(results)):
         split_data = results[split_idx]
         for idx in range(len(split_data['feature_idxs'])):
             coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
                 split_data['coefs'][idx]
-    feature_mean_coefs = []
+            roc_auc_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                split_data['roc_auc_te']
+    feature_mean_coefs, feature_mean_roc_aucs = [], []
     for idx in range(len(feature_idxs)):
         feature_mean_coefs.append(np.mean(coef_mx[idx]))
-        # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t',  coef_mx[idx])
+        feature_mean_roc_aucs.append(np.mean(roc_auc_mx[idx]))
+        # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
+        # print(feature_names[idx], '\t', feature_mean_roc_aucs[idx], '\t', roc_auc_mx[idx])
+    if args.fs_rank_meth == 'mean_coefs':
+        feature_ranks = feature_mean_coefs
+    else:
+        feature_ranks = feature_mean_roc_aucs
     print('Top Classifier Features:')
     for rank, feature, symbol in sorted(
         zip(
-            feature_mean_coefs,
+            feature_ranks,
             feature_names,
             r_get_gene_symbols(
                 eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
@@ -602,6 +626,9 @@ elif args.analysis in (5, 6):
     elif args.analysis == 6:
         results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_topfwd_svm)
         fs_title = 'Limma-SVM-TopForward'
+    results_fh = open('data/analysis_' + args.analysis + '_results.pkl', 'wb')
+    pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
+    results_fh.close()
     # plot roc curves
     plt.figure(5)
     plt.rcParams['font.size'] = 20
@@ -725,20 +752,29 @@ elif args.analysis in (5, 6):
         feature_mx_idx = {}
         for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
         coef_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
+        roc_auc_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
         for split_idx in range(len(te_results)):
             split_data = sorted(te_results[split_idx]['nf_split_data'], key=lambda k: k['roc_auc_te']).pop()
             for idx in range(len(split_data['feature_idxs'])):
                 coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
                     split_data['coefs'][idx]
-        feature_mean_coefs = []
+                roc_auc_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                    split_data['roc_auc_te']
+        feature_mean_coefs, feature_mean_roc_aucs = [], []
         for idx in range(len(feature_idxs)):
             feature_mean_coefs.append(np.mean(coef_mx[idx]))
+            feature_mean_roc_aucs.append(np.mean(roc_auc_mx[idx]))
             # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
+            # print(feature_names[idx], '\t', feature_mean_roc_aucs[idx], '\t', roc_auc_mx[idx])
+        if args.fs_rank_meth == 'mean_coefs':
+            feature_ranks = feature_mean_coefs
+        else:
+            feature_ranks = feature_mean_roc_aucs
         eset_te_name = eset_te_names[te_idx].replace('eset_gex_', '').upper()
         print('%s Best Scoring Features:' % eset_te_name)
         for rank, feature, symbol in sorted(
             zip(
-                feature_mean_coefs,
+                feature_ranks,
                 feature_names,
                 r_get_gene_symbols(
                     eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
@@ -766,9 +802,12 @@ elif args.analysis in (7, 8):
     if args.analysis == 7:
         results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma, tr_rfecv_svm)
         fs_title = 'Limma-RFECV'
-    elif args.analysis = 8:
+    elif args.analysis == 8:
         results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_rfecv_svm)
         fs_title = 'Limma-SVM-RFECV'
+    results_fh = open('data/analysis_' + args.analysis + '_results.pkl', 'wb')
+    pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
+    results_fh.close()
     # plot roc curves
     plt.figure(7)
     plt.rcParams['font.size'] = 20
@@ -833,20 +872,29 @@ elif args.analysis in (7, 8):
         feature_mx_idx = {}
         for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
         coef_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
+        roc_auc_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
         for split_idx in range(len(te_results)):
             split_data = te_results[split_idx]
             for idx in range(len(split_data['feature_idxs'])):
                 coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
                     split_data['coefs'][idx]
-        feature_mean_coefs = []
+                roc_auc_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                    split_data['roc_auc_te']
+        feature_mean_coefs, feature_mean_roc_aucs = [], []
         for idx in range(len(feature_idxs)):
             feature_mean_coefs.append(np.mean(coef_mx[idx]))
+            feature_mean_roc_aucs.append(np.mean(roc_auc_mx[idx]))
             # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
+            # print(feature_names[idx], '\t', feature_mean_roc_aucs[idx], '\t', roc_auc_mx[idx])
+        if args.fs_rank_meth == 'mean_coefs':
+            feature_ranks = feature_mean_coefs
+        else:
+            feature_ranks = feature_mean_roc_aucs
         eset_te_name = eset_te_names[te_idx].replace('eset_gex_', '').upper()
-        print('%s Selected Features:' % eset_te_name)
+        print('%s Best Scoring Features:' % eset_te_name)
         for rank, feature, symbol in sorted(
             zip(
-                feature_mean_coefs,
+                feature_ranks,
                 feature_names,
                 r_get_gene_symbols(
                     eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
@@ -885,7 +933,10 @@ elif args.analysis in (9, 10):
             eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name + bc_ext_tr])
             base.load('data/' + eset_te_name + bc_ext_te + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name + bc_ext_te])
-            results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_topfwd_svm)
+            if args.analysis == 9:
+                results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma, tr_topfwd_svm)
+            elif args.analysis == 10:
+                results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_topfwd_svm)
             if te_idx < len(te_results):
                 te_results[te_idx].append(results)
             else:
@@ -903,12 +954,16 @@ elif args.analysis in (9, 10):
     pickle.dump(bc_results, bc_results_fh, pickle.HIGHEST_PROTOCOL)
     te_results_fh.close()
     bc_results_fh.close()
+    if args.analysis == 9:
+        fs_title = 'Limma-TopForward'
+    elif args.analysis == 10:
+        fs_title = 'Limma-SVM-TopForward'
     # plot effect bc method vs test dataset roc auc
     plt.figure(8)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on Classifier Performance\n' +
-        'Limma-SVM-TopForward Feature Selection (Best Scoring Number of Features)'
+        fs_title + ' Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
@@ -955,7 +1010,7 @@ elif args.analysis in (9, 10):
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on Classifier Performance\n' +
-        'Limma-SVM-TopForward Feature Selection (Best Scoring Number of Features)'
+        fs_title + ' Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
@@ -996,22 +1051,22 @@ elif args.analysis in (9, 10):
     plt.legend(loc='best')
 elif args.analysis in (11, 12):
     eset_pair_names = [
-        #('eset_gex_gse31210_gse30219_gse37745_gse50081', 'eset_gex_gse8894'),
-        #('eset_gex_gse31210_gse8894_gse37745_gse50081', 'eset_gex_gse30219'),
-        #('eset_gex_gse8894_gse30219_gse37745_gse50081', 'eset_gex_gse31210'),
+        ('eset_gex_gse31210_gse30219_gse37745_gse50081', 'eset_gex_gse8894'),
+        ('eset_gex_gse31210_gse8894_gse37745_gse50081', 'eset_gex_gse30219'),
+        ('eset_gex_gse8894_gse30219_gse37745_gse50081', 'eset_gex_gse31210'),
         ('eset_gex_gse31210_gse8894_gse30219_gse50081', 'eset_gex_gse37745'),
         ('eset_gex_gse31210_gse8894_gse30219_gse37745', 'eset_gex_gse50081'),
     ]
     bc_methods = [
-        #'none',
-        #'std',
+        'none',
+        'std',
         'cbt',
         #'fab',
-        #'sva',
-        #'stica0',
-        #'stica025',
-        #'stica05',
-        #'stica1',
+        'sva',
+        'stica0',
+        'stica025',
+        'stica05',
+        'stica1',
         'svd',
     ]
     te_results, bc_results = [], []
@@ -1025,7 +1080,10 @@ elif args.analysis in (11, 12):
             eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name + bc_ext_tr])
             base.load('data/' + eset_te_name + bc_ext_te + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name + bc_ext_te])
-            results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_rfecv_svm)
+            if args.analysis == 11:
+                results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma, tr_rfecv_svm)
+            elif args.analysis == 12:
+                results = pipeline_one_vs_one(eset_tr, eset_te, fs_limma_svm, tr_rfecv_svm)
             if te_idx < len(te_results):
                 te_results[te_idx].append(results)
             else:
@@ -1043,12 +1101,16 @@ elif args.analysis in (11, 12):
     pickle.dump(bc_results, bc_results_fh, pickle.HIGHEST_PROTOCOL)
     te_results_fh.close()
     bc_results_fh.close()
+    if args.analysis == 11:
+        fs_title = 'Limma-TopForward'
+    elif args.analysis == 12:
+        fs_title = 'Limma-SVM-TopForward'
     # plot effect bc method vs test dataset roc auc
     plt.figure(10)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on Classifier Performance\n' +
-        'Limma-SVM-RFECV Feature Selection (Best Scoring Number of Features)'
+        fs_title + ' Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
@@ -1094,7 +1156,7 @@ elif args.analysis in (11, 12):
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on Classifier Performance\n' +
-        'Limma-SVM-RFECV Feature Selection (Best Scoring Number of Features)'
+        fs_title + ' Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
