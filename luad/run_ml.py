@@ -550,6 +550,7 @@ elif args.analysis in (3, 4):
     )
     plt.xlabel('Number of features selected')
     plt.ylabel('ROC AUC')
+    plt.ylim(0.45, 0.9)
     plt_fig2_x_axis = range(1, len(roc_aucs_tr) + 1)
     plt.xlim([0.5, len(roc_aucs_tr) + 0.5])
     plt.xticks(plt_fig2_x_axis)
@@ -968,7 +969,7 @@ elif args.analysis in (9, 10):
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
     plt_fig1_x_axis = range(1, len(bc_methods) + 1)
-    plt.xticks(plt_fig1_x_axis, bc_methods, rotation=30)
+    plt.xticks(plt_fig1_x_axis, bc_methods)
     for te_idx, te_bc_results in enumerate(te_results):
         mean_roc_aucs_tr_bc, range_roc_aucs_tr_bc = [], [[], []]
         mean_roc_aucs_te_bc, range_roc_aucs_te_bc = [], [[], []]
@@ -1115,7 +1116,7 @@ elif args.analysis in (11, 12):
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
     plt_fig1_x_axis = range(1, len(bc_methods) + 1)
-    plt.xticks(plt_fig1_x_axis, bc_methods, rotation=30)
+    plt.xticks(plt_fig1_x_axis, bc_methods)
     for te_idx, te_bc_results in enumerate(te_results):
         mean_roc_aucs_tr_bc, range_roc_aucs_tr_bc = [], [[], []]
         mean_roc_aucs_te_bc, range_roc_aucs_te_bc = [], [[], []]
