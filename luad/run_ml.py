@@ -280,7 +280,7 @@ def fs_limma(X_fs, y_fs, eset_fs):
     fs_num_features = min(args.fs_dfx_select, len(feature_idxs))
     fs_data = {
         'feature_idxs': feature_idxs[:fs_num_features],
-        'feature_names': feature_names[:fs_num_features],
+        'feature_names': feature_names[feature_idxs[:fs_num_features]],
     }
     print('Features: %3s / %3s' % (fs_num_features, len(feature_idxs)))
     return(fs_data)
