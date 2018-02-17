@@ -753,7 +753,7 @@ elif args.analysis in (5, 6):
         feature_mx_idx = {}
         for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
         coef_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
-        roc_auc_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
+        roc_auc_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
         for split_idx in range(len(te_results)):
             split_data = sorted(te_results[split_idx]['nf_split_data'], key=lambda k: k['roc_auc_te']).pop()
             for idx in range(len(split_data['feature_idxs'])):
@@ -873,7 +873,7 @@ elif args.analysis in (7, 8):
         feature_mx_idx = {}
         for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
         coef_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
-        roc_auc_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
+        roc_auc_mx = np.zeros((len(feature_idxs), len(te_results)), dtype=float)
         for split_idx in range(len(te_results)):
             split_data = te_results[split_idx]
             for idx in range(len(split_data['feature_idxs'])):
