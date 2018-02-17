@@ -338,7 +338,7 @@ if args.analysis in (1, 2):
     elif args.analysis == 2:
         results = pipeline_one(eset_tr, fs_limma_svm, tr_topfwd_svm)
         fs_title = 'Limma-SVM-TopForward'
-    results_fh = open('data/analysis_' + str(args.analysis) + '_results.pkl', 'wb')
+    results_fh = open('data/results_analysis_' + str(args.analysis) + '.pkl', 'wb')
     pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
     results_fh.close()
     # plot roc curves
@@ -482,7 +482,7 @@ elif args.analysis in (3, 4):
     elif args.analysis == 4:
         results = pipeline_one(eset_tr, fs_limma_svm, tr_rfecv_svm)
         fs_title = 'Limma-SVM-RFECV'
-    results_fh = open('data/analysis_' + str(args.analysis) + '_results.pkl', 'wb')
+    results_fh = open('data/results_analysis_' + str(args.analysis) + '.pkl', 'wb')
     pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
     results_fh.close()
     # plot roc curves
@@ -627,7 +627,7 @@ elif args.analysis in (5, 6):
     elif args.analysis == 6:
         results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_topfwd_svm)
         fs_title = 'Limma-SVM-TopForward'
-    results_fh = open('data/analysis_' + str(args.analysis) + '_results.pkl', 'wb')
+    results_fh = open('data/results_analysis_' + str(args.analysis) + '.pkl', 'wb')
     pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
     results_fh.close()
     # plot roc curves
@@ -806,7 +806,7 @@ elif args.analysis in (7, 8):
     elif args.analysis == 8:
         results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_rfecv_svm)
         fs_title = 'Limma-SVM-RFECV'
-    results_fh = open('data/analysis_' + str(args.analysis) + '_results.pkl', 'wb')
+    results_fh = open('data/results_analysis_' + str(args.analysis) + '.pkl', 'wb')
     pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
     results_fh.close()
     # plot roc curves
@@ -949,12 +949,10 @@ elif args.analysis in (9, 10):
             base.remove(eset_tr_name + bc_ext_tr)
             base.remove(eset_te_name + bc_ext_te)
     # save results
-    te_results_fh = open('data/analysis_' + str(args.analysis) + '_te_results.pkl', 'wb')
-    bc_results_fh = open('data/analysis_' + str(args.analysis) + '_bc_results.pkl', 'wb')
-    pickle.dump(te_results, te_results_fh, pickle.HIGHEST_PROTOCOL)
-    pickle.dump(bc_results, bc_results_fh, pickle.HIGHEST_PROTOCOL)
-    te_results_fh.close()
-    bc_results_fh.close()
+    all_results = { 'te': te_results, 'bc': bc_results }
+    results_fh = open('data/results_analysis_' + str(args.analysis) + '.pkl', 'wb')
+    pickle.dump(all_results, results_fh, pickle.HIGHEST_PROTOCOL)
+    results_fh.close()
     if args.analysis == 9:
         fs_title = 'Limma-TopForward'
     elif args.analysis == 10:
@@ -1096,12 +1094,10 @@ elif args.analysis in (11, 12):
             base.remove(eset_tr_name + bc_ext_tr)
             base.remove(eset_te_name + bc_ext_te)
     # save results
-    te_results_fh = open('data/analysis_' + str(args.analysis) + '_te_results.pkl', 'wb')
-    bc_results_fh = open('data/analysis_' + str(args.analysis) + '_bc_results.pkl', 'wb')
-    pickle.dump(te_results, te_results_fh, pickle.HIGHEST_PROTOCOL)
-    pickle.dump(bc_results, bc_results_fh, pickle.HIGHEST_PROTOCOL)
-    te_results_fh.close()
-    bc_results_fh.close()
+    all_results = { 'te': te_results, 'bc': bc_results }
+    results_fh = open('data/results_analysis_' + str(args.analysis) + '.pkl', 'wb')
+    pickle.dump(all_results, results_fh, pickle.HIGHEST_PROTOCOL)
+    results_fh.close()
     if args.analysis == 11:
         fs_title = 'Limma-TopForward'
     elif args.analysis == 12:
