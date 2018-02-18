@@ -4,6 +4,7 @@ suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("bapred"))
 # suppressPackageStartupMessages(library("sva"))
 source("svaba.R")
+source("normFact.R")
 source("config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
@@ -26,7 +27,8 @@ for (bc_type in cmd_args) {
                         eset_te_bc_name <- paste0(eset_te_name, "_te_", bc_type, alpha_name)
                         print(paste(eset_tr_bc_name, "->", eset_te_bc_name))
                         bc_obj <- normFact(
-                            "stICA", Xtr, ptr$Batch, "categorical", ref2=ptr$Relapse, refType2="categorical", alpha=alpha
+                            "stICA", Xtr, ptr$Batch, "categorical",
+                            ref2=ptr$Relapse, refType2="categorical", k=matfact_k, alpha=alpha
                         )
                         eset_tr_bc <- get(eset_tr_name)
                         exprs(eset_tr_bc) <- bc_obj$Xn
@@ -50,7 +52,8 @@ for (bc_type in cmd_args) {
                     print(paste(eset_tr_bc_name, "->", eset_te_bc_name))
                     load(paste0("data/", eset_tr_name, ".Rda"))
                     bc_obj <- normFact(
-                        "SVD", Xtr, ptr$Batch, "categorical", ref2=ptr$Relapse, refType2="categorical"
+                        "SVD", Xtr, ptr$Batch, "categorical",
+                        ref2=ptr$Relapse, refType2="categorical", k=matfact_k
                     )
                     eset_tr_bc <- get(eset_tr_name)
                     exprs(eset_tr_bc) <- bc_obj$Xn
@@ -143,7 +146,9 @@ for (bc_type in cmd_args) {
         print(eset_tr_norm_name)
         load(paste0("data/", eset_tr_name, ".Rda"))
         Xtr <- t(exprs(get(eset_tr_name)))
-        norm_obj <- qunormtrain(Xtr)
+        if (bc_type == "qnorm") {
+            norm_obj <- qunormtrain(Xtr)
+        }
         eset_tr_norm <- get(eset_tr_name)
         exprs(eset_tr_norm) <- t(norm_obj$xnorm)
         assign(eset_tr_norm_name, eset_tr_norm)
@@ -157,7 +162,9 @@ for (bc_type in cmd_args) {
             load(paste0("data/", eset_te_name, ".Rda"))
             Xte <- t(exprs(get(eset_te_name)))
             eset_te_norm <- get(eset_te_name)
-            exprs(eset_te_norm) <- t(qunormaddon(norm_obj, Xte))
+            if (bc_type == "qnorm") {
+                exprs(eset_te_norm) <- t(qunormaddon(norm_obj, Xte))
+            }
             assign(eset_te_norm_name, eset_te_norm)
             save(list=eset_te_norm_name, file=paste0("data/", eset_te_norm_name, ".Rda"))
         }

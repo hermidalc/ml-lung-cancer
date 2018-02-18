@@ -1,4 +1,3 @@
-
 unbiased_stICA <- function(X,k=20,alpha=0.5) {
 
 #

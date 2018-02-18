@@ -1,5 +1,3 @@
-#!/usr/bin/env R
-
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("genefilter"))
 suppressPackageStartupMessages(library("limma"))
