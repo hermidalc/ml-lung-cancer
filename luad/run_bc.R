@@ -44,6 +44,7 @@ for (bc_type in cmd_args) {
                         exprs(eset_te_bc) <- bc_obj$U %*% t((t(Xte) %*% bc_obj$U) %*% solve(t(bc_obj$U) %*% bc_obj$U))
                         assign(eset_te_bc_name, eset_te_bc)
                         save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
+                        remove(list=c(eset_tr_bc_name, eset_te_bc_name))
                     }
                 }
                 else if (bc_type == "svd") {
@@ -68,6 +69,7 @@ for (bc_type in cmd_args) {
                     exprs(eset_te_bc) <- bc_obj$U %*% t((t(Xte) %*% bc_obj$U) %*% solve(t(bc_obj$U) %*% bc_obj$U))
                     assign(eset_te_bc_name, eset_te_bc)
                     save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
+                    remove(list=c(eset_tr_bc_name, eset_te_bc_name))
                 }
             }
             else if (bc_type %in% c("cbt", "fab", "std", "sva")) {
@@ -132,6 +134,7 @@ for (bc_type in cmd_args) {
                 }
                 assign(eset_te_bc_name, eset_te_bc)
                 save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
+                remove(list=c(eset_tr_bc_name, eset_te_bc_name))
             }
         }
     }
