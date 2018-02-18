@@ -14,9 +14,9 @@ for (bc_type in cmd_args) {
         for (col in 1:ncol(dataset_name_combos)) {
             eset_tr_name <- paste0(c("eset", dataset_name_combos[,col]), collapse="_")
             eset_te_name <- paste0(c("eset", setdiff(dataset_names, dataset_name_combos[,col])), collapse="_")
+            load(paste0("data/", eset_tr_name, ".Rda"))
+            load(paste0("data/", eset_te_name, ".Rda"))
             if (bc_type %in% c("stica", "svd")) {
-                load(paste0("data/", eset_tr_name, ".Rda"))
-                load(paste0("data/", eset_te_name, ".Rda"))
                 ptr <- pData(get(eset_tr_name))
                 Xtr <- exprs(get(eset_tr_name))
                 Xte <- exprs(get(eset_te_name))
@@ -74,7 +74,6 @@ for (bc_type in cmd_args) {
                 eset_tr_bc_name <- paste0(eset_tr_name, "_tr_", bc_type)
                 eset_te_bc_name <- paste0(eset_te_name, "_te_", bc_type)
                 print(paste(eset_tr_bc_name, "->", eset_te_bc_name))
-                load(paste0("data/", eset_tr_name, ".Rda"))
                 ptr <- pData(get(eset_tr_name))
                 Xtr <- t(exprs(get(eset_tr_name)))
                 ytr <- as.factor(ptr$Relapse + 1)
@@ -108,7 +107,6 @@ for (bc_type in cmd_args) {
                 eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
                 assign(eset_tr_bc_obj_name, bc_obj)
                 save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
-                load(paste0("data/", eset_te_name, ".Rda"))
                 pte <- pData(get(eset_te_name))
                 Xte <- t(exprs(get(eset_te_name)))
                 bte <- pte$Batch
