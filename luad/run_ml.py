@@ -329,7 +329,7 @@ def fs_limma_svm(X_fs, y_fs, eset_fs):
 
 # analyses
 if args.analysis in (1, 2):
-    eset_tr_name = 'eset_gex_gse31210'
+    eset_tr_name = 'eset_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     if args.analysis == 1:
@@ -473,7 +473,7 @@ if args.analysis in (1, 2):
         reverse=True
     ): print(feature, '\t', symbol, '\t', rank)
 elif args.analysis in (3, 4):
-    eset_tr_name = 'eset_gex_gse31210'
+    eset_tr_name = 'eset_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     if args.analysis == 3:
@@ -605,14 +605,13 @@ elif args.analysis in (3, 4):
         reverse=True
     ): print(feature, '\t', symbol, '\t', rank)
 elif args.analysis in (5, 6):
-    eset_tr_name = 'eset_gex_gse31210'
+    eset_tr_name = 'eset_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     eset_te_names = [
-        'eset_gex_gse8894',
-        'eset_gex_gse30219',
-        'eset_gex_gse37745',
-        'eset_gex_gse50081',
+        'eset_gse8894',
+        'eset_gse30219',
+        'eset_gse37745',
     ]
     esets_te = []
     for eset_te_name in eset_te_names:
@@ -657,7 +656,7 @@ elif args.analysis in (5, 6):
         te_std_roc_auc = np.std(te_roc_aucs)
         te_mean_num_features = np.mean(te_num_features)
         te_std_num_features = np.std(te_num_features)
-        eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
+        eset_te_name = eset_te_names[idx].replace('eset_', '').upper()
         plt.plot(
             mean_fpr, te_mean_tpr, lw=4, alpha=0.5,
             label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' %
@@ -714,7 +713,7 @@ elif args.analysis in (5, 6):
         for nf_idx in range(len(roc_aucs_te)):
             mean_roc_aucs_te.append(np.mean(roc_aucs_te[nf_idx]))
             std_roc_aucs_te.append(np.std(roc_aucs_te[nf_idx]))
-        eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
+        eset_te_name = eset_te_names[idx].replace('eset_', '').upper()
         plt.plot(
             plt_fig2_x_axis, mean_roc_aucs_te,
             lw=4, alpha=0.8, label='%s Mean ROC AUC (Test)' % eset_te_name,
@@ -771,7 +770,7 @@ elif args.analysis in (5, 6):
             feature_ranks = feature_mean_coefs
         else:
             feature_ranks = feature_mean_roc_aucs
-        eset_te_name = eset_te_names[te_idx].replace('eset_gex_', '').upper()
+        eset_te_name = eset_te_names[te_idx].replace('eset_', '').upper()
         print('%s Best Scoring Features:' % eset_te_name)
         for rank, feature, symbol in sorted(
             zip(
@@ -784,14 +783,13 @@ elif args.analysis in (5, 6):
             reverse=True
         ): print(feature, '\t', symbol, '\t', rank)
 elif args.analysis in (7, 8):
-    eset_tr_name = 'eset_gex_gse31210'
+    eset_tr_name = 'eset_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     eset_te_names = [
-        'eset_gex_gse8894',
-        'eset_gex_gse30219',
-        'eset_gex_gse37745',
-        'eset_gex_gse50081',
+        'eset_gse8894',
+        'eset_gse30219',
+        'eset_gse37745',
     ]
     esets_te = []
     for eset_te_name in eset_te_names:
@@ -835,7 +833,7 @@ elif args.analysis in (7, 8):
         te_std_roc_auc = np.std(te_roc_aucs)
         te_mean_num_features = np.mean(te_num_features)
         te_std_num_features = np.std(te_num_features)
-        eset_te_name = eset_te_names[idx].replace('eset_gex_', '').upper()
+        eset_te_name = eset_te_names[idx].replace('eset_', '').upper()
         plt.plot(
             mean_fpr, te_mean_tpr, lw=4, alpha=0.5,
             label=r'%s Mean ROC (AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' %
@@ -891,7 +889,7 @@ elif args.analysis in (7, 8):
             feature_ranks = feature_mean_coefs
         else:
             feature_ranks = feature_mean_roc_aucs
-        eset_te_name = eset_te_names[te_idx].replace('eset_gex_', '').upper()
+        eset_te_name = eset_te_names[te_idx].replace('eset_', '').upper()
         print('%s Best Scoring Features:' % eset_te_name)
         for rank, feature, symbol in sorted(
             zip(
@@ -905,17 +903,16 @@ elif args.analysis in (7, 8):
         ): print(feature, '\t', symbol, '\t', rank)
 elif args.analysis in (9, 10):
     eset_pair_names = [
-        ('eset_gex_gse31210_gse30219_gse37745_gse50081', 'eset_gex_gse8894'),
-        ('eset_gex_gse31210_gse8894_gse37745_gse50081', 'eset_gex_gse30219'),
-        ('eset_gex_gse8894_gse30219_gse37745_gse50081', 'eset_gex_gse31210'),
-        ('eset_gex_gse31210_gse8894_gse30219_gse50081', 'eset_gex_gse37745'),
-        ('eset_gex_gse31210_gse8894_gse30219_gse37745', 'eset_gex_gse50081'),
+        ('eset_gse31210_gse30219_gse37745', 'eset_gse8894'),
+        ('eset_gse31210_gse8894_gse37745', 'eset_gse30219'),
+        ('eset_gse8894_gse30219_gse37745', 'eset_gse31210'),
+        ('eset_gse31210_gse8894_gse30219', 'eset_gse37745'),
     ]
     bc_methods = [
         'none',
         'std',
         'cbt',
-        #'fab',
+        'fab',
         'sva',
         'stica0',
         'stica025',
@@ -988,9 +985,9 @@ elif args.analysis in (9, 10):
         mean_num_features_te = np.mean(num_features_te)
         std_num_features_te = np.std(num_features_te)
         eset_tr_name, eset_te_name = eset_pair_names[te_idx]
-        eset_tr_name = eset_tr_name.replace('eset_gex_', '').upper()
+        eset_tr_name = eset_tr_name.replace('eset_', '').upper()
         eset_tr_name = eset_tr_name.replace('_', '-')
-        eset_te_name = eset_te_name.replace('eset_gex_', '').upper()
+        eset_te_name = eset_te_name.replace('eset_', '').upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.errorbar(
             plt_fig1_x_axis, mean_roc_aucs_tr_bc, yerr=range_roc_aucs_tr_bc, lw=4, alpha=0.8,
@@ -1013,7 +1010,7 @@ elif args.analysis in (9, 10):
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
-    eset_te_names = [te_name.replace('eset_gex_', '').upper() for _, te_name in eset_pair_names]
+    eset_te_names = [te_name.replace('eset_', '').upper() for _, te_name in eset_pair_names]
     plt_fig2_x_axis = range(1, len(eset_te_names) + 1)
     plt.xticks(plt_fig2_x_axis, eset_te_names)
     for bc_idx, bc_te_results in enumerate(bc_results):
@@ -1050,17 +1047,16 @@ elif args.analysis in (9, 10):
     plt.legend(loc='best')
 elif args.analysis in (11, 12):
     eset_pair_names = [
-        ('eset_gex_gse31210_gse30219_gse37745_gse50081', 'eset_gex_gse8894'),
-        ('eset_gex_gse31210_gse8894_gse37745_gse50081', 'eset_gex_gse30219'),
-        ('eset_gex_gse8894_gse30219_gse37745_gse50081', 'eset_gex_gse31210'),
-        ('eset_gex_gse31210_gse8894_gse30219_gse50081', 'eset_gex_gse37745'),
-        ('eset_gex_gse31210_gse8894_gse30219_gse37745', 'eset_gex_gse50081'),
+        ('eset_gse31210_gse30219_gse37745', 'eset_gse8894'),
+        ('eset_gse31210_gse8894_gse37745', 'eset_gse30219'),
+        ('eset_gse8894_gse30219_gse37745', 'eset_gse31210'),
+        ('eset_gse31210_gse8894_gse30219', 'eset_gse37745'),
     ]
     bc_methods = [
         'none',
         'std',
         'cbt',
-        #'fab',
+        'fab',
         'sva',
         'stica0',
         'stica025',
@@ -1132,9 +1128,9 @@ elif args.analysis in (11, 12):
         mean_num_features_te = np.mean(num_features_te)
         std_num_features_te = np.std(num_features_te)
         eset_tr_name, eset_te_name = eset_pair_names[te_idx]
-        eset_tr_name = eset_tr_name.replace('eset_gex_', '').upper()
+        eset_tr_name = eset_tr_name.replace('eset_', '').upper()
         eset_tr_name = eset_tr_name.replace('_', '-')
-        eset_te_name = eset_te_name.replace('eset_gex_', '').upper()
+        eset_te_name = eset_te_name.replace('eset_', '').upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.errorbar(
             plt_fig1_x_axis, mean_roc_aucs_tr_bc, yerr=range_roc_aucs_tr_bc, lw=4, alpha=0.8,
@@ -1157,7 +1153,7 @@ elif args.analysis in (11, 12):
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
-    eset_te_names = [te_name.replace('eset_gex_', '').upper() for _, te_name in eset_pair_names]
+    eset_te_names = [te_name.replace('eset_', '').upper() for _, te_name in eset_pair_names]
     plt_fig2_x_axis = range(1, len(eset_te_names) + 1)
     plt.xticks(plt_fig2_x_axis, eset_te_names)
     for bc_idx, bc_te_results in enumerate(bc_results):
