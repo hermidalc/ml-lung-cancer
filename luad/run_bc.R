@@ -10,11 +10,11 @@ source("config.R")
 cmd_args <- commandArgs(trailingOnly=TRUE)
 dataset_name_combos <- combn(dataset_names, length(dataset_names) - 1)
 for (bc_type in cmd_args) {
-    if (bc_type in c("cbt", "fab", "std", "sva", "stica", "svd")) {
+    if (bc_type %in% c("cbt", "fab", "std", "sva", "stica", "svd")) {
         for (col in 1:ncol(dataset_name_combos)) {
             eset_tr_name <- paste0(c("eset", dataset_name_combos[,col]), collapse="_")
-            eset_te_name <- setdiff(dataset_names, dataset_name_combos[,col])
-            if (bc_type in c("stica", "svd")) {
+            eset_te_name <- paste0(c("eset", setdiff(dataset_names, dataset_name_combos[,col])), collapse="_")
+            if (bc_type %in% c("stica", "svd")) {
                 load(paste0("data/", eset_tr_name, ".Rda"))
                 load(paste0("data/", eset_te_name, ".Rda"))
                 ptr <- pData(get(eset_tr_name))
@@ -72,7 +72,7 @@ for (bc_type in cmd_args) {
                     save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
                 }
             }
-            else if (bc_type in c("cbt", "fab", "std", "sva")) {
+            else if (bc_type %in% c("cbt", "fab", "std", "sva")) {
                 eset_tr_bc_name <- paste0(eset_tr_name, "_tr_", bc_type)
                 eset_te_bc_name <- paste0(eset_te_name, "_te_", bc_type)
                 print(paste(eset_tr_bc_name, "->", eset_te_bc_name))
@@ -139,9 +139,9 @@ for (bc_type in cmd_args) {
             }
         }
     }
-    else if (bc_type in c("qnorm")) {
+    else if (bc_type %in% c("qnorm")) {
         # currently take first dataset as train
-        eset_tr_name <- dataset_names[1]
+        eset_tr_name <- paste0(c("eset", dataset_names[1]), collapse="_")
         eset_tr_norm_name <- paste0(eset_tr_name, "_tr_", bc_type)
         print(eset_tr_norm_name)
         load(paste0("data/", eset_tr_name, ".Rda"))
@@ -156,7 +156,8 @@ for (bc_type in cmd_args) {
         eset_tr_norm_obj_name <- paste0(eset_tr_norm_name, "_obj")
         assign(eset_tr_norm_obj_name, norm_obj)
         save(list=eset_tr_norm_obj_name, file=paste0("data/", eset_tr_norm_obj_name, ".Rda"))
-        for (eset_te_name in dataset_names[2:length(dataset_names)]) {
+        for (j in 2:length(dataset_names)) {
+            eset_te_name <- paste0(c("eset", dataset_names[j]), collapse="_")
             eset_te_norm_name <- paste0(eset_te_name, "_te_norm")
             print(paste(eset_tr_norm_name, "->", eset_te_norm_name))
             load(paste0("data/", eset_te_name, ".Rda"))
