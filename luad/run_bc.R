@@ -37,10 +37,10 @@ for (bc_type in cmd_args) {
                         eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
                         assign(eset_tr_bc_obj_name, bc_obj)
                         save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
-                        eset_te_bc <- get(eset_te_name)
                         # Renard et al stICA IEEE 2017 paper code add-on batch effect correction
                         # Vte = dot(dot(Xte.T,U),np.linalg.inv(dot(U.T,U)))
                         # Xte_n = dot(U,Vte.T)
+                        eset_te_bc <- get(eset_te_name)
                         exprs(eset_te_bc) <- bc_obj$U %*% t((t(Xte) %*% bc_obj$U) %*% solve(t(bc_obj$U) %*% bc_obj$U))
                         assign(eset_te_bc_name, eset_te_bc)
                         save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
@@ -50,7 +50,6 @@ for (bc_type in cmd_args) {
                     eset_tr_bc_name <- paste0(eset_tr_name, "_tr_", bc_type)
                     eset_te_bc_name <- paste0(eset_te_name, "_te_", bc_type)
                     print(paste(eset_tr_bc_name, "->", eset_te_bc_name))
-                    load(paste0("data/", eset_tr_name, ".Rda"))
                     bc_obj <- normFact(
                         "SVD", Xtr, ptr$Batch, "categorical",
                         ref2=ptr$Relapse, refType2="categorical", k=matfact_k
@@ -62,11 +61,10 @@ for (bc_type in cmd_args) {
                     eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
                     assign(eset_tr_bc_obj_name, bc_obj)
                     save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
-                    load(paste0("data/", eset_te_name, ".Rda"))
-                    eset_te_bc <- get(eset_te_name)
                     # Renard et al stICA IEEE 2017 paper code add-on batch effect correction
                     # Vte = dot(dot(Xte.T,U),np.linalg.inv(dot(U.T,U)))
                     # Xte_n = dot(U,Vte.T)
+                    eset_te_bc <- get(eset_te_name)
                     exprs(eset_te_bc) <- bc_obj$U %*% t((t(Xte) %*% bc_obj$U) %*% solve(t(bc_obj$U) %*% bc_obj$U))
                     assign(eset_te_bc_name, eset_te_bc)
                     save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
