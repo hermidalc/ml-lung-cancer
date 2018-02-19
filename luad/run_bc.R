@@ -3,9 +3,9 @@
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("bapred"))
 # suppressPackageStartupMessages(library("sva"))
-source("svaba.R")
-source("normFact.R")
-source("config.R")
+source("lib/R/svaba.R")
+source("lib/R/normFact.R")
+source("lib/R/config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
 dataset_name_combos <- combn(dataset_names, length(dataset_names) - 1)

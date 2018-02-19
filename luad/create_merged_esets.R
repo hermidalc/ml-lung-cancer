@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 suppressPackageStartupMessages(library("Biobase"))
-source("config.R")
+source("lib/R/config.R")
 
 for (dataset_name in dataset_names) {
     eset_name <- paste0(c("eset", dataset_name), collapse="_")

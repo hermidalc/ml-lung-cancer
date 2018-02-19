@@ -14,15 +14,13 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, LinearSVC
 from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.externals import joblib
-from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 from matplotlib import style
 
 style.use('ggplot')
 base = importr('base')
 biobase = importr('Biobase')
-base.source('functions.R')
+base.source('lib/R/functions.R')
 r_rand_perm_sample_nums = robjects.globalenv['randPermSampleNums']
 r_filter_eset = robjects.globalenv['filterEset']
 r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']

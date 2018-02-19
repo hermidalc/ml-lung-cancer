@@ -15,7 +15,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+#lib/
 lib64/
 parts/
 sdist/
@@ -103,6 +103,7 @@ ENV/
 # R files
 *.Rda
 
-# data dirs
+# custom dirs and file types
 /luad/data
-
+test.py
+test.R
