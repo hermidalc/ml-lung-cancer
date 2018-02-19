@@ -16,8 +16,16 @@ from sklearn.svm import SVC, LinearSVC
 from sklearn.metrics import roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 from matplotlib import style
+from cycler import cycler
 
 style.use('ggplot')
+plt.rcParams['axes.prop_cycle'] = cycler(color=[
+    'xkcd:blue', 'xkcd:green', 'xkcd:red', 'xkcd:cyan', 'xkcd:magenta', 'xkcd:tomato',
+    'xkcd:olive', 'xkcd:purple', 'xkcd:pink', 'xkcd:brown', 'xkcd:orange', 'xkcd:teal',
+    'xkcd:coral', 'xkcd:lightblue', 'xkcd:lime', 'xkcd:lavender', 'xkcd:turquoise',
+    'xkcd:darkgreen', 'xkcd:tan', 'xkcd:salmon', 'xkcd:gold', 'xkcd:orchid',
+    'xkcd:orangered', 'xkcd:darkblue',
+])
 base = importr('base')
 biobase = importr('Biobase')
 base.source('lib/R/functions.R')
