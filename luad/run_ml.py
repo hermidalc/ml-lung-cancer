@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--splits', type=int, default=100, help='num splits')
 parser.add_argument('--fs-size', type=float, default=0.5, help='fs size')
-parser.add_argument('--fs-dfx-max', type=int, default=100, help='fs max num dfx features')
+parser.add_argument('--fs-dfx-max', type=int, default=np.inf, help='fs max num dfx features')
 parser.add_argument('--fs-dfx-pval', type=float, default=0.05, help='fs min dfx adj p-value')
 parser.add_argument('--fs-dfx-lfc', type=float, default=0, help='fs min dfx logfc')
 parser.add_argument('--fs-dfx-select', type=int, default=30, help='fs dfx top select')
@@ -910,7 +910,7 @@ elif args.analysis in (9, 10):
         'none',
         'std',
         'cbt',
-        'fab',
+        #'fab',
         'sva',
         'stica0',
         'stica025',
@@ -1054,7 +1054,7 @@ elif args.analysis in (11, 12):
         'none',
         'std',
         'cbt',
-        'fab',
+        #'fab',
         'sva',
         'stica0',
         'stica025',
