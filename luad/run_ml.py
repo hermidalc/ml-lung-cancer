@@ -16,16 +16,7 @@ from sklearn.svm import SVC, LinearSVC
 from sklearn.metrics import roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 from matplotlib import style
-from cycler import cycler
 
-style.use('ggplot')
-plt.rcParams['axes.prop_cycle'] = cycler(color=[
-    'xkcd:blue', 'xkcd:green', 'xkcd:red', 'xkcd:cyan', 'xkcd:magenta', 'xkcd:tomato',
-    'xkcd:olive', 'xkcd:purple', 'xkcd:pink', 'xkcd:brown', 'xkcd:orange', 'xkcd:teal',
-    'xkcd:coral', 'xkcd:lightblue', 'xkcd:lime', 'xkcd:lavender', 'xkcd:turquoise',
-    'xkcd:darkgreen', 'xkcd:tan', 'xkcd:salmon', 'xkcd:gold', 'xkcd:orchid',
-    'xkcd:orangered', 'xkcd:darkblue',
-])
 base = importr('base')
 biobase = importr('Biobase')
 base.source('lib/R/functions.R')
@@ -438,6 +429,7 @@ if args.analysis in (1, 2):
         color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
     )
     plt.legend(loc='lower right')
+    plt.grid('on')
     # print final selected feature information
     feature_idxs = []
     for split in results:
@@ -571,6 +563,7 @@ elif args.analysis in (3, 4):
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
     plt.legend(loc='lower right')
+    plt.grid('on')
     # print final selected feature information
     feature_idxs = []
     for split in results: feature_idxs.extend(split['feature_idxs'])
@@ -745,6 +738,7 @@ elif args.analysis in (5, 6):
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
     plt.legend(loc='lower right')
+    plt.grid('on')
     # print final selected feature information
     for te_idx, te_results in enumerate(results):
         feature_idxs = []
@@ -1007,6 +1001,7 @@ elif args.analysis in (9, 10):
             (eset_te_name, mean_num_features_te, std_num_features_te)
         )
     plt.legend(loc='best')
+    plt.grid('on')
     # plot effect test dataset vs bc roc auc
     plt.figure(9)
     plt.rcParams['font.size'] = 20
@@ -1051,6 +1046,7 @@ elif args.analysis in (9, 10):
             (bc_methods[bc_idx], mean_num_features_bc, std_num_features_bc)
         )
     plt.legend(loc='best')
+    plt.grid('on')
 elif args.analysis in (11, 12):
     eset_pair_names = [
         ('eset_gse31210_gse30219_gse37745', 'eset_gse8894'),
@@ -1150,6 +1146,7 @@ elif args.analysis in (11, 12):
             (eset_te_name, mean_num_features_te, std_num_features_te)
         )
     plt.legend(loc='best')
+    plt.grid('on')
     # plot effect test dataset vs bc roc auc
     plt.figure(11)
     plt.rcParams['font.size'] = 20
@@ -1193,5 +1190,6 @@ elif args.analysis in (11, 12):
             (bc_methods[bc_idx], mean_num_features_bc, std_num_features_bc)
         )
     plt.legend(loc='best')
+    plt.grid('on')
 
 plt.show()
