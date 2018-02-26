@@ -53,6 +53,18 @@ getGeneSymbols <- function(eset, features=NULL) {
     return(symbols)
 }
 
+limma <- function(exprs, groups) {
+    design <- model.matrix(~0 + factor(groups))
+    colnames(design) <- c("Group0", "Group1")
+    fit <- lmFit(exprs, design)
+    contrast.matrix <- makeContrasts(Group1VsGroup0=Group1-Group0, levels=design)
+    fit.contrasts <- contrasts.fit(fit, contrast.matrix)
+    fit.b <- eBayes(fit.contrasts)
+    results <- topTableF(fit.b, number=Inf, adjust.method="BH")
+    results <- results[order(as.integer(row.names(results))),]
+    return(list(results$F, results$adj.P.Val))
+}
+
 getLimmaFeatures <- function(eset, numbers=TRUE, min.p.value=0.05, min.lfc=0, max.num.features=Inf) {
     design <- model.matrix(~0 + factor(pData(eset)$Relapse))
     colnames(design) <- c("NoRelapse", "Relapse")
