@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import argparse, pickle, pprint
+import argparse, pprint
 from tempfile import mkdtemp
 from shutil import rmtree
 import rpy2.robjects as robjects
@@ -10,8 +10,9 @@ from rpy2.robjects import numpy2ri
 # import pandas as pd
 import numpy as np
 from natsort import natsorted
-from sklearn.feature_selection import SelectKBest, SelectFpr, RFE
+from sklearn.feature_selection import mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
 from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit, train_test_split
+from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC, SVC
@@ -54,13 +55,11 @@ def bcr_score(y_true, y_pred):
 # config
 parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
-parser.add_argument('--splits', type=int, default=10, help='num splits')
-parser.add_argument('--fs-dfx-pval', type=float, default=0.05, help='fs min dfx adj p-value')
-parser.add_argument('--fs-dfx-lfc', type=float, default=0, help='fs min dfx logfc')
-parser.add_argument('--fs-dfx-select', type=int, default=30, help='fs dfx top select')
+parser.add_argument('--fs-meth', type=str, help='feature selection method')
+parser.add_argument('--fs-num-max', type=int, default=30, help='fs num max')
+parser.add_argument('--fs-num-final', type=int, default=20, help='fs num final')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='mean_coefs or mean_roc_aucs')
-parser.add_argument('--fs-final-select', type=int, default=20, help='fs final top select')
-parser.add_argument('--gscv-splits', type=int, default=50, help='gscv splits')
+parser.add_argument('--gscv-splits', type=int, default=30, help='gscv splits')
 parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
@@ -68,298 +67,203 @@ parser.add_argument('--rfe-step', type=float, default=0.01, help='rfe step')
 parser.add_argument('--rfe-verbose', type=int, default=0, help='rfe verbosity')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='libsvm cache size')
 parser.add_argument('--svm-alg', type=str, default='liblinear', help='svm algorithm (liblinear or libsvm)')
-parser.add_argument('--eset-tr', type=str, help='R eset for fs/tr')
-parser.add_argument('--eset-te', type=str, help='R eset for te')
 args = parser.parse_args()
 
-C_OPTIONS = [ 0.001, 0.01, 0.1, 1, 10, 100, 1000 ]
-N_FEATURES_OPTIONS = list(range(1, args.fs_dfx_select + 1))
+# specify in sort order (needed by code dealing with gridsearch cv_results)
+CLF_SVC_C = [ 0.001, 0.01, 0.1, 1, 10, 100, 1000 ]
+SFM_SVC_C = [ 0.01, 0.1, 1, 10, 100, 1000 ]
+SFM_THRESHOLDS = [ 0.01, 0.02, 0.03, 0.04 ]
+SKB_N_FEATURES = list(range(1, args.fs_num_max + 1))
+RFE_N_FEATURES = list(range(5, args.fs_num_max + 1, 5))
 
-def pipeline_one_vs_one(eset_tr, eset_te, tr_meth):
-    X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-    y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
-    X_te = np.array(base.t(biobase.exprs(eset_te)))
-    y_te = np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
-    print('TR: %3s' % y_tr.size, ' TE: %3s' % y_te.size)
-    return(tr_meth(X_tr, y_tr))
-# end pipeline_one_vs_one
+pipelines = {
+    'Limma-KBest': {
+        'pipe_steps': [
+            ('fsl', SelectKBest(limma)),
+            ('slr', StandardScaler()),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__k': SKB_N_FEATURES,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'Limma-Fpr-RFE-SVM': {
+        'pipe_steps': [
+            ('sfp', SelectFpr(limma, alpha=0.01)),
+            ('slr', StandardScaler()),
+            ('fsl', RFE(
+                LinearSVC(class_weight='balanced'),
+                step=args.rfe_step, verbose=args.rfe_verbose,
+            )),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__n_features_to_select': RFE_N_FEATURES,
+                'fsl__estimator__C': CLF_SVC_C,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'MI-KBest': {
+        'pipe_steps': [
+            ('slr', StandardScaler()),
+            ('fsl', SelectKBest(mutual_info_classif)),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__k': SKB_N_FEATURES,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'SFM-SVM': {
+        'pipe_steps': [
+            ('slr', StandardScaler()),
+            ('fsl', SelectFromModel(
+                LinearSVC(penalty='l1', dual=False, class_weight='balanced')
+            )),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__estimator__C': SFM_SVC_C,
+                'fsl__threshold': SFM_THRESHOLDS,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'SFM-ExtraTrees': {
+        'pipe_steps': [
+            ('slr', StandardScaler()),
+            ('fsl', SelectFromModel(ExtraTreesClassifier())),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__threshold': SFM_THRESHOLDS,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+}
 
 # analyses
-if args.analysis in (1, 2):
+if args.analysis == 1:
     eset_name = 'eset_gse31210'
     base.load('data/' + eset_name + '.Rda')
     eset = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_name])
     X = np.array(base.t(biobase.exprs(eset)))
     y = np.array(r_filter_eset_relapse_labels(eset), dtype=int)
-    if args.analysis == 1:
-        pipeline_steps = [
-            ('skb', SelectKBest(limma)),
-            ('slr', StandardScaler()),
-            ('svc', LinearSVC(class_weight='balanced')),
-        ]
-        param_grid = [
-            {
-                'skb__k': N_FEATURES_OPTIONS,
-                'svc__C': C_OPTIONS,
-            },
-        ]
-    elif args.analysis == 2:
-        pipeline_steps = [
-            ('sfp', SelectFpr(limma, alpha=0.01)),
-            ('slr', StandardScaler()),
-            ('rfe', RFE(
-                LinearSVC(class_weight='balanced'),
-                step=args.rfe_step, verbose=args.rfe_verbose
-            )),
-            ('svc', LinearSVC(class_weight='balanced')),
-        ]
-        param_grid = [
-            {
-                'rfe__n_features_to_select': N_FEATURES_OPTIONS,
-                'rfe__estimator__C': C_OPTIONS,
-                'svc__C': C_OPTIONS,
-            },
-        ]
     grid = GridSearchCV(
-        Pipeline(pipeline_steps, memory=joblib.Memory(cachedir=cachedir, verbose=0)),
+        Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
         scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit='roc_auc',
         cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
-        param_grid=param_grid, error_score=0, return_train_score=False, n_jobs=args.gscv_jobs,
-        verbose=args.gscv_verbose
+        param_grid=pipelines[args.fs_meth]['param_grid'], error_score=0, return_train_score=False,
+        n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
     )
     grid.fit(X, y)
-    # fs_feature_idxs = grid.best_estimator_.named_steps['skb'].get_support(indices=True)
-    # coefs = np.square(grid.best_estimator_.named_steps['svc'].coef_[0])
+    joblib.dump(grid, 'data/grid_analysis_' + str(args.analysis) + '.pkl')
+    # print selected feature information
+    feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
     print(
-        'Features: %3s' % grid.best_estimator_.named_steps['skb'].get_support(indices=True).size,
+        'Features: %3s' % feature_idxs.size,
         ' ROC AUC (CV): %.4f' % grid.best_score_,
         ' Params:',  grid.best_params_,
     )
-    joblib.dump(grid, 'data/grid_analysis_' + str(args.analysis) + '.pkl')
-    fs_title = 'Limma-KBest'
+    feature_names = np.array(biobase.featureNames(eset), dtype=str)
+    feature_names = feature_names[feature_idxs]
+    coefs = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
+    print('Feature Rankings:')
+    for rank, feature, symbol in sorted(
+        zip(
+            coefs,
+            feature_names,
+            r_get_gene_symbols(
+                eset, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
+            ),
+        ),
+        reverse=True
+    ): print(feature, '\t', symbol, '\t', rank)
     # plot num top ranked features selected vs roc auc, bcr
-    mean_roc_aucs = np.array(grid.cv_results_['mean_test_roc_auc']).reshape((len(N_FEATURES_OPTIONS), len(C_OPTIONS)))
-    std_roc_aucs = np.array(grid.cv_results_['std_test_roc_auc']).reshape((len(N_FEATURES_OPTIONS), len(C_OPTIONS)))
+    if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
+        new_shape = (len(SKB_N_FEATURES), len(CLF_SVC_C))
+        xaxis_group_sorted_idxs = np.argsort(
+            np.ma.getdata(grid.cv_results_['param_fsl__k'])
+        )
+    elif args.fs_meth == 'Limma-Fpr-RFE-SVM':
+        new_shape = (len(RFE_N_FEATURES), len(CLF_SVC_C) ** 2)
+        xaxis_group_sorted_idxs = np.argsort(
+            np.ma.getdata(grid.cv_results_['param_fsl__n_features_to_select'])
+        )
+    elif args.fs_meth in ('SFM-SVM', 'SFM-ExtraTrees'):
+        new_shape = (len(SFM_THRESHOLDS), len(SFM_SVC_C) * len(CLF_SVC_C))
+        xaxis_group_sorted_idxs = np.argsort(
+            np.ma.getdata(grid.cv_results_['param_fsl__threshold']).astype(str)
+        )
+    mean_roc_aucs = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+    std_roc_aucs = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
     mean_roc_aucs_max_idxs = np.argmax(mean_roc_aucs, axis=1)
     mean_roc_aucs = mean_roc_aucs[np.arange(len(mean_roc_aucs)), mean_roc_aucs_max_idxs]
     std_roc_aucs = std_roc_aucs[np.arange(len(std_roc_aucs)), mean_roc_aucs_max_idxs]
-    mean_bcrs = np.array(grid.cv_results_['mean_test_bcr']).reshape((len(N_FEATURES_OPTIONS), len(C_OPTIONS)))
-    std_bcrs = np.array(grid.cv_results_['std_test_bcr']).reshape((len(N_FEATURES_OPTIONS), len(C_OPTIONS)))
+    mean_bcrs = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+    std_bcrs = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
     mean_bcrs_max_idxs = np.argmax(mean_bcrs, axis=1)
     mean_bcrs = mean_bcrs[np.arange(len(mean_bcrs)), mean_bcrs_max_idxs]
     std_bcrs = std_bcrs[np.arange(len(std_bcrs)), mean_bcrs_max_idxs]
     plt.figure(1)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'GSE31210 SVM Classifier (' + fs_title + ' Feature Selection)\n' +
+        'GSE31210 SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
         'Effect of Number of Top-Ranked Features Selected on CV Performance Metrics'
     )
     plt.xlabel('Number of top-ranked features selected')
     plt.ylabel('Cross-validation Score')
-    plt.xlim([0.5, len(mean_roc_aucs) + 0.5])
-    plt_fig1_x_axis = range(1, len(mean_roc_aucs) + 1)
-    plt.xticks(plt_fig1_x_axis)
+    if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
+        x_axis = SKB_N_FEATURES
+        plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+        plt.xticks(x_axis)
+    elif args.fs_meth == 'Limma-Fpr-RFE-SVM':
+        x_axis = RFE_N_FEATURES
+        plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+        plt.xticks(x_axis)
+    elif args.fs_meth in ('SFM-SVM', 'SFM-ExtraTrees'):
+        x_axis = range(len(SFM_THRESHOLDS))
+        plt.xticks(x_axis, SFM_THRESHOLDS)
     plt.plot(
-        plt_fig1_x_axis,
+        x_axis,
         mean_roc_aucs,
         lw=4, alpha=0.8, label='Mean ROC AUC'
     )
     plt.fill_between(
-        plt_fig1_x_axis,
+        x_axis,
         [m - s for m, s in zip(mean_roc_aucs, std_roc_aucs)],
         [m + s for m, s in zip(mean_roc_aucs, std_roc_aucs)],
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
     plt.plot(
-        plt_fig1_x_axis,
+        x_axis,
         mean_bcrs,
         lw=4, alpha=0.8, label='Mean BCR'
     )
     plt.fill_between(
-        plt_fig1_x_axis,
+        x_axis,
         [m - s for m, s in zip(mean_bcrs, std_bcrs)],
         [m + s for m, s in zip(mean_bcrs, std_bcrs)],
         color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
     )
     plt.legend(loc='lower right')
     plt.grid('on')
-    # print final selected feature information
-    # feature_idxs = []
-    # for split in results:
-    #     feature_idxs.extend(split[args.fs_final_select - 1]['feature_idxs'])
-    # feature_idxs = sorted(list(set(feature_idxs)))
-    # feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
-    # feature_names = feature_names[feature_idxs]
-    # # print(*natsorted(feature_names), sep='\n')
-    # feature_mx_idx = {}
-    # for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
-    # coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
-    # roc_auc_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
-    # for split_idx in range(len(results)):
-    #     split_data = results[split_idx][args.fs_final_select - 1]
-    #     for idx in range(len(split_data['feature_idxs'])):
-    #         coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
-    #             split_data['coefs'][idx]
-    #         roc_auc_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
-    #             split_data['roc_auc_te']
-    # feature_mean_coefs, feature_mean_roc_aucs = [], []
-    # for idx in range(len(feature_idxs)):
-    #     feature_mean_coefs.append(np.mean(coef_mx[idx]))
-    #     feature_mean_roc_aucs.append(np.mean(roc_auc_mx[idx]))
-    #     # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
-    #     # print(feature_names[idx], '\t', feature_mean_roc_aucs[idx], '\t', roc_auc_mx[idx])
-    # if args.fs_rank_meth == 'mean_coefs':
-    #     feature_ranks = feature_mean_coefs
-    # else:
-    #     feature_ranks = feature_mean_roc_aucs
-    # print('Top Classifier Features:')
-    # for rank, feature, symbol in sorted(
-    #     zip(
-    #         feature_ranks,
-    #         feature_names,
-    #         r_get_gene_symbols(
-    #             eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
-    #         ),
-    #     ),
-    #     reverse=True
-    # ): print(feature, '\t', symbol, '\t', rank)
-elif args.analysis in (3, 4):
+elif args.analysis == 2:
     eset_tr_name = 'eset_gse31210'
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-    if args.analysis == 3:
-        results = pipeline_one(eset_tr, fs_limma, tr_rfecv_svm)
-        fs_title = 'Limma-RFECV'
-    elif args.analysis == 4:
-        results = pipeline_one(eset_tr, fs_limma_svm, tr_rfecv_svm)
-        fs_title = 'Limma-SVM-RFECV'
-    results_fh = open('data/results_analysis_' + str(args.analysis) + '.pkl', 'wb')
-    pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
-    results_fh.close()
-    # plot roc curves
-    plt.figure(3)
-    plt.rcParams['font.size'] = 20
-    plt.title(
-        'GSE31210 Train SVM Classifier Vs GSE31210 Test ROC Curves\n' +
-        fs_title + ' Feature Selection (Best Scoring Number of Features)'
-    )
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.xlim([-0.01,1.01])
-    plt.ylim([-0.01,1.01])
-    tprs, roc_aucs, num_features = [], [], []
-    mean_fpr = np.linspace(0, 1, 500)
-    for idx, split in enumerate(results):
-        tprs.append(np.interp(mean_fpr, split['fprs'], split['tprs']))
-        tprs[-1][0] = 0.0
-        roc_aucs.append(split['roc_auc_te'])
-        num_features.append(len(split['feature_idxs']))
-        plt.plot(
-            split['fprs'], split['tprs'], lw=2, alpha=0.3,
-            # label='ROC split %d (AUC = %0.4f)' % (idx + 1, split['roc_auc_te']),
-        )
-    mean_tpr = np.mean(tprs, axis=0)
-    mean_tpr[-1] = 1.0
-    mean_roc_auc = np.mean(roc_aucs)
-    std_roc_auc = np.std(roc_aucs)
-    mean_num_features = np.mean(num_features)
-    std_num_features = np.std(num_features)
-    plt.plot(
-        mean_fpr, mean_tpr, color='darkblue', lw=4, alpha=0.8,
-        label=r'Test Mean ROC (AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' %
-        (mean_roc_auc, std_roc_auc, mean_num_features, std_num_features),
-    )
-    std_tpr = np.std(tprs, axis=0)
-    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
-    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
-    plt.fill_between(
-        mean_fpr, tprs_lower, tprs_upper,
-        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
-    )
-    plt.plot([0,1], [0,1], color='darkred', lw=4, linestyle='--', alpha=0.8, label='Chance')
-    plt.legend(loc='lower right')
-    plt.grid('off')
-    # plot num features selected vs train roc auc
-    roc_aucs_tr = []
-    for split in results:
-        for nf_idx, roc_auc_tr in enumerate(
-            split['gscv_clf'].best_estimator_.named_steps['rfe'].grid_scores_
-        ):
-            if nf_idx < len(roc_aucs_tr):
-                roc_aucs_tr[nf_idx].append(roc_auc_tr)
-            else:
-                roc_aucs_tr.append([roc_auc_tr])
-    mean_roc_aucs_tr, std_roc_aucs_tr = [], []
-    for nf_idx in range(len(roc_aucs_tr)):
-        mean_roc_aucs_tr.append(np.mean(roc_aucs_tr[nf_idx]))
-        std_roc_aucs_tr.append(np.std(roc_aucs_tr[nf_idx]))
-    plt.figure(4)
-    plt.rcParams['font.size'] = 20
-    plt.title(
-        'GSE31210 Train SVM Classifier Vs GSE31210 Test (' + fs_title + ' FS)\n' +
-        'Effect of Number of RFECV Features Selected on ROC AUC'
-    )
-    plt.xlabel('Number of features selected')
-    plt.ylabel('ROC AUC')
-    plt.ylim(0.45, 0.9)
-    plt_fig2_x_axis = range(1, len(roc_aucs_tr) + 1)
-    plt.xlim([0.5, len(roc_aucs_tr) + 0.5])
-    plt.xticks(plt_fig2_x_axis)
-    plt.plot(
-        plt_fig2_x_axis, mean_roc_aucs_tr,
-        lw=4, alpha=0.8, label='Mean ROC AUC (Train CV)',
-    )
-    plt.fill_between(
-        plt_fig2_x_axis,
-        [m - s for m, s in zip(mean_roc_aucs_tr, std_roc_aucs_tr)],
-        [m + s for m, s in zip(mean_roc_aucs_tr, std_roc_aucs_tr)],
-        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
-    )
-    plt.legend(loc='lower right')
-    plt.grid('on')
-    # print final selected feature information
-    feature_idxs = []
-    for split in results: feature_idxs.extend(split['feature_idxs'])
-    feature_idxs = sorted(list(set(feature_idxs)))
-    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
-    feature_names = feature_names[feature_idxs]
-    # print(*natsorted(feature_names), sep='\n')
-    feature_mx_idx = {}
-    for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
-    coef_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
-    roc_auc_mx = np.zeros((len(feature_idxs), len(results)), dtype=float)
-    for split_idx in range(len(results)):
-        split_data = results[split_idx]
-        for idx in range(len(split_data['feature_idxs'])):
-            coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
-                split_data['coefs'][idx]
-            roc_auc_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
-                split_data['roc_auc_te']
-    feature_mean_coefs, feature_mean_roc_aucs = [], []
-    for idx in range(len(feature_idxs)):
-        feature_mean_coefs.append(np.mean(coef_mx[idx]))
-        feature_mean_roc_aucs.append(np.mean(roc_auc_mx[idx]))
-        # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
-        # print(feature_names[idx], '\t', feature_mean_roc_aucs[idx], '\t', roc_auc_mx[idx])
-    if args.fs_rank_meth == 'mean_coefs':
-        feature_ranks = feature_mean_coefs
-    else:
-        feature_ranks = feature_mean_roc_aucs
-    print('Top Classifier Features:')
-    for rank, feature, symbol in sorted(
-        zip(
-            feature_ranks,
-            feature_names,
-            r_get_gene_symbols(
-                eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
-            ),
-        ),
-        reverse=True
-    ): print(feature, '\t', symbol, '\t', rank)
-elif args.analysis in (5, 6):
-    eset_tr_name = 'eset_gse31210'
-    base.load('data/' + eset_tr_name + '.Rda')
-    eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
+    X_tr = np.array(base.t(biobase.exprs(eset_tr)))
+    y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
     eset_te_names = [
         'eset_gse8894',
         'eset_gse30219',
@@ -372,20 +276,21 @@ elif args.analysis in (5, 6):
             eset_te_name,
             r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         ))
-    if args.analysis == 5:
-        results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma, tr_topfwd_svm)
-        fs_title = 'Limma-TopForward'
-    elif args.analysis == 6:
-        results = pipeline_one_vs_many(eset_tr, esets_te, fs_limma_svm, tr_topfwd_svm)
-        fs_title = 'Limma-SVM-TopForward'
-    results_fh = open('data/results_analysis_' + str(args.analysis) + '.pkl', 'wb')
-    pickle.dump(results, results_fh, pickle.HIGHEST_PROTOCOL)
-    results_fh.close()
+    grid = GridSearchCV(
+        Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
+        scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit='roc_auc',
+        cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
+        param_grid=pipelines[args.fs_meth]['param_grid'], error_score=0, return_train_score=False,
+        n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+    )
+    grid.fit(X, y)
+    joblib.dump(grid, 'data/grid_analysis_' + str(args.analysis) + '.pkl')
+
     # plot roc curves
     plt.figure(5)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'GSE31210 Train SVM Classifier Vs GEO LUAD Test Datasets ROC Curves\n' +
+        'GSE31210 SVM Classifier Vs GEO LUAD Test Datasets ROC Curves\n' +
         fs_title + ' Feature Selection (Best Scoring Number of Features)'
     )
     plt.xlabel('False Positive Rate')
