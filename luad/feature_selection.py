@@ -6,7 +6,7 @@ from sklearn.utils.validation import check_is_fitted
 from skfeature.function.statistical_based.CFS import cfs
 
 class CFS(BaseEstimator, SelectorMixin):
-    """Feature selector using Correlation Feature Selection (CFS)
+    """Feature selector using Correlation Feature Selection (CFS) algorithm
 
     Attributes
     ----------
