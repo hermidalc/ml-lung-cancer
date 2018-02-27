@@ -105,5 +105,4 @@ ENV/
 
 # custom dirs and file types
 /luad/data
-test.py
-test.R
+test*
