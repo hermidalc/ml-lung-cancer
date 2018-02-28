@@ -13,7 +13,8 @@ for (bc_type in cmd_args) {
     if (bc_type %in% c("cbt", "fab", "std", "sva", "stica", "svd")) {
         for (col in 1:ncol(dataset_name_combos)) {
             eset_tr_name <- paste0(c("eset", dataset_name_combos[,col]), collapse="_")
-            eset_te_name <- paste0(c("eset", setdiff(dataset_names, dataset_name_combos[,col])), collapse="_")
+            dataset_te_name <- setdiff(dataset_names, dataset_name_combos[,col])
+            eset_te_name <- paste0("eset_", dataset_te_name)
             load(paste0("data/", eset_tr_name, ".Rda"))
             load(paste0("data/", eset_te_name, ".Rda"))
             if (bc_type %in% c("stica", "svd")) {
@@ -24,7 +25,7 @@ for (bc_type in cmd_args) {
                     for (alpha in stica_alphas) {
                         alpha_name <- gsub("[^0-9]", "", alpha)
                         eset_tr_bc_name <- paste0(eset_tr_name, "_tr_", bc_type, alpha_name)
-                        eset_te_bc_name <- paste0(eset_te_name, "_te_", bc_type, alpha_name)
+                        eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
                         print(paste(eset_tr_bc_name, "->", eset_te_bc_name))
                         bc_obj <- normFact(
                             "stICA", Xtr, ptr$Batch, "categorical",
@@ -49,7 +50,7 @@ for (bc_type in cmd_args) {
                 }
                 else if (bc_type == "svd") {
                     eset_tr_bc_name <- paste0(eset_tr_name, "_tr_", bc_type)
-                    eset_te_bc_name <- paste0(eset_te_name, "_te_", bc_type)
+                    eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
                     print(paste(eset_tr_bc_name, "->", eset_te_bc_name))
                     bc_obj <- normFact(
                         "SVD", Xtr, ptr$Batch, "categorical",
@@ -74,7 +75,7 @@ for (bc_type in cmd_args) {
             }
             else if (bc_type %in% c("cbt", "fab", "std", "sva")) {
                 eset_tr_bc_name <- paste0(eset_tr_name, "_tr_", bc_type)
-                eset_te_bc_name <- paste0(eset_te_name, "_te_", bc_type)
+                eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
                 print(paste(eset_tr_bc_name, "->", eset_te_bc_name))
                 ptr <- pData(get(eset_tr_name))
                 Xtr <- t(exprs(get(eset_tr_name)))
@@ -157,7 +158,7 @@ for (bc_type in cmd_args) {
         save(list=eset_tr_norm_obj_name, file=paste0("data/", eset_tr_norm_obj_name, ".Rda"))
         for (j in 2:length(dataset_names)) {
             eset_te_name <- paste0(c("eset", dataset_names[j]), collapse="_")
-            eset_te_norm_name <- paste0(eset_te_name, "_te_norm")
+            eset_te_norm_name <- paste0(eset_tr_norm_name, "_", dataset_names[j], "_te")
             print(paste(eset_tr_norm_name, "->", eset_te_norm_name))
             load(paste0("data/", eset_te_name, ".Rda"))
             Xte <- t(exprs(get(eset_te_name)))
