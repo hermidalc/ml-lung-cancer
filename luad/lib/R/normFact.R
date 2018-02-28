@@ -25,8 +25,8 @@ normFact <- function(fact,X,ref,refType,k=20,t=0.5,ref2=NULL,refType2=NULL,t2=0.
 #
 #    Renard E., Branders S. and Absil P.-A.: Independent Component Analysis to Remove Batch Effects from Merged Microarray Datasets (WABI2016)
 
-    source("unbiased_stICA.R")
-    source("R2.R")
+    source("lib/R/unbiased_stICA.R")
+    source("lib/R/R2.R")
 
     if (fact=='stICA') {
         obj = unbiased_stICA(X,k,...)
