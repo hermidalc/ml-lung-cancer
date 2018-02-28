@@ -20,9 +20,11 @@ for (col in 1:ncol(dataset_name_combos)) {
     eset_1 <- get(paste0(c("eset", dataset_name_combos[1,col]), collapse="_"))
     eset_2 <- get(paste0(c("eset", dataset_name_combos[2,col]), collapse="_"))
     eset_merged <- combine(eset_1, eset_2)
-    for (row in 3:nrow(dataset_name_combos)) {
-        eset_n <- get(paste0(c("eset", dataset_name_combos[row,col]), collapse="_"))
-        eset_merged <- combine(eset_merged, eset_n)
+    if (nrow(dataset_name_combos) > 2) {
+        for (row in 3:nrow(dataset_name_combos)) {
+            eset_n <- get(paste0(c("eset", dataset_name_combos[row,col]), collapse="_"))
+            eset_merged <- combine(eset_merged, eset_n)
+        }
     }
     assign(eset_merged_name, eset_merged)
     save(list=eset_merged_name, file=paste0("data/", eset_merged_name, ".Rda"))
