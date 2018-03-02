@@ -75,13 +75,13 @@ parser.add_argument('--bc-meth', type=str, help='batch effect correction method'
 args = parser.parse_args()
 
 dataset_pair_names = [
-    # ('gse31210_gse30219', 'gse8894'),
-    # ('gse31210_gse8894', 'gse30219'),
-    # ('gse8894_gse30219', 'gse31210'),
-    ('eset_gse31210_gse30219_gse37745', 'eset_gse8894'),
-    ('eset_gse31210_gse8894_gse37745', 'eset_gse30219'),
-    ('eset_gse8894_gse30219_gse37745', 'eset_gse31210'),
-    ('eset_gse31210_gse8894_gse30219', 'eset_gse37745'),
+    ('gse31210_gse30219', 'gse8894'),
+    ('gse31210_gse8894', 'gse30219'),
+    ('gse8894_gse30219', 'gse31210'),
+    # ('gse31210_gse30219_gse37745', 'gse8894'),
+    # ('gse31210_gse8894_gse37745', 'gse30219'),
+    # ('gse8894_gse30219_gse37745', 'gse31210'),
+    # ('gse31210_gse8894_gse30219', 'gse37745'),
 ]
 
 # specify in sort order (needed by code dealing with gridsearch cv_results)
@@ -359,11 +359,7 @@ elif args.analysis == 2:
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
     plt.ylim([-0.01,1.01])
-    dataset_te_names = [
-        'gse8894',
-        'gse30219',
-        'gse37745',
-    ]
+    dataset_te_names = [te_name for _, te_name in dataset_pair_names]
     tprs, roc_aucs = [], []
     mean_fpr = np.linspace(0, 1, 500)
     for dataset_te_name in dataset_te_names:
