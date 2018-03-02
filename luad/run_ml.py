@@ -74,6 +74,16 @@ parser.add_argument('--dataset-te', type=str, nargs="+", help='dataset te')
 parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
 args = parser.parse_args()
 
+dataset_pair_names = [
+    # ('gse31210_gse30219', 'gse8894'),
+    # ('gse31210_gse8894', 'gse30219'),
+    # ('gse8894_gse30219', 'gse31210'),
+    ('eset_gse31210_gse30219_gse37745', 'eset_gse8894'),
+    ('eset_gse31210_gse8894_gse37745', 'eset_gse30219'),
+    ('eset_gse8894_gse30219_gse37745', 'eset_gse31210'),
+    ('eset_gse31210_gse8894_gse30219', 'eset_gse37745'),
+]
+
 # specify in sort order (needed by code dealing with gridsearch cv_results)
 CLF_SVC_C = [ 0.001, 0.01, 0.1, 1, 10, 100, 1000 ]
 SFM_SVC_C = [ 0.01, 0.1, 1, 10, 100, 1000 ]
@@ -392,12 +402,6 @@ elif args.analysis == 2:
     plt.legend(loc='lower right')
     plt.grid('off')
 elif args.analysis == 3:
-    dataset_pair_names = [
-        ('gse31210_gse30219', 'gse8894'),
-        ('gse31210_gse8894', 'gse30219'),
-        ('gse8894_gse30219', 'gse31210'),
-        #('gse31210_gse8894_gse30219', 'eset_gse37745'),
-    ]
     bc_methods = [
         'none',
         'std',
@@ -516,12 +520,12 @@ elif args.analysis == 3:
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color,
+            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
             #label='%s (Train CV)' % dataset_tr_name,
         )
         plt.plot(
             plt_fig_x_axis, roc_aucs_te,
-            lw=4, alpha=0.8, color=color,
+            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 dataset_te_name,
                 mean_roc_auc_te, std_roc_auc_te,
@@ -557,12 +561,12 @@ elif args.analysis == 3:
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color,
+            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
             #label='%s (Train CV)' % bc_methods[bc_idx],
         )
         plt.plot(
             plt_fig_x_axis, roc_aucs_te,
-            lw=4, alpha=0.8, color=color,
+            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 bc_methods[bc_idx],
                 mean_roc_auc_te, std_roc_auc_te,
@@ -572,12 +576,6 @@ elif args.analysis == 3:
     plt.legend(loc='best')
     plt.grid('on')
 elif args.analysis == 4:
-    dataset_pair_names = [
-        ('gse31210_gse30219', 'gse8894'),
-        ('gse31210_gse8894', 'gse30219'),
-        ('gse8894_gse30219', 'gse31210'),
-        #('gse31210_gse8894_gse30219', 'eset_gse37745'),
-    ]
     fs_methods = [
         'Limma-KBest',
         #'MI-KBest',
@@ -693,12 +691,12 @@ elif args.analysis == 4:
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color,
+            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
             #label='%s (Train CV)' % dataset_tr_name,
         )
         plt.plot(
             plt_fig_x_axis, roc_aucs_te,
-            lw=4, alpha=0.8, color=color,
+            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 dataset_te_name,
                 mean_roc_auc_te, std_roc_auc_te,
@@ -734,12 +732,12 @@ elif args.analysis == 4:
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color,
+            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
             #label='%s (Train CV)' % fs_methods[fs_idx],
         )
         plt.plot(
             plt_fig_x_axis, roc_aucs_te,
-            lw=4, alpha=0.8, color=color,
+            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 fs_methods[fs_idx],
                 mean_roc_auc_te, std_roc_auc_te,
