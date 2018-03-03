@@ -60,11 +60,12 @@ parser.add_argument('--fs-meth', type=str, help='feature selection method')
 parser.add_argument('--fs-num-max', type=int, default=30, help='fs num max')
 parser.add_argument('--fs-num-final', type=int, default=20, help='fs num final')
 parser.add_argument('--fs-fpr-pval', type=float, default=0.01, help='fs fpr min p-value')
-parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='mean_coefs or mean_roc_aucs')
+parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='fs rank method (mean_coefs or mean_roc_aucs)')
 parser.add_argument('--gscv-splits', type=int, default=30, help='gscv splits')
 parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
+parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
 parser.add_argument('--rfe-step', type=float, default=0.01, help='rfe step')
 parser.add_argument('--rfe-verbose', type=int, default=0, help='rfe verbosity')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='libsvm cache size')
@@ -84,13 +85,14 @@ dataset_pair_names = [
     # ('gse31210_gse8894_gse30219', 'gse37745'),
 ]
 
-# specify in sort order (needed by code dealing with gridsearch cv_results)
+# specify elements in sort order (needed by code dealing with gridsearch cv_results)
 CLF_SVC_C = [ 0.001, 0.01, 0.1, 1, 10, 100, 1000 ]
 SFM_SVC_C = [ 0.01, 0.1, 1, 10, 100, 1000 ]
 SFM_THRESHOLDS = [ 0.01, 0.02, 0.03, 0.04 ]
 SKB_N_FEATURES = list(range(1, args.fs_num_max + 1))
+SKB_MI_N_FEATURES = list(range(5, args.fs_num_max + 1, 5))
 RFE_N_FEATURES = list(range(5, args.fs_num_max + 1, 5))
-FPR_ALPHA = [ 0.001, 0.01, 0.05 ]
+SPR_ALPHA = [ 0.001, 0.01, 0.05 ]
 
 pipelines = {
     'Limma-KBest': {
@@ -114,7 +116,7 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'fsl__k': SKB_N_FEATURES,
+                'fsl__k': SKB_MI_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -164,8 +166,8 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'fsl__estimator__C': SFM_SVC_C,
                 'fsl__threshold': SFM_THRESHOLDS,
+                'fsl__estimator__C': SFM_SVC_C,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -201,14 +203,18 @@ pipelines = {
 
 # analyses
 if args.analysis == 1:
-    eset_tr_name = 'eset_' + args.dataset_tr
+    if args.bc_meth:
+        eset_tr_name = 'eset_' + args.dataset_tr + '_tr_' + args.bc_meth
+    else:
+        eset_tr_name = 'eset_' + args.dataset_tr
+    print(eset_tr_name)
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
     y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
     grid = GridSearchCV(
         Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
-        scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit='roc_auc',
+        scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit=args.gscv_refit,
         cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
         param_grid=pipelines[args.fs_meth]['param_grid'], error_score=0, return_train_score=False,
         n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
@@ -238,22 +244,35 @@ if args.analysis == 1:
     ): print(feature, '\t', symbol, '\t', rank)
     # plot num top ranked features selected vs roc auc, bcr
     if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
-        new_shape = (len(SKB_N_FEATURES), len(CLF_SVC_C))
+        params = pipelines[args.fs_meth]['param_grid'][0]
+        new_shape = (
+            len(params['fsl__k']),
+            np.prod([len(v) for k,v in params.items() if k != 'fsl__k'])
+        )
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__k'])
         )
     elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-RFE'):
-        new_shape = (len(RFE_N_FEATURES), len(CLF_SVC_C) ** 2)
+        params = pipelines[args.fs_meth]['param_grid'][0]
+        new_shape = (
+            len(params['fsl__n_features_to_select']),
+            np.prod([len(v) for k,v in params.items() if k != 'fsl__n_features_to_select'])
+        )
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__n_features_to_select'])
         )
-    elif args.fs_meth == 'SVM-SFM':
-        new_shape = (len(SFM_THRESHOLDS), len(SFM_SVC_C) * len(CLF_SVC_C))
+    elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM'):
+        params = pipelines[args.fs_meth]['param_grid'][0]
+        new_shape = (
+            len(params['fsl__threshold']),
+            np.prod([len(v) for k,v in params.items() if k != 'fsl__threshold'])
+        )
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__threshold']).astype(str)
         )
-    elif args.fs_meth == 'ExtraTrees-SFM':
-        new_shape = (len(SFM_THRESHOLDS), len(CLF_SVC_C))
+    elif args.fs_meth in ('Limma-Fpr-CFS'):
+        params = pipelines[args.fs_meth]['param_grid'][0]
+        new_shape = grid.cv_results_['param_fsl__threshold'].shape
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__threshold']).astype(str)
         )
@@ -269,9 +288,9 @@ if args.analysis == 1:
     std_bcrs = std_bcrs[np.arange(len(std_bcrs)), mean_bcrs_max_idxs]
     plt.figure(1)
     plt.rcParams['font.size'] = 20
-    dataset_name = dataset_name.replace('gse', 'GSE')
+    args.dataset_tr = args.dataset_tr.replace('gse', 'GSE')
     plt.title(
-        dataset_name + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+        args.dataset_tr + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
         'Effect of Number of Top-Ranked Features Selected on CV Performance Metrics'
     )
     plt.xlabel('Number of top-ranked features selected')
@@ -312,14 +331,18 @@ if args.analysis == 1:
     plt.legend(loc='lower right')
     plt.grid('on')
 elif args.analysis == 2:
-    eset_tr_name = 'eset_' + args.dataset_tr
+    if args.bc_meth:
+        eset_tr_name = 'eset_' + args.dataset_tr + '_tr_' + args.bc_meth
+    else:
+        eset_tr_name = 'eset_' + args.dataset_tr
+    print(eset_tr_name)
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
     y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
     grid = GridSearchCV(
         Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
-        scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit='roc_auc',
+        scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit=args.gscv_refit,
         cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
         param_grid=pipelines[args.fs_meth]['param_grid'], error_score=0, return_train_score=False,
         n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
@@ -350,16 +373,19 @@ elif args.analysis == 2:
     # plot roc curves
     plt.figure(2)
     plt.rcParams['font.size'] = 20
-    dataset_name = dataset_name.replace('gse', 'GSE')
+    args.dataset_tr = args.dataset_tr.replace('gse', 'GSE')
     plt.title(
-        dataset_name + ' SVM Classifier (' + args.fs_meth + ' ' +
+        args.dataset_tr + ' SVM Classifier (' + args.fs_meth + ' ' +
         str(len(feature_idxs)) + ' Features)\nGEO LUAD Test Datasets ROC Curves'
     )
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.xlim([-0.01,1.01])
     plt.ylim([-0.01,1.01])
-    dataset_te_names = [te_name for _, te_name in dataset_pair_names]
+    if args.bc_meth:
+        dataset_te_names = [te_name for tr_name, te_name in dataset_pair_names if tr_name == dataset_tr_name]
+    else:
+        dataset_te_names = [te_name for _, te_name in dataset_pair_names]
     tprs, roc_aucs = [], []
     mean_fpr = np.linspace(0, 1, 500)
     for dataset_te_name in dataset_te_names:
@@ -426,7 +452,7 @@ elif args.analysis == 3:
             y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
                 Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
-                scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit='roc_auc',
+                scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit=args.gscv_refit,
                 cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
                 param_grid=pipelines[args.fs_meth]['param_grid'], error_score=0, return_train_score=False,
                 n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
@@ -597,7 +623,7 @@ elif args.analysis == 4:
             y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
                 Pipeline(pipelines[fs_method]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
-                scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit='roc_auc',
+                scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit=args.gscv_refit,
                 cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
                 param_grid=pipelines[fs_method]['param_grid'], error_score=0, return_train_score=False,
                 n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
