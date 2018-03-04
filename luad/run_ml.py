@@ -243,35 +243,32 @@ if args.analysis == 1:
         reverse=True
     ): print(feature, '\t', symbol, '\t', rank)
     # plot num top ranked features selected vs roc auc, bcr
+    grid_params = pipelines[args.fs_meth]['param_grid'][0]
     if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
-        params = pipelines[args.fs_meth]['param_grid'][0]
         new_shape = (
-            len(params['fsl__k']),
-            np.prod([len(v) for k,v in params.items() if k != 'fsl__k'])
+            len(grid_params['fsl__k']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__k'])
         )
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__k'])
         )
     elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-RFE'):
-        params = pipelines[args.fs_meth]['param_grid'][0]
         new_shape = (
-            len(params['fsl__n_features_to_select']),
-            np.prod([len(v) for k,v in params.items() if k != 'fsl__n_features_to_select'])
+            len(grid_params['fsl__n_features_to_select']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__n_features_to_select'])
         )
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__n_features_to_select'])
         )
     elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM'):
-        params = pipelines[args.fs_meth]['param_grid'][0]
         new_shape = (
-            len(params['fsl__threshold']),
-            np.prod([len(v) for k,v in params.items() if k != 'fsl__threshold'])
+            len(grid_params['fsl__threshold']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__threshold'])
         )
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__threshold']).astype(str)
         )
     elif args.fs_meth in ('Limma-Fpr-CFS'):
-        params = pipelines[args.fs_meth]['param_grid'][0]
         new_shape = grid.cv_results_['param_fsl__threshold'].shape
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__threshold']).astype(str)
@@ -296,16 +293,16 @@ if args.analysis == 1:
     plt.xlabel('Number of top-ranked features selected')
     plt.ylabel('Cross-validation Score')
     if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
-        x_axis = SKB_N_FEATURES
+        x_axis = grid_params['fsl__k']
         plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
         plt.xticks(x_axis)
     elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-RFE'):
-        x_axis = RFE_N_FEATURES
+        x_axis = grid_params['fsl__n_features_to_select']
         plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
         plt.xticks(x_axis)
     elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM'):
-        x_axis = range(len(SFM_THRESHOLDS))
-        plt.xticks(x_axis, SFM_THRESHOLDS)
+        x_axis = range(len(grid_params['fsl__threshold']))
+        plt.xticks(x_axis, grid_params['fsl__threshold'])
     plt.plot(
         x_axis,
         mean_roc_aucs,
