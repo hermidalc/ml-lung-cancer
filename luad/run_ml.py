@@ -84,6 +84,28 @@ dataset_pair_names = [
     # ('gse8894_gse30219_gse37745', 'gse31210'),
     # ('gse31210_gse8894_gse30219', 'gse37745'),
 ]
+bc_methods = [
+    'none',
+    'std',
+    'cbt',
+    #'fab',
+    'sva',
+    'stica0',
+    'stica025',
+    'stica05',
+    'stica1',
+    'svd',
+]
+fs_methods = [
+    'Limma-KBest',
+    #'MI-KBest',
+    'Limma-Fpr-SVM-RFE',
+    'SVM-RFE',
+    #'SVM-SFM',
+    #'ExtraTrees-SFM',
+    #'Limma-Fpr-CFS',
+]
+gscv_score_text = args.gscv_refit.replace('_', ' ').upper()
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 CLF_SVC_C = [ 0.001, 0.01, 0.1, 1, 10, 100, 1000 ]
@@ -198,7 +220,6 @@ pipelines = {
             },
         ],
     },
-
 }
 
 # analyses
@@ -225,7 +246,7 @@ if args.analysis == 1:
     feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
     print(
         'Features: %3s' % feature_idxs.size,
-        ' ROC AUC (CV): %.4f' % grid.best_score_,
+        ' ' + gscv_score_text + ' (CV): %.4f' % grid.best_score_,
         ' Params:',  grid.best_params_,
     )
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
@@ -269,20 +290,20 @@ if args.analysis == 1:
             np.ma.getdata(grid.cv_results_['param_fsl__threshold']).astype(str)
         )
     elif args.fs_meth in ('Limma-Fpr-CFS'):
-        new_shape = grid.cv_results_['param_fsl__threshold'].shape
+        new_shape = grid.cv_results_['clf__C'].shape
         xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_fsl__threshold']).astype(str)
+            np.ma.getdata(grid.cv_results_['clf__C'])
         )
-    mean_roc_aucs = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-    std_roc_aucs = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-    mean_roc_aucs_max_idxs = np.argmax(mean_roc_aucs, axis=1)
-    mean_roc_aucs = mean_roc_aucs[np.arange(len(mean_roc_aucs)), mean_roc_aucs_max_idxs]
-    std_roc_aucs = std_roc_aucs[np.arange(len(std_roc_aucs)), mean_roc_aucs_max_idxs]
-    mean_bcrs = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-    std_bcrs = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-    mean_bcrs_max_idxs = np.argmax(mean_bcrs, axis=1)
-    mean_bcrs = mean_bcrs[np.arange(len(mean_bcrs)), mean_bcrs_max_idxs]
-    std_bcrs = std_bcrs[np.arange(len(std_bcrs)), mean_bcrs_max_idxs]
+    mean_roc_aucs_cv = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+    std_roc_aucs_cv = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+    mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv, axis=1)
+    mean_roc_aucs_cv = mean_roc_aucs_cv[np.arange(len(mean_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
+    std_roc_aucs_cv = std_roc_aucs_cv[np.arange(len(std_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
+    mean_bcrs_cv = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+    std_bcrs_cv = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+    mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv, axis=1)
+    mean_bcrs_cv = mean_bcrs_cv[np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs]
+    std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
     plt.figure(1)
     plt.rcParams['font.size'] = 20
     args.dataset_tr = args.dataset_tr.replace('gse', 'GSE')
@@ -290,8 +311,8 @@ if args.analysis == 1:
         args.dataset_tr + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
         'Effect of Number of Top-Ranked Features Selected on CV Performance Metrics'
     )
-    plt.xlabel('Number of top-ranked features selected')
-    plt.ylabel('Cross-validation Score')
+    plt.xlabel('Number of Top-Ranked Features Selected')
+    plt.ylabel('CV Score')
     if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
         x_axis = grid_params['fsl__k']
         plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
@@ -303,29 +324,31 @@ if args.analysis == 1:
     elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM'):
         x_axis = range(len(grid_params['fsl__threshold']))
         plt.xticks(x_axis, grid_params['fsl__threshold'])
+    # elif args.fs_meth in ('Limma-Fpr-CFS'):
+    #
     plt.plot(
         x_axis,
-        mean_roc_aucs,
+        mean_roc_aucs_cv,
         lw=4, alpha=0.8, label='Mean ROC AUC'
     )
     plt.fill_between(
         x_axis,
-        [m - s for m, s in zip(mean_roc_aucs, std_roc_aucs)],
-        [m + s for m, s in zip(mean_roc_aucs, std_roc_aucs)],
+        [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+        [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
     plt.plot(
         x_axis,
-        mean_bcrs,
+        mean_bcrs_cv,
         lw=4, alpha=0.8, label='Mean BCR'
     )
     plt.fill_between(
         x_axis,
-        [m - s for m, s in zip(mean_bcrs, std_bcrs)],
-        [m + s for m, s in zip(mean_bcrs, std_bcrs)],
+        [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+        [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
         color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
     )
-    plt.legend(loc='lower right')
+    plt.legend(loc='lower right', fontsize='small')
     plt.grid('on')
 elif args.analysis == 2:
     if args.bc_meth:
@@ -350,7 +373,7 @@ elif args.analysis == 2:
     feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
     print(
         'Features: %3s' % feature_idxs.size,
-        ' ROC AUC (CV): %.4f' % grid.best_score_,
+        ' ' + gscv_score_text + ' (CV): %.4f' % grid.best_score_,
         ' Params:',  grid.best_params_,
     )
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
@@ -418,21 +441,9 @@ elif args.analysis == 2:
         color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
     )
     plt.plot([0,1], [0,1], color='darkred', lw=4, linestyle='--', alpha=0.8, label='Chance')
-    plt.legend(loc='lower right')
+    plt.legend(loc='lower right', fontsize='small')
     plt.grid('off')
 elif args.analysis == 3:
-    bc_methods = [
-        'none',
-        'std',
-        'cbt',
-        #'fab',
-        'sva',
-        'stica0',
-        'stica025',
-        'stica05',
-        'stica1',
-        'svd',
-    ]
     te_results, bc_results = [], []
     for te_idx, (dataset_tr_name, dataset_te_name) in enumerate(dataset_pair_names):
         for bc_idx, bc_method in enumerate(bc_methods):
@@ -463,7 +474,7 @@ elif args.analysis == 3:
             feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
             print(
                 'Features: %3s' % feature_idxs.size,
-                ' ROC AUC (CV): %.4f' % grid.best_score_,
+                ' ' + gscv_score_text + ' (CV): %.4f' % grid.best_score_,
                 ' Params:',  grid.best_params_,
             )
             feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
@@ -480,13 +491,17 @@ elif args.analysis == 3:
                 ),
                 reverse=True
             ): print(feature, '\t', symbol, '\t', rank)
+            roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
+            bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
             base.load('data/' + eset_te_name + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
             X_te = np.array(base.t(biobase.exprs(eset_te)))
             y_te = np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
             y_score = grid.decision_function(X_te)
             fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-            roc_auc = roc_auc_score(y_te, y_score)
+            roc_auc_te = roc_auc_score(y_te, y_score)
+            y_pred = grid.predict(X_te)
+            bcr_te = bcr_score(y_te, y_pred)
             result = {
                 'grid': grid,
                 'feature_idxs': feature_idxs,
@@ -495,10 +510,12 @@ elif args.analysis == 3:
                 'tprs': tpr,
                 'thres': thres,
                 'coefs': coefs,
-                'y_scores': y_score,
-                'y_tests': y_te,
-                'roc_auc_cv': grid.best_score_,
-                'roc_auc_te': roc_auc,
+                'y_score': y_score,
+                'y_test': y_te,
+                'roc_auc_cv': roc_auc_cv,
+                'roc_auc_te': roc_auc_te,
+                'bcr_cv': bcr_cv,
+                'bcr_te': bcr_te,
             }
             if te_idx < len(te_results):
                 te_results[te_idx].append(result)
@@ -510,100 +527,163 @@ elif args.analysis == 3:
                 bc_results.append([result])
             base.remove(eset_tr_name)
             base.remove(eset_te_name)
-    # plot effect bc method vs test dataset roc auc
+    # plot bc method vs train/test scores
     plt.figure(3)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'Effect of Batch Effect Correction Method on Classifier Performance\n' +
+        'Effect of Batch Effect Correction Method on ROC AUC\n' +
         '(' + args.fs_meth + ' Feature Selection Best Scoring Selected Features)'
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
     plt_fig_x_axis = range(1, len(bc_methods) + 1)
     plt.xticks(plt_fig_x_axis, bc_methods)
+    plt.figure(4)
+    plt.rcParams['font.size'] = 20
+    plt.title(
+        'Effect of Batch Effect Correction Method on BCR\n' +
+        '(' + args.fs_meth + ' Feature Selection Best Scoring Selected Features)'
+    )
+    plt.xlabel('Batch Effect Correction Method')
+    plt.ylabel('BCR')
+    plt_fig_x_axis = range(1, len(bc_methods) + 1)
+    plt.xticks(plt_fig_x_axis, bc_methods)
     for te_idx, te_bc_results in enumerate(te_results):
-        roc_aucs_cv, roc_aucs_te, num_features = [], [], []
+        roc_aucs_cv, roc_aucs_te = [], []
+        bcrs_cv, bcrs_te, num_features = [], [], []
         for result in te_bc_results:
             roc_aucs_cv.append(result['roc_auc_cv'])
             roc_aucs_te.append(result['roc_auc_te'])
+            bcrs_cv.append(result['bcr_cv'])
+            bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         mean_roc_auc_cv = np.mean(roc_aucs_cv)
         mean_roc_auc_te = np.mean(roc_aucs_te)
+        mean_bcr_cv = np.mean(bcrs_cv)
+        mean_bcr_te = np.mean(bcrs_te)
         mean_num_features = np.mean(num_features)
         std_roc_auc_cv = np.std(roc_aucs_cv)
         std_roc_auc_te = np.std(roc_aucs_te)
+        std_bcr_cv = np.std(bcrs_cv)
+        std_bcr_te = np.std(bcrs_te)
         std_num_features = np.std(num_features)
         dataset_tr_name, dataset_te_name = dataset_pair_names[te_idx]
         dataset_tr_name = dataset_tr_name.upper()
         dataset_te_name = dataset_te_name.upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
+        plt.figure(3)
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-            #label='%s (Train CV)' % dataset_tr_name,
         )
         plt.plot(
             plt_fig_x_axis, roc_aucs_te,
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
+            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 dataset_te_name,
+                mean_roc_auc_cv, std_roc_auc_cv,
                 mean_roc_auc_te, std_roc_auc_te,
                 mean_num_features, std_num_features,
             )
         )
-    plt.legend(loc='best')
+        plt.figure(4)
+        plt.plot(
+            plt_fig_x_axis, bcrs_cv,
+            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
+        )
+        plt.plot(
+            plt_fig_x_axis, bcrs_te,
+            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
+            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
+                dataset_te_name,
+                mean_bcr_cv, std_bcr_cv,
+                mean_bcr_te, std_bcr_te,
+                mean_num_features, std_num_features,
+            )
+        )
+    plt.figure(3)
+    plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    # plot effect test dataset vs bc roc auc
     plt.figure(4)
+    plt.legend(loc='best', fontsize='x-small')
+    plt.grid('on')
+    # plot train/test dataset vs bc method
+    plt.figure(5)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'Effect of Training/Held-Out Test Dataset on Classifier Performance\n' +
+        'Effect of Train/Held-Out Test Dataset on ROC AUC\n' +
         '(' + args.fs_meth + ' Feature Selection Best Scoring Selected Features)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
+    plt.figure(6)
+    plt.rcParams['font.size'] = 20
+    plt.title(
+        'Effect of Train/Held-Out Test Dataset on BCR\n' +
+        '(' + args.fs_meth + ' Feature Selection Best Scoring Selected Features)'
+    )
+    plt.xlabel('Test Dataset')
+    plt.ylabel('BCR')
     dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
     plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
     plt.xticks(plt_fig_x_axis, dataset_te_names)
     for bc_idx, bc_te_results in enumerate(bc_results):
-        roc_aucs_cv, roc_aucs_te, num_features = [], [], []
+        roc_aucs_cv, roc_aucs_te = [], []
+        bcrs_cv, bcrs_te, num_features = [], [], []
         for result in bc_te_results:
             roc_aucs_cv.append(result['roc_auc_cv'])
             roc_aucs_te.append(result['roc_auc_te'])
+            bcrs_cv.append(result['bcr_cv'])
+            bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         mean_roc_auc_cv = np.mean(roc_aucs_cv)
         mean_roc_auc_te = np.mean(roc_aucs_te)
+        mean_bcr_cv = np.mean(bcrs_cv)
+        mean_bcr_te = np.mean(bcrs_te)
         mean_num_features = np.mean(num_features)
         std_roc_auc_cv = np.std(roc_aucs_cv)
         std_roc_auc_te = np.std(roc_aucs_te)
+        std_bcr_cv = np.std(bcrs_cv)
+        std_bcr_te = np.std(bcrs_te)
         std_num_features = np.std(num_features)
         color = next(plt.gca()._get_lines.prop_cycler)['color']
+        plt.figure(5)
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-            #label='%s (Train CV)' % bc_methods[bc_idx],
         )
         plt.plot(
             plt_fig_x_axis, roc_aucs_te,
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
+            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 bc_methods[bc_idx],
+                mean_roc_auc_cv, std_roc_auc_cv,
                 mean_roc_auc_te, std_roc_auc_te,
                 mean_num_features, std_num_features,
             )
         )
-    plt.legend(loc='best')
+        plt.figure(6)
+        plt.plot(
+            plt_fig_x_axis, bcrs_cv,
+            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
+        )
+        plt.plot(
+            plt_fig_x_axis, bcrs_te,
+            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
+            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
+                bc_methods[bc_idx],
+                mean_bcr_cv, std_bcr_cv,
+                mean_bcr_te, std_bcr_te,
+                mean_num_features, std_num_features,
+            )
+        )
+    plt.figure(5)
+    plt.legend(loc='best', fontsize='x-small')
+    plt.grid('on')
+    plt.figure(6)
+    plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
 elif args.analysis == 4:
-    fs_methods = [
-        'Limma-KBest',
-        #'MI-KBest',
-        'Limma-Fpr-SVM-RFE',
-        'SVM-RFE',
-        #'SVM-SFM',
-        #'ExtraTrees-SFM',
-        #'Limma-Fpr-CFS',
-    ]
     te_results, fs_results = [], []
     for te_idx, (dataset_tr_name, dataset_te_name) in enumerate(dataset_pair_names):
         for fs_idx, fs_method in enumerate(fs_methods):
@@ -634,7 +714,7 @@ elif args.analysis == 4:
             feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
             print(
                 'Features: %3s' % feature_idxs.size,
-                ' ROC AUC (CV): %.4f' % grid.best_score_,
+                ' ' + gscv_score_text + ' (CV): %.4f' % grid.best_score_,
                 ' Params:',  grid.best_params_,
             )
             feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
@@ -651,13 +731,17 @@ elif args.analysis == 4:
                 ),
                 reverse=True
             ): print(feature, '\t', symbol, '\t', rank)
+            roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
+            bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
             base.load('data/' + eset_te_name + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
             X_te = np.array(base.t(biobase.exprs(eset_te)))
             y_te = np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
             y_score = grid.decision_function(X_te)
             fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-            roc_auc = roc_auc_score(y_te, y_score)
+            roc_auc_te = roc_auc_score(y_te, y_score)
+            y_pred = grid.predict(X_te)
+            bcr_te = bcr_score(y_te, y_pred)
             result = {
                 'grid': grid,
                 'feature_idxs': feature_idxs,
@@ -666,10 +750,12 @@ elif args.analysis == 4:
                 'tprs': tpr,
                 'thres': thres,
                 'coefs': coefs,
-                'y_scores': y_score,
-                'y_tests': y_te,
-                'roc_auc_cv': grid.best_score_,
-                'roc_auc_te': roc_auc,
+                'y_score': y_score,
+                'y_test': y_te,
+                'roc_auc_cv': roc_auc_cv,
+                'roc_auc_te': roc_auc_te,
+                'bcr_cv': bcr_cv,
+                'bcr_te': bcr_te,
             }
             if te_idx < len(te_results):
                 te_results[te_idx].append(result)
@@ -681,89 +767,159 @@ elif args.analysis == 4:
                 fs_results.append([result])
             base.remove(eset_tr_name)
             base.remove(eset_te_name)
-    # plot effect fs method vs test dataset roc auc
-    plt.figure(5)
+    # plot fs method vs train/test dataset
+    plt.figure(7)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'Effect of Feature Selection Method on Classifier Performance\n' +
+        'Effect of Feature Selection Method on ROC AUC\n' +
         '(' + args.bc_meth + ' Batch Effect Correction Best Scoring Selected Features)'
     )
     plt.xlabel('Feature Selection Method')
     plt.ylabel('ROC AUC')
+    plt.figure(8)
+    plt.rcParams['font.size'] = 20
+    plt.title(
+        'Effect of Feature Selection Method on BCR\n' +
+        '(' + args.bc_meth + ' Batch Effect Correction Best Scoring Selected Features)'
+    )
+    plt.xlabel('Feature Selection Method')
+    plt.ylabel('BCR')
     plt_fig_x_axis = range(1, len(fs_methods) + 1)
     plt.xticks(plt_fig_x_axis, fs_methods)
     for te_idx, te_fs_results in enumerate(te_results):
-        roc_aucs_cv, roc_aucs_te, num_features = [], [], []
+        roc_aucs_cv, roc_aucs_te = [], []
+        bcrs_cv, bcrs_te, num_features = [], [], []
         for result in te_fs_results:
             roc_aucs_cv.append(result['roc_auc_cv'])
             roc_aucs_te.append(result['roc_auc_te'])
+            bcrs_cv.append(result['bcr_cv'])
+            bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         mean_roc_auc_cv = np.mean(roc_aucs_cv)
         mean_roc_auc_te = np.mean(roc_aucs_te)
+        mean_bcr_cv = np.mean(bcrs_cv)
+        mean_bcr_te = np.mean(bcrs_te)
         mean_num_features = np.mean(num_features)
         std_roc_auc_cv = np.std(roc_aucs_cv)
         std_roc_auc_te = np.std(roc_aucs_te)
+        std_bcr_cv = np.std(bcrs_cv)
+        std_bcr_te = np.std(bcrs_te)
         std_num_features = np.std(num_features)
         dataset_tr_name, dataset_te_name = dataset_pair_names[te_idx]
         dataset_tr_name = dataset_tr_name.upper()
         dataset_te_name = dataset_te_name.upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
+        plt.figure(7)
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-            #label='%s (Train CV)' % dataset_tr_name,
         )
         plt.plot(
             plt_fig_x_axis, roc_aucs_te,
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
+            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 dataset_te_name,
+                mean_roc_auc_cv, std_roc_auc_cv,
                 mean_roc_auc_te, std_roc_auc_te,
                 mean_num_features, std_num_features,
             )
         )
-    plt.legend(loc='best')
+        plt.figure(8)
+        plt.plot(
+            plt_fig_x_axis, bcrs_cv,
+            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
+        )
+        plt.plot(
+            plt_fig_x_axis, bcrs_te,
+            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
+            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
+                dataset_te_name,
+                mean_bcr_cv, std_bcr_cv,
+                mean_bcr_te, std_bcr_te,
+                mean_num_features, std_num_features,
+            )
+        )
+    plt.figure(7)
+    plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    # plot effect test dataset vs fs roc auc
-    plt.figure(6)
+    plt.figure(8)
+    plt.legend(loc='best', fontsize='x-small')
+    plt.grid('on')
+    # plot train/test dataset vs fs method
+    plt.figure(9)
     plt.rcParams['font.size'] = 20
     plt.title(
-        'Effect of Training/Held-Out Test Dataset on Classifier Performance\n' +
+        'Effect of Training/Held-Out Test Dataset on ROC AUC\n' +
         '(' + args.bc_meth + ' Batch Effect Correction Best Scoring Selected Features)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
+    plt.figure(10)
+    plt.rcParams['font.size'] = 20
+    plt.title(
+        'Effect of Training/Held-Out Test Dataset on BCR\n' +
+        '(' + args.bc_meth + ' Batch Effect Correction Best Scoring Selected Features)'
+    )
+    plt.xlabel('Test Dataset')
+    plt.ylabel('BCR')
     dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
     plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
     plt.xticks(plt_fig_x_axis, dataset_te_names)
     for fs_idx, fs_te_results in enumerate(fs_results):
-        roc_aucs_cv, roc_aucs_te, num_features = [], [], []
+        roc_aucs_cv, roc_aucs_te = [], []
+        bcrs_cv, bcrs_te, num_features = [], [], []
         for result in fs_te_results:
             roc_aucs_cv.append(result['roc_auc_cv'])
             roc_aucs_te.append(result['roc_auc_te'])
+            bcrs_cv.append(result['bcr_cv'])
+            bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         mean_roc_auc_cv = np.mean(roc_aucs_cv)
         mean_roc_auc_te = np.mean(roc_aucs_te)
+        mean_bcr_cv = np.mean(bcrs_cv)
+        mean_bcr_te = np.mean(bcrs_te)
         mean_num_features = np.mean(num_features)
         std_roc_auc_cv = np.std(roc_aucs_cv)
         std_roc_auc_te = np.std(roc_aucs_te)
+        std_bcr_cv = np.std(bcrs_cv)
+        std_bcr_te = np.std(bcrs_te)
         std_num_features = np.std(num_features)
         color = next(plt.gca()._get_lines.prop_cycler)['color']
+        plt.figure(9)
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-            #label='%s (Train CV)' % fs_methods[fs_idx],
         )
         plt.plot(
             plt_fig_x_axis, roc_aucs_te,
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
-                fs_methods[fs_idx],
+            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
+                fs_methods[bc_idx],
+                mean_roc_auc_cv, std_roc_auc_cv,
                 mean_roc_auc_te, std_roc_auc_te,
                 mean_num_features, std_num_features,
             )
         )
-    plt.legend(loc='best')
+        plt.figure(10)
+        plt.plot(
+            plt_fig_x_axis, bcrs_cv,
+            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
+        )
+        plt.plot(
+            plt_fig_x_axis, bcrs_te,
+            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
+            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
+                fs_methods[bc_idx],
+                mean_bcr_cv, std_bcr_cv,
+                mean_bcr_te, std_bcr_te,
+                mean_num_features, std_num_features,
+            )
+        )
+    plt.figure(9)
+    plt.legend(loc='best', fontsize='x-small')
+    plt.grid('on')
+    plt.figure(10)
+    plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
 
 plt.show()
