@@ -246,7 +246,10 @@ if args.analysis in (1, 2):
         n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
     )
     grid.fit(X_tr, y_tr)
-    joblib.dump(grid, 'data/grid_' + args.dataset_tr + '_' + args.fs_meth.lower() + '.pkl')
+    if args.bc_meth != 'none':
+        joblib.dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + args.fs_meth.lower() + '.pkl')
+    else:
+        joblib.dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
     # print summary info
     feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
@@ -399,11 +402,10 @@ if args.analysis in (1, 2):
                 ' ROC AUC: %.4f / %.4f' % roc_auc_te,
                 ' BCR: %.4f / %.4f' % bcr_te,
             )
-            dataset_te_name = dataset_te_name.replace('gse', 'GSE')
             plt.plot(
                 fpr, tpr, lw=4, alpha=0.5,
                 label=r'%s ROC (AUC = %0.4f, BCR = %0.4f)' % (
-                    dataset_te_name, roc_auc_te, bcr_te,
+                    dataset_te_name.replace('gse', 'GSE'), roc_auc_te, bcr_te,
                 ),
             )
         mean_tpr = np.mean(tprs, axis=0)
