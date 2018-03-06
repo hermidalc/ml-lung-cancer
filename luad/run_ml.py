@@ -110,7 +110,7 @@ fs_methods = [
     #'ExtraTrees-SFM',
     'Limma-Fpr-CFS',
 ]
-gscv_score_text = args.gscv_refit.replace('_', ' ').upper()
+gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 CLF_SVC_C = [ 0.001, 0.01, 0.1, 1, 10, 100, 1000 ]
@@ -240,10 +240,9 @@ if args.analysis in (1, 2):
     y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
     grid = GridSearchCV(
         Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
-        scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit=args.gscv_refit,
+        param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
         cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
-        param_grid=pipelines[args.fs_meth]['param_grid'], error_score=0, return_train_score=False,
-        n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+        error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
     )
     grid.fit(X_tr, y_tr)
     if args.bc_meth != 'none':
@@ -448,10 +447,9 @@ elif args.analysis == 3:
             y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
                 Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
-                scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit=args.gscv_refit,
+                param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
                 cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
-                param_grid=pipelines[args.fs_meth]['param_grid'], error_score=0, return_train_score=False,
-                n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+                error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
             )
             grid.fit(X_tr, y_tr)
             if bc_method != 'none':
@@ -689,10 +687,9 @@ elif args.analysis == 4:
             y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
                 Pipeline(pipelines[fs_method]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
-                scoring={ 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }, refit=args.gscv_refit,
+                param_grid=pipelines[fs_method]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
                 cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
-                param_grid=pipelines[fs_method]['param_grid'], error_score=0, return_train_score=False,
-                n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+                error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
             )
             grid.fit(X_tr, y_tr)
             if args.bc_meth:
