@@ -517,6 +517,7 @@ elif args.analysis == 3:
                 reverse=True
             ): print(feature, '\t', symbol, '\t', rank)
     # plot bc method vs train/test scores
+    plt_fig_x_axis = range(1, len(bc_methods) + 1)
     plt.figure(3)
     plt.rcParams['font.size'] = 20
     plt.title(
@@ -525,7 +526,6 @@ elif args.analysis == 3:
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
-    plt_fig_x_axis = range(1, len(bc_methods) + 1)
     plt.xticks(plt_fig_x_axis, bc_methods)
     plt.figure(4)
     plt.rcParams['font.size'] = 20
@@ -535,7 +535,6 @@ elif args.analysis == 3:
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('BCR')
-    plt_fig_x_axis = range(1, len(bc_methods) + 1)
     plt.xticks(plt_fig_x_axis, bc_methods)
     for te_idx, te_bc_results in enumerate(te_results):
         roc_aucs_cv, roc_aucs_te = [], []
@@ -597,6 +596,8 @@ elif args.analysis == 3:
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
     # plot train/test dataset vs bc method
+    dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
+    plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
     plt.figure(5)
     plt.rcParams['font.size'] = 20
     plt.title(
@@ -605,6 +606,7 @@ elif args.analysis == 3:
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
+    plt.xticks(plt_fig_x_axis, dataset_te_names)
     plt.figure(6)
     plt.rcParams['font.size'] = 20
     plt.title(
@@ -613,8 +615,6 @@ elif args.analysis == 3:
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('BCR')
-    dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
-    plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
     plt.xticks(plt_fig_x_axis, dataset_te_names)
     for bc_idx, bc_te_results in enumerate(bc_results):
         roc_aucs_cv, roc_aucs_te = [], []
@@ -758,6 +758,7 @@ elif args.analysis == 4:
                 reverse=True
             ): print(feature, '\t', symbol, '\t', rank)
     # plot fs method vs train/test dataset
+    plt_fig_x_axis = range(1, len(fs_methods) + 1)
     plt.figure(7)
     plt.rcParams['font.size'] = 20
     plt.title(
@@ -766,6 +767,7 @@ elif args.analysis == 4:
     )
     plt.xlabel('Feature Selection Method')
     plt.ylabel('ROC AUC')
+    plt.xticks(plt_fig_x_axis, fs_methods)
     plt.figure(8)
     plt.rcParams['font.size'] = 20
     plt.title(
@@ -774,7 +776,6 @@ elif args.analysis == 4:
     )
     plt.xlabel('Feature Selection Method')
     plt.ylabel('BCR')
-    plt_fig_x_axis = range(1, len(fs_methods) + 1)
     plt.xticks(plt_fig_x_axis, fs_methods)
     for te_idx, te_fs_results in enumerate(te_results):
         roc_aucs_cv, roc_aucs_te = [], []
@@ -836,6 +837,8 @@ elif args.analysis == 4:
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
     # plot train/test dataset vs fs method
+    dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
+    plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
     plt.figure(9)
     plt.rcParams['font.size'] = 20
     plt.title(
@@ -844,6 +847,7 @@ elif args.analysis == 4:
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
+    plt.xticks(plt_fig_x_axis, dataset_te_names)
     plt.figure(10)
     plt.rcParams['font.size'] = 20
     plt.title(
@@ -852,8 +856,6 @@ elif args.analysis == 4:
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('BCR')
-    dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
-    plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
     plt.xticks(plt_fig_x_axis, dataset_te_names)
     for fs_idx, fs_te_results in enumerate(fs_results):
         roc_aucs_cv, roc_aucs_te = [], []
