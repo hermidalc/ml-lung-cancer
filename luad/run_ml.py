@@ -11,7 +11,7 @@ from rpy2.robjects import numpy2ri
 import numpy as np
 from natsort import natsorted
 from sklearn.feature_selection import mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
-from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit, train_test_split
+from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -217,7 +217,7 @@ pipelines = {
             ('sfp', SelectFpr(limma, alpha=args.fs_fpr_pval)),
             ('slr', StandardScaler()),
             ('fsl', CFS()),
-            ('svc', LinearSVC(class_weight='balanced')),
+            ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
             {
