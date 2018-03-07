@@ -15,12 +15,34 @@ from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import LinearSVC, SVC
+from sklearn.svm import LinearSVC
 from sklearn.metrics import roc_auc_score, roc_curve, make_scorer
-from sklearn.externals import joblib
+from sklearn.externals.joblib import dump, Memory
 from feature_selection import CFS
 import matplotlib.pyplot as plt
 from matplotlib import style
+
+# config
+parser = argparse.ArgumentParser()
+parser.add_argument('--analysis', type=int, help='analysis run number')
+parser.add_argument('--fs-meth', type=str, help='feature selection method')
+parser.add_argument('--fs-num-max', type=int, default=30, help='fs num max')
+parser.add_argument('--fs-num-final', type=int, default=20, help='fs num final')
+parser.add_argument('--fs-fpr-pval', type=float, default=0.01, help='fs fpr min p-value')
+parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='fs rank method (mean_coefs or mean_roc_aucs)')
+parser.add_argument('--gscv-splits', type=int, default=30, help='gscv splits')
+parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
+parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
+parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
+parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
+parser.add_argument('--rfe-step', type=float, default=0.2, help='rfe step')
+parser.add_argument('--rfe-verbose', type=int, default=0, help='rfe verbosity')
+parser.add_argument('--svm-cache-size', type=int, default=2000, help='libsvm cache size')
+parser.add_argument('--svm-alg', type=str, default='liblinear', help='svm algorithm (liblinear or libsvm)')
+parser.add_argument('--dataset-tr', type=str, help='dataset fs/tr')
+parser.add_argument('--dataset-te', type=str, nargs="+", help='dataset te')
+parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
+args = parser.parse_args()
 
 base = importr('base')
 biobase = importr('Biobase')
@@ -29,8 +51,20 @@ r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']
 r_filter_eset_relapse_labels = robjects.globalenv['filterEsetRelapseLabels']
 r_get_gene_symbols = robjects.globalenv['getGeneSymbols']
 r_limma = robjects.globalenv['limma']
-cachedir = mkdtemp()
 numpy2ri.activate()
+cachedir = mkdtemp()
+memory = Memory(cachedir=cachedir, verbose=0)
+
+# custom mixin and class for LinearSVC with memory cached fits
+class CachedFitMixin:
+    def fit(self, *args, **kwargs):
+        fit = memory.cache(super(CachedFitMixin, self).fit)
+        cached_self = fit(*args, **kwargs)
+        vars(self).update(vars(cached_self))
+        return self
+
+class CachedLinearSVC(CachedFitMixin, LinearSVC):
+    pass
 
 # limma feature selection scoring function
 def limma(X, y):
@@ -54,27 +88,122 @@ def bcr_score(y_true, y_pred):
         return (tp / mes1 + tn / mes2) / 2
 
 # config
-parser = argparse.ArgumentParser()
-parser.add_argument('--analysis', type=int, help='analysis run number')
-parser.add_argument('--fs-meth', type=str, help='feature selection method')
-parser.add_argument('--fs-num-max', type=int, default=30, help='fs num max')
-parser.add_argument('--fs-num-final', type=int, default=20, help='fs num final')
-parser.add_argument('--fs-fpr-pval', type=float, default=0.01, help='fs fpr min p-value')
-parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='fs rank method (mean_coefs or mean_roc_aucs)')
-parser.add_argument('--gscv-splits', type=int, default=30, help='gscv splits')
-parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
-parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
-parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
-parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
-parser.add_argument('--rfe-step', type=float, default=0.01, help='rfe step')
-parser.add_argument('--rfe-verbose', type=int, default=0, help='rfe verbosity')
-parser.add_argument('--svm-cache-size', type=int, default=2000, help='libsvm cache size')
-parser.add_argument('--svm-alg', type=str, default='liblinear', help='svm algorithm (liblinear or libsvm)')
-parser.add_argument('--dataset-tr', type=str, help='dataset fs/tr')
-parser.add_argument('--dataset-te', type=str, nargs="+", help='dataset te')
-parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
-args = parser.parse_args()
+limma_cached = memory.cache(limma)
+mutual_info_classif_cached = memory.cache(mutual_info_classif)
 
+# specify elements in sort order (needed by code dealing with gridsearch cv_results)
+CLF_SVC_C = [ 0.001, 0.01, 0.1, 1, 10, 100, 1000 ]
+SFM_SVC_C = [ 0.01, 0.1, 1, 10, 100, 1000 ]
+SFM_THRESHOLDS = [ 0.01, 0.02, 0.03, 0.04 ]
+SKB_N_FEATURES = list(range(1, args.fs_num_max + 1))
+RFE_N_FEATURES = list(range(1, args.fs_num_max + 1))
+SPR_ALPHA = [ 0.001, 0.01, 0.05 ]
+
+pipelines = {
+    'Limma-KBest': {
+        'pipe_steps': [
+            ('fsl', SelectKBest(limma_cached)),
+            ('slr', StandardScaler()),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__k': SKB_N_FEATURES,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'MI-KBest': {
+        'pipe_steps': [
+            ('slr', StandardScaler()),
+            ('fsl', SelectKBest(mutual_info_classif_cached)),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__k': SKB_N_FEATURES,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'Limma-Fpr-SVM-RFE': {
+        'pipe_steps': [
+            ('sfp', SelectFpr(limma_cached, alpha=args.fs_fpr_pval)),
+            ('slr', StandardScaler()),
+            ('fsl', RFE(
+                CachedLinearSVC(class_weight='balanced'),
+                step=args.rfe_step, verbose=args.rfe_verbose,
+            )),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__n_features_to_select': RFE_N_FEATURES,
+                'fsl__estimator__C': CLF_SVC_C,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'SVM-RFE': {
+        'pipe_steps': [
+            ('slr', StandardScaler()),
+            ('fsl', RFE(
+                CachedLinearSVC(class_weight='balanced'),
+                step=args.rfe_step, verbose=args.rfe_verbose,
+            )),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__n_features_to_select': RFE_N_FEATURES,
+                'fsl__estimator__C': CLF_SVC_C,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'SVM-SFM': {
+        'pipe_steps': [
+            ('slr', StandardScaler()),
+            ('fsl', SelectFromModel(
+                CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
+            )),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__threshold': SFM_THRESHOLDS,
+                'fsl__estimator__C': SFM_SVC_C,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'ExtraTrees-SFM': {
+        'pipe_steps': [
+            ('slr', StandardScaler()),
+            ('fsl', SelectFromModel(ExtraTreesClassifier())),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'fsl__threshold': SFM_THRESHOLDS,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'Limma-Fpr-CFS': {
+        'pipe_steps': [
+            ('sfp', SelectFpr(limma_cached, alpha=args.fs_fpr_pval)),
+            ('slr', StandardScaler()),
+            ('fsl', CFS()),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+}
 dataset_pair_names = [
     ('gse31210_gse30219', 'gse8894'),
     ('gse31210_gse8894', 'gse30219'),
@@ -112,121 +241,6 @@ fs_methods = [
 ]
 gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
-# specify elements in sort order (needed by code dealing with gridsearch cv_results)
-CLF_SVC_C = [ 0.001, 0.01, 0.1, 1, 10, 100, 1000 ]
-SFM_SVC_C = [ 0.01, 0.1, 1, 10, 100, 1000 ]
-SFM_THRESHOLDS = [ 0.01, 0.02, 0.03, 0.04 ]
-SKB_N_FEATURES = list(range(1, args.fs_num_max + 1))
-SKB_MI_N_FEATURES = list(range(5, args.fs_num_max + 1, 5))
-RFE_N_FEATURES = list(range(5, args.fs_num_max + 1, 5))
-SPR_ALPHA = [ 0.001, 0.01, 0.05 ]
-
-pipelines = {
-    'Limma-KBest': {
-        'pipe_steps': [
-            ('fsl', SelectKBest(limma)),
-            ('slr', StandardScaler()),
-            ('clf', LinearSVC(class_weight='balanced')),
-        ],
-        'param_grid': [
-            {
-                'fsl__k': SKB_N_FEATURES,
-                'clf__C': CLF_SVC_C,
-            },
-        ],
-    },
-    'MI-KBest': {
-        'pipe_steps': [
-            ('slr', StandardScaler()),
-            ('fsl', SelectKBest(mutual_info_classif)),
-            ('clf', LinearSVC(class_weight='balanced')),
-        ],
-        'param_grid': [
-            {
-                'fsl__k': SKB_MI_N_FEATURES,
-                'clf__C': CLF_SVC_C,
-            },
-        ],
-    },
-    'Limma-Fpr-SVM-RFE': {
-        'pipe_steps': [
-            ('sfp', SelectFpr(limma, alpha=args.fs_fpr_pval)),
-            ('slr', StandardScaler()),
-            ('fsl', RFE(
-                LinearSVC(class_weight='balanced'),
-                step=args.rfe_step, verbose=args.rfe_verbose,
-            )),
-            ('clf', LinearSVC(class_weight='balanced')),
-        ],
-        'param_grid': [
-            {
-                'fsl__n_features_to_select': RFE_N_FEATURES,
-                'fsl__estimator__C': CLF_SVC_C,
-                'clf__C': CLF_SVC_C,
-            },
-        ],
-    },
-    'SVM-RFE': {
-        'pipe_steps': [
-            ('slr', StandardScaler()),
-            ('fsl', RFE(
-                LinearSVC(class_weight='balanced'),
-                step=args.rfe_step, verbose=args.rfe_verbose,
-            )),
-            ('clf', LinearSVC(class_weight='balanced')),
-        ],
-        'param_grid': [
-            {
-                'fsl__n_features_to_select': RFE_N_FEATURES,
-                'fsl__estimator__C': CLF_SVC_C,
-                'clf__C': CLF_SVC_C,
-            },
-        ],
-    },
-    'SVM-SFM': {
-        'pipe_steps': [
-            ('slr', StandardScaler()),
-            ('fsl', SelectFromModel(
-                LinearSVC(penalty='l1', dual=False, class_weight='balanced')
-            )),
-            ('clf', LinearSVC(class_weight='balanced')),
-        ],
-        'param_grid': [
-            {
-                'fsl__threshold': SFM_THRESHOLDS,
-                'fsl__estimator__C': SFM_SVC_C,
-                'clf__C': CLF_SVC_C,
-            },
-        ],
-    },
-    'ExtraTrees-SFM': {
-        'pipe_steps': [
-            ('slr', StandardScaler()),
-            ('fsl', SelectFromModel(ExtraTreesClassifier())),
-            ('clf', LinearSVC(class_weight='balanced')),
-        ],
-        'param_grid': [
-            {
-                'fsl__threshold': SFM_THRESHOLDS,
-                'clf__C': CLF_SVC_C,
-            },
-        ],
-    },
-    'Limma-Fpr-CFS': {
-        'pipe_steps': [
-            ('sfp', SelectFpr(limma, alpha=args.fs_fpr_pval)),
-            ('slr', StandardScaler()),
-            ('fsl', CFS()),
-            ('clf', LinearSVC(class_weight='balanced')),
-        ],
-        'param_grid': [
-            {
-                'clf__C': CLF_SVC_C,
-            },
-        ],
-    },
-}
-
 # analyses
 if args.analysis in (1, 2):
     if args.bc_meth:
@@ -239,16 +253,16 @@ if args.analysis in (1, 2):
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
     y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
     grid = GridSearchCV(
-        Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
+        Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
         param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
         cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
         error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
     )
     grid.fit(X_tr, y_tr)
     if args.bc_meth != 'none':
-        joblib.dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + args.fs_meth.lower() + '.pkl')
+        dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + args.fs_meth.lower() + '.pkl')
     else:
-        joblib.dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
+        dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
     # print summary info
     feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
@@ -446,16 +460,16 @@ elif args.analysis == 3:
             X_tr = np.array(base.t(biobase.exprs(eset_tr)))
             y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
-                Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
+                Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
                 param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
                 cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
                 error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
             )
             grid.fit(X_tr, y_tr)
             if bc_method != 'none':
-                joblib.dump(grid, 'data/grid_' + dataset_tr_name + '_' + bc_method + '_' + args.fs_meth.lower() + '.pkl')
+                dump(grid, 'data/grid_' + dataset_tr_name + '_' + bc_method + '_' + args.fs_meth.lower() + '.pkl')
             else:
-                joblib.dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
+                dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
             feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
             feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
             feature_names = feature_names[feature_idxs]
@@ -686,16 +700,16 @@ elif args.analysis == 4:
             X_tr = np.array(base.t(biobase.exprs(eset_tr)))
             y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
-                Pipeline(pipelines[fs_method]['pipe_steps'], memory=joblib.Memory(cachedir=cachedir, verbose=0)),
+                Pipeline(pipelines[fs_method]['pipe_steps'], memory=memory),
                 param_grid=pipelines[fs_method]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
                 cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
                 error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
             )
             grid.fit(X_tr, y_tr)
             if args.bc_meth:
-                joblib.dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + fs_method.lower() + '.pkl')
+                dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + fs_method.lower() + '.pkl')
             else:
-                joblib.dump(grid, 'data/grid_' + dataset_tr_name + '_' + fs_method.lower() + '.pkl')
+                dump(grid, 'data/grid_' + dataset_tr_name + '_' + fs_method.lower() + '.pkl')
             feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
             feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
             feature_names = feature_names[feature_idxs]
