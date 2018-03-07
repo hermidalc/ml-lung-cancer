@@ -29,14 +29,15 @@ parser.add_argument('--fs-meth', type=str, help='feature selection method')
 parser.add_argument('--fs-num-max', type=int, default=30, help='fs num max')
 parser.add_argument('--fs-num-final', type=int, default=20, help='fs num final')
 parser.add_argument('--fs-fpr-pval', type=float, default=0.01, help='fs fpr min p-value')
+parser.add_argument('--fs-sfm-thres', type=float, default=0.01, help='fs sfm threshold')
+parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
+parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='fs rank method (mean_coefs or mean_roc_aucs)')
 parser.add_argument('--gscv-splits', type=int, default=30, help='gscv splits')
 parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
-parser.add_argument('--rfe-step', type=float, default=0.2, help='rfe step')
-parser.add_argument('--rfe-verbose', type=int, default=0, help='rfe verbosity')
 parser.add_argument('--svm-cache-size', type=int, default=2000, help='libsvm cache size')
 parser.add_argument('--svm-alg', type=str, default='liblinear', help='svm algorithm (liblinear or libsvm)')
 parser.add_argument('--dataset-tr', type=str, help='dataset fs/tr')
@@ -79,7 +80,7 @@ def bcr_score(y_true, y_pred):
     fn = np.sum(np.logical_and(y_pred == 0, y_true == 1))
     mes1 = (tp + fn)
     mes2 = (tn + fp)
-    # if presence of only one class
+    # if only one class
     if mes2 == 0:
         return tp / mes1
     elif mes1 == 0:
@@ -92,11 +93,11 @@ limma_cached = memory.cache(limma)
 mutual_info_classif_cached = memory.cache(mutual_info_classif)
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
-CLF_SVC_C = [ 0.001, 0.01, 0.1, 1, 10, 100, 1000 ]
-SFM_SVC_C = [ 0.01, 0.1, 1, 10, 100, 1000 ]
+CLF_SVC_C = [ 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1 ]
+SFM_SVC_C = [ 1e-2, 1e-1, 1, 10, 10 ]
 SFM_THRESHOLDS = [ 0.01, 0.02, 0.03, 0.04 ]
-SKB_N_FEATURES = list(range(1, args.fs_num_max + 1))
-RFE_N_FEATURES = list(range(1, args.fs_num_max + 1))
+SKB_N_FEATURES = list(range(5, args.fs_num_max + 1, 5))
+RFE_N_FEATURES = list(range(5, args.fs_num_max + 1, 5))
 SPR_ALPHA = [ 0.001, 0.01, 0.05 ]
 
 pipelines = {
@@ -132,7 +133,7 @@ pipelines = {
             ('slr', StandardScaler()),
             ('fsl', RFE(
                 CachedLinearSVC(class_weight='balanced'),
-                step=args.rfe_step, verbose=args.rfe_verbose,
+                step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
             )),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
@@ -144,12 +145,34 @@ pipelines = {
             },
         ],
     },
+    'SVM-SFM-RFE': {
+        'pipe_steps': [
+            ('slr', StandardScaler()),
+            ('sfm', SelectFromModel(
+                CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced'),
+                threshold=args.fs_sfm_thres,
+            )),
+            ('fsl', RFE(
+                CachedLinearSVC(class_weight='balanced'),
+                step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
+            )),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'sfm__estimator__C': SFM_SVC_C,
+                'fsl__n_features_to_select': RFE_N_FEATURES,
+                'fsl__estimator__C': CLF_SVC_C,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
     'SVM-RFE': {
         'pipe_steps': [
             ('slr', StandardScaler()),
             ('fsl', RFE(
                 CachedLinearSVC(class_weight='balanced'),
-                step=args.rfe_step, verbose=args.rfe_verbose,
+                step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
             )),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
@@ -234,6 +257,7 @@ fs_methods = [
     'Limma-KBest',
     'MI-KBest',
     'Limma-Fpr-SVM-RFE',
+    #'SVM-SFM-RFE',
     #'SVM-RFE',
     #'SVM-SFM',
     #'ExtraTrees-SFM',
@@ -255,14 +279,14 @@ if args.analysis in (1, 2):
     grid = GridSearchCV(
         Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
         param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
-        cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
+        cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
         error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
     )
     grid.fit(X_tr, y_tr)
-    if args.bc_meth != 'none':
-        dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + args.fs_meth.lower() + '.pkl')
+    if args.bc_meth:
+        dump(grid, 'data/grid_' + args.dataset_tr + '_' + args.bc_meth + '_' + args.fs_meth.lower() + '.pkl')
     else:
-        dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
+        dump(grid, 'data/grid_' + args.dataset_tr + '_' + args.fs_meth.lower() + '.pkl')
     # print summary info
     feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
@@ -331,9 +355,11 @@ if args.analysis in (1, 2):
         std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
         plt.figure(1)
         plt.rcParams['font.size'] = 20
-        args.dataset_tr = args.dataset_tr.replace('gse', 'GSE')
+        dataset_tr_name = args.dataset_tr.replace('gse', 'GSE')
+        if args.bc_meth:
+            dataset_tr_name = dataset_tr_name + ' ' + args.bc_meth
         plt.title(
-            args.dataset_tr + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+            dataset_tr_name + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
             'Effect of Number of Top-Ranked Features Selected on CV Performance Metrics'
         )
         plt.xlabel('Number of Top-Ranked Features Selected')
@@ -379,9 +405,11 @@ if args.analysis in (1, 2):
         # plot roc curves
         plt.figure(2)
         plt.rcParams['font.size'] = 20
-        args.dataset_tr = args.dataset_tr.replace('gse', 'GSE')
+        dataset_tr_name = args.dataset_tr.replace('gse', 'GSE')
+        if args.bc_meth:
+            dataset_tr_name = dataset_tr_name + ' ' + args.bc_meth
         plt.title(
-            args.dataset_tr + ' SVM Classifier (' + args.fs_meth + ' ' +
+            dataset_tr_name + ' SVM Classifier (' + args.fs_meth + ' ' +
             str(len(feature_idxs)) + ' Features)\nGEO LUAD Test Datasets ROC Curves'
         )
         plt.xlabel('False Positive Rate')
@@ -389,9 +417,9 @@ if args.analysis in (1, 2):
         plt.xlim([-0.01,1.01])
         plt.ylim([-0.01,1.01])
         if args.bc_meth:
-            dataset_te_names = [te_name for tr_name, te_name in dataset_pair_names if tr_name == dataset_tr_name]
+            dataset_te_names = [te_name for tr_name, te_name in dataset_pair_names if tr_name == args.dataset_tr]
         else:
-            dataset_te_names = [te_name for _, te_name in dataset_pair_names]
+            dataset_te_names = [te_name for _, te_name in dataset_pair_names if te_name != args.dataset_tr]
         tprs, roc_aucs_te, bcrs_te = [], [], []
         mean_fpr = np.linspace(0, 1, 500)
         for dataset_te_name in dataset_te_names:
@@ -412,8 +440,8 @@ if args.analysis in (1, 2):
             # print summary info
             print(
                 'Test Dataset: %3s' % dataset_te_name,
-                ' ROC AUC: %.4f / %.4f' % roc_auc_te,
-                ' BCR: %.4f / %.4f' % bcr_te,
+                ' ROC AUC: %.4f' % roc_auc_te,
+                ' BCR: %.4f' % bcr_te,
             )
             plt.plot(
                 fpr, tpr, lw=4, alpha=0.5,
@@ -462,7 +490,7 @@ elif args.analysis == 3:
             grid = GridSearchCV(
                 Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
                 param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
+                cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
                 error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
             )
             grid.fit(X_tr, y_tr)
@@ -702,7 +730,7 @@ elif args.analysis == 4:
             grid = GridSearchCV(
                 Pipeline(pipelines[fs_method]['pipe_steps'], memory=memory),
                 param_grid=pipelines[fs_method]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size),
+                cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
                 error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
             )
             grid.fit(X_tr, y_tr)
