@@ -32,16 +32,17 @@ parser.add_argument('--fs-num-select', type=int, nargs="+", help='fs num select'
 parser.add_argument('--fs-fpr-pval', type=float, nargs="+", help='fs fpr p-value')
 parser.add_argument('--fs-sfm-thres', type=float, nargs="+", help='fs sfm threshold')
 parser.add_argument('--fs-sfm-c', type=float, nargs="+", help='fs sfm c')
+parser.add_argument('--fs-rfe-c', type=float, nargs="+", help='fs rfe c')
 parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='fs rank method (mean_coefs or mean_roc_aucs)')
 parser.add_argument('--clf-svm-c', type=float, nargs="+", help='clf svm c')
-parser.add_argument('--gscv-splits', type=int, default=30, help='gscv splits')
+parser.add_argument('--gscv-splits', type=int, default=32, help='gscv splits')
 parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
-parser.add_argument('--dataset-tr', type=str, help='dataset fs/tr')
+parser.add_argument('--dataset-tr', type=str, help='dataset tr')
 args = parser.parse_args()
 
 base = importr('base')
@@ -90,12 +91,17 @@ def bcr_score(y_true, y_pred):
 # config
 limma_cached = memory.cache(limma)
 mutual_info_classif_cached = memory.cache(mutual_info_classif)
+gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 if args.clf_svm_c:
     CLF_SVC_C = sorted(args.clf_svm_c)
 else:
     CLF_SVC_C = [ 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100, 1000 ]
+if args.fs_rfe_c:
+    RFE_SVC_C = sorted(args.fs_rfe_c)
+else:
+    RFE_SVC_C = [ 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100, 1000 ]
 if args.fs_sfm_c:
     SFM_SVC_C = sorted(args.fs_sfm_c)
 else:
@@ -111,7 +117,7 @@ else:
 if args.fs_num_select:
     RFE_N_FEATURES = sorted(args.fs_num_select)
 else:
-    RFE_N_FEATURES = list(range(5, args.fs_num_max + 1, 5))
+    RFE_N_FEATURES = list(range(1, args.fs_num_max + 1))
 if args.fs_fpr_pval:
     SFP_ALPHA = sorted(args.fs_fpr_pval)
 else:
@@ -158,7 +164,7 @@ pipelines = {
             {
                 'sfp__alpha': SFP_ALPHA,
                 'fsl__n_features_to_select': RFE_N_FEATURES,
-                'fsl__estimator__C': CLF_SVC_C,
+                'fsl__estimator__C': RFE_SVC_C,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -180,7 +186,7 @@ pipelines = {
                 'sfm__threshold': SFM_THRESHOLDS,
                 'sfm__estimator__C': SFM_SVC_C,
                 'fsl__n_features_to_select': RFE_N_FEATURES,
-                'fsl__estimator__C': CLF_SVC_C,
+                'fsl__estimator__C': RFE_SVC_C,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -197,7 +203,7 @@ pipelines = {
         'param_grid': [
             {
                 'fsl__n_features_to_select': RFE_N_FEATURES,
-                'fsl__estimator__C': CLF_SVC_C,
+                'fsl__estimator__C': RFE_SVC_C,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -221,7 +227,9 @@ pipelines = {
     'ExtraTrees-SFM': {
         'pipe_steps': [
             ('slr', StandardScaler()),
-            ('fsl', SelectFromModel(ExtraTreesClassifier())),
+            ('fsl', SelectFromModel(
+                ExtraTreesClassifier(),
+            )),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
@@ -282,7 +290,6 @@ fs_methods = [
     #'ExtraTrees-SFM',
     'Limma-Fpr-CFS',
 ]
-gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
 # analyses
 if args.analysis == 1:
@@ -330,9 +337,12 @@ if args.analysis == 1:
     )
     print('Rankings:')
     for coef, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', coef)
+    # plot feature selection search vs cv perf metrics
+    dataset_tr_title = args.dataset_tr.replace('gse', 'GSE')
+    if args.bc_meth:
+        dataset_tr_title = dataset_tr_title + '_' + args.bc_meth
     grid_params = pipelines[args.fs_meth]['param_grid'][0]
-    # plot num top-ranked features selected vs cv perf metrics
-    if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
+    if args.fs_meth in ('Limma-KBest', 'MI-KBest') and len(grid_params['fsl__k']) > 1:
         new_shape = (
             len(grid_params['fsl__k']),
             np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__k'])
@@ -340,7 +350,8 @@ if args.analysis == 1:
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__k'])
         )
-    elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-RFE'):
+    elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE') and \
+        len(grid_params['fsl__n_features_to_select']) > 1:
         new_shape = (
             len(grid_params['fsl__n_features_to_select']),
             np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__n_features_to_select'])
@@ -348,7 +359,7 @@ if args.analysis == 1:
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__n_features_to_select'])
         )
-    elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM'):
+    elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM') and len(grid_params['fsl__threshold']) > 1:
         new_shape = (
             len(grid_params['fsl__threshold']),
             np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__threshold'])
@@ -356,7 +367,7 @@ if args.analysis == 1:
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_fsl__threshold']).astype(str)
         )
-    elif args.fs_meth in ('Limma-Fpr-CFS'):
+    elif args.fs_meth in ('Limma-Fpr-CFS') and len(grid_params['sfp__alpha']) > 1:
         new_shape = (
             len(grid_params['sfp__alpha']),
             np.prod([len(v) for k,v in grid_params.items() if k != 'sfp__alpha'])
@@ -364,135 +375,138 @@ if args.analysis == 1:
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_sfp__alpha'])
         )
-    mean_roc_aucs_cv = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-    std_roc_aucs_cv = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-    mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv, axis=1)
-    mean_roc_aucs_cv = mean_roc_aucs_cv[np.arange(len(mean_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
-    std_roc_aucs_cv = std_roc_aucs_cv[np.arange(len(std_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
-    mean_bcrs_cv = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-    std_bcrs_cv = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-    mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv, axis=1)
-    mean_bcrs_cv = mean_bcrs_cv[np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs]
-    std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
-    plt.figure(1)
-    plt.rcParams['font.size'] = 20
-    dataset_tr_name = args.dataset_tr.replace('gse', 'GSE')
-    if args.bc_meth:
-        dataset_tr_name = dataset_tr_name + ' ' + args.bc_meth
-    plt.title(
-        dataset_tr_name + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
-        'Effect of Number of Top-Ranked Features Selected on CV Performance Metrics'
-    )
-    plt.xlabel('Number of Top-Ranked Features Selected')
-    plt.ylabel('CV Score')
-    if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
-        x_axis = grid_params['fsl__k']
-        plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
-        plt.xticks(x_axis)
-    elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-RFE'):
-        x_axis = grid_params['fsl__n_features_to_select']
-        plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
-        plt.xticks(x_axis)
-    elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM'):
-        x_axis = range(len(grid_params['fsl__threshold']))
-        plt.xticks(x_axis, grid_params['fsl__threshold'])
-    elif args.fs_meth in ('Limma-Fpr-CFS'):
-        x_axis = grange(len(grid_params['sfp__alpha']))
-        plt.xticks(x_axis, grid_params['sfp__alpha'])
-    plt.plot(
-        x_axis,
-        mean_roc_aucs_cv,
-        lw=4, alpha=0.8, label='Mean ROC AUC'
-    )
-    plt.fill_between(
-        x_axis,
-        [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-        [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
-    )
-    plt.plot(
-        x_axis,
-        mean_bcrs_cv,
-        lw=4, alpha=0.8, label='Mean BCR'
-    )
-    plt.fill_between(
-        x_axis,
-        [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-        [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-        color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
-    )
-    plt.legend(loc='lower right', fontsize='small')
-    plt.grid('on')
-    # plot svm c vs cv perf metrics
-    new_shape = (
-        len(grid_params['clf__C']),
-        np.prod([len(v) for k,v in grid_params.items() if k != 'clf__C'])
-    )
-    xaxis_group_sorted_idxs = np.argsort(
-        np.ma.getdata(grid.cv_results_['param_clf__C'])
-    )
-    mean_roc_aucs_cv = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-    std_roc_aucs_cv = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-    mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv, axis=1)
-    mean_roc_aucs_cv = mean_roc_aucs_cv[np.arange(len(mean_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
-    std_roc_aucs_cv = std_roc_aucs_cv[np.arange(len(std_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
-    mean_bcrs_cv = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-    std_bcrs_cv = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-    mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv, axis=1)
-    mean_bcrs_cv = mean_bcrs_cv[np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs]
-    std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
-    plt.figure(2)
-    plt.rcParams['font.size'] = 20
-    dataset_tr_name = args.dataset_tr.replace('gse', 'GSE')
-    if args.bc_meth:
-        dataset_tr_name = dataset_tr_name + ' ' + args.bc_meth
-    plt.title(
-        dataset_tr_name + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
-        'Effect of SVM C Hyperparameter on CV Performance Metrics'
-    )
-    plt.xlabel('SVM C')
-    plt.ylabel('CV Score')
-    x_axis = range(len(grid_params['clf__C']))
-    plt.xticks(x_axis, grid_params['clf__C'])
-    plt.plot(
-        x_axis,
-        mean_roc_aucs_cv,
-        lw=4, alpha=0.8, label='Mean ROC AUC'
-    )
-    plt.fill_between(
-        x_axis,
-        [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-        [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
-    )
-    plt.plot(
-        x_axis,
-        mean_bcrs_cv,
-        lw=4, alpha=0.8, label='Mean BCR'
-    )
-    plt.fill_between(
-        x_axis,
-        [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-        [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-        color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
-    )
-    plt.legend(loc='lower right', fontsize='small')
-    plt.grid('on')
+    if new_shape:
+        mean_roc_aucs_cv = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+        std_roc_aucs_cv = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+        mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv, axis=1)
+        mean_roc_aucs_cv = mean_roc_aucs_cv[np.arange(len(mean_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
+        std_roc_aucs_cv = std_roc_aucs_cv[np.arange(len(std_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
+        mean_bcrs_cv = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+        std_bcrs_cv = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+        mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv, axis=1)
+        mean_bcrs_cv = mean_bcrs_cv[np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs]
+        std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
+        plt.figure(1)
+        plt.rcParams['font.size'] = 20
+        if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
+            x_axis = grid_params['fsl__k']
+            plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+            plt.xticks(x_axis)
+            x_label = 'Number of Top-Ranked Features Selected'
+        elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE'):
+            x_axis = grid_params['fsl__n_features_to_select']
+            plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+            plt.xticks(x_axis)
+            x_label = 'Number of Top-Ranked Features Selected'
+        elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM'):
+            x_axis = range(len(grid_params['fsl__threshold']))
+            plt.xticks(x_axis, grid_params['fsl__threshold'])
+            x_label = 'SFM Threshold'
+        elif args.fs_meth in ('Limma-Fpr-CFS'):
+            x_axis = grange(len(grid_params['sfp__alpha']))
+            plt.xticks(x_axis, grid_params['sfp__alpha'])
+            x_label = 'Limma P-Value Threshold'
+        plt.title(
+            dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+            'Effect of ' + x_label + ' on CV Performance Metrics'
+        )
+        plt.xlabel(x_label)
+        plt.ylabel('CV Score')
+        plt.plot(
+            x_axis,
+            mean_roc_aucs_cv,
+            lw=4, alpha=0.8, label='Mean ROC AUC'
+        )
+        plt.fill_between(
+            x_axis,
+            [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+            [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+            color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+        )
+        plt.plot(
+            x_axis,
+            mean_bcrs_cv,
+            lw=4, alpha=0.8, label='Mean BCR'
+        )
+        plt.fill_between(
+            x_axis,
+            [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+            [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+            color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
+        )
+        plt.legend(loc='lower right', fontsize='small')
+        plt.grid('on')
+    # plot clf or rfe svm c vs cv perf metrics
+    new_shape = ()
+    if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE') and \
+        len(grid_params['fsl__estimator__C']) > 1:
+        new_shape = (
+            len(grid_params['fsl__estimator__C']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__estimator__C'])
+        )
+        xaxis_group_sorted_idxs = np.argsort(
+            np.ma.getdata(grid.cv_results_['param_fsl__estimator__C'])
+        )
+    elif len(grid_params['clf__C']) > 1:
+        new_shape = (
+            len(grid_params['clf__C']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'clf__C'])
+        )
+        xaxis_group_sorted_idxs = np.argsort(
+            np.ma.getdata(grid.cv_results_['param_clf__C'])
+        )
+    if new_shape:
+        mean_roc_aucs_cv = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+        std_roc_aucs_cv = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+        mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv, axis=1)
+        mean_roc_aucs_cv = mean_roc_aucs_cv[np.arange(len(mean_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
+        std_roc_aucs_cv = std_roc_aucs_cv[np.arange(len(std_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
+        mean_bcrs_cv = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+        std_bcrs_cv = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+        mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv, axis=1)
+        mean_bcrs_cv = mean_bcrs_cv[np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs]
+        std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
+        plt.figure(2)
+        plt.rcParams['font.size'] = 20
+        if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE'):
+            x_axis = range(len(grid_params['fsl__estimator__C']))
+            plt.xticks(x_axis, grid_params['fsl__estimator__C'])
+            x_label = 'SVM-RFE'
+        else:
+            x_axis = range(len(grid_params['clf__C']))
+            plt.xticks(x_axis, grid_params['clf__C'])
+            x_label = 'Classifier SVM'
+        plt.title(
+            dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+            'Effect of ' + x_label + ' C Hyperparameter on CV Performance Metrics'
+        )
+        plt.xlabel(x_label)
+        plt.ylabel('CV Score')
+        plt.plot(
+            x_axis,
+            mean_roc_aucs_cv,
+            lw=4, alpha=0.8, label='Mean ROC AUC'
+        )
+        plt.fill_between(
+            x_axis,
+            [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+            [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+            color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+        )
+        plt.plot(
+            x_axis,
+            mean_bcrs_cv,
+            lw=4, alpha=0.8, label='Mean BCR'
+        )
+        plt.fill_between(
+            x_axis,
+            [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+            [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+            color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
+        )
+        plt.legend(loc='lower right', fontsize='small')
+        plt.grid('on')
     # plot num top-ranked features selected vs test dataset perf metrics
-    plt.figure(3)
-    plt.rcParams['font.size'] = 20
-    dataset_tr_name = args.dataset_tr.replace('gse', 'GSE')
-    if args.bc_meth:
-        dataset_tr_name = dataset_tr_name + ' ' + args.bc_meth
-    plt.title(
-        dataset_tr_name + ' SVM Classifier (' + args.fs_meth + 'Feature Selection)\n' +
-        'Effect of Number of Top-Ranked Features Selected Performance Metrics'
-    )
-    plt.xlabel('Number of top-ranked features selected')
-    plt.ylabel('Test Score')
-    x_axis = range(1, feature_idxs.size + 1)
-    plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
-    plt.xticks(x_axis)
     dataset_te_names = []
     for dataset_tr_name, dataset_te_name in dataset_pair_names:
         if args.dataset_tr == dataset_tr_name:
@@ -500,6 +514,17 @@ if args.analysis == 1:
             break
         elif args.dataset_tr != dataset_te_name:
             dataset_te_names.append(dataset_te_name)
+    plt.figure(3)
+    plt.rcParams['font.size'] = 20
+    plt.title(
+        dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+        'Effect of Number of Top-Ranked Features Selected Performance Metrics'
+    )
+    plt.xlabel('Number of top-ranked features selected')
+    plt.ylabel('Test Score')
+    x_axis = range(1, feature_idxs.size + 1)
+    plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+    plt.xticks(x_axis)
     ranked_feature_idxs = [x for _, x, _, _ in feature_ranks]
     clf = Pipeline([
         ('slr', StandardScaler()),
