@@ -99,7 +99,7 @@ else:
 if args.fs_sfm_c:
     SFM_SVC_C = sorted(args.fs_sfm_c)
 else:
-    SFM_SVC_C = [ 1e-2, 1e-1, 1, 10, 10 ]
+    SFM_SVC_C = [ 1e-3, 1e-2, 1e-1, 1, 10, 100 ]
 if args.fs_sfm_thres:
     SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
 else:
@@ -548,6 +548,8 @@ if args.analysis == 1:
     plt.legend(loc='lower right', fontsize='small')
     plt.grid('on')
 elif args.analysis == 2:
+    if args.dataset_tr:
+        dataset_pair_names = [t for t in dataset_pair_names if t[0] == args.dataset_tr]
     te_results, bc_results = [], []
     for te_idx, (dataset_tr_name, dataset_te_name) in enumerate(dataset_pair_names):
         for bc_idx, bc_method in enumerate(bc_methods):
@@ -788,6 +790,8 @@ elif args.analysis == 2:
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
 elif args.analysis == 3:
+    if args.dataset_tr:
+        dataset_pair_names = [t for t in dataset_pair_names if t[0] == args.dataset_tr]
     te_results, fs_results = [], []
     for te_idx, (dataset_tr_name, dataset_te_name) in enumerate(dataset_pair_names):
         for fs_idx, fs_method in enumerate(fs_methods):
