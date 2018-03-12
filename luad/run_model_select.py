@@ -342,6 +342,7 @@ if args.analysis == 1:
     if args.bc_meth:
         dataset_tr_title = dataset_tr_title + '_' + args.bc_meth
     grid_params = pipelines[args.fs_meth]['param_grid'][0]
+    new_shape = ()
     if args.fs_meth in ('Limma-KBest', 'MI-KBest') and len(grid_params['fsl__k']) > 1:
         new_shape = (
             len(grid_params['fsl__k']),
