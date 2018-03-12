@@ -687,16 +687,6 @@ elif args.analysis == 2:
             bcrs_cv.append(result['bcr_cv'])
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
-        mean_roc_auc_cv = np.mean(roc_aucs_cv)
-        mean_roc_auc_te = np.mean(roc_aucs_te)
-        mean_bcr_cv = np.mean(bcrs_cv)
-        mean_bcr_te = np.mean(bcrs_te)
-        mean_num_features = np.mean(num_features)
-        std_roc_auc_cv = np.std(roc_aucs_cv)
-        std_roc_auc_te = np.std(roc_aucs_te)
-        std_bcr_cv = np.std(bcrs_cv)
-        std_bcr_te = np.std(bcrs_te)
-        std_num_features = np.std(num_features)
         dataset_tr_name, dataset_te_name = dataset_pair_names[te_idx]
         dataset_tr_name = dataset_tr_name.upper()
         dataset_te_name = dataset_te_name.upper()
@@ -711,9 +701,9 @@ elif args.analysis == 2:
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 dataset_te_name,
-                mean_roc_auc_cv, std_roc_auc_cv,
-                mean_roc_auc_te, std_roc_auc_te,
-                mean_num_features, std_num_features,
+                np.mean(roc_aucs_cv), np.std(roc_aucs_cv),
+                np.mean(roc_aucs_te), np.std(roc_aucs_te),
+                np.mean(num_features), np.std(num_features),
             )
         )
         plt.figure(5)
@@ -726,9 +716,9 @@ elif args.analysis == 2:
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 dataset_te_name,
-                mean_bcr_cv, std_bcr_cv,
-                mean_bcr_te, std_bcr_te,
-                mean_num_features, std_num_features,
+                np.mean(bcrs_cv), np.std(bcrs_cv),
+                np.mean(bcrs_te), np.std(bcrs_te),
+                np.mean(num_features), np.std(num_features),
             )
         )
     plt.figure(4)
@@ -767,16 +757,6 @@ elif args.analysis == 2:
             bcrs_cv.append(result['bcr_cv'])
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
-        mean_roc_auc_cv = np.mean(roc_aucs_cv)
-        mean_roc_auc_te = np.mean(roc_aucs_te)
-        mean_bcr_cv = np.mean(bcrs_cv)
-        mean_bcr_te = np.mean(bcrs_te)
-        mean_num_features = np.mean(num_features)
-        std_roc_auc_cv = np.std(roc_aucs_cv)
-        std_roc_auc_te = np.std(roc_aucs_te)
-        std_bcr_cv = np.std(bcrs_cv)
-        std_bcr_te = np.std(bcrs_te)
-        std_num_features = np.std(num_features)
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.figure(6)
         plt.plot(
@@ -788,9 +768,9 @@ elif args.analysis == 2:
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 bc_methods[bc_idx],
-                mean_roc_auc_cv, std_roc_auc_cv,
-                mean_roc_auc_te, std_roc_auc_te,
-                mean_num_features, std_num_features,
+                np.mean(roc_aucs_cv), np.std(roc_aucs_cv),
+                np.mean(roc_aucs_te), np.std(roc_aucs_te),
+                np.mean(num_features), np.std(num_features),
             )
         )
         plt.figure(7)
@@ -803,9 +783,9 @@ elif args.analysis == 2:
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 bc_methods[bc_idx],
-                mean_bcr_cv, std_bcr_cv,
-                mean_bcr_te, std_bcr_te,
-                mean_num_features, std_num_features,
+                np.mean(bcrs_cv), np.std(bcrs_cv),
+                np.mean(bcrs_te), np.std(bcrs_te),
+                np.mean(num_features), np.std(num_features),
             )
         )
     plt.figure(6)
@@ -929,16 +909,6 @@ elif args.analysis == 3:
             bcrs_cv.append(result['bcr_cv'])
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
-        mean_roc_auc_cv = np.mean(roc_aucs_cv)
-        mean_roc_auc_te = np.mean(roc_aucs_te)
-        mean_bcr_cv = np.mean(bcrs_cv)
-        mean_bcr_te = np.mean(bcrs_te)
-        mean_num_features = np.mean(num_features)
-        std_roc_auc_cv = np.std(roc_aucs_cv)
-        std_roc_auc_te = np.std(roc_aucs_te)
-        std_bcr_cv = np.std(bcrs_cv)
-        std_bcr_te = np.std(bcrs_te)
-        std_num_features = np.std(num_features)
         dataset_tr_name, dataset_te_name = dataset_pair_names[te_idx]
         dataset_tr_name = dataset_tr_name.upper()
         dataset_te_name = dataset_te_name.upper()
@@ -953,9 +923,9 @@ elif args.analysis == 3:
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 dataset_te_name,
-                mean_roc_auc_cv, std_roc_auc_cv,
-                mean_roc_auc_te, std_roc_auc_te,
-                mean_num_features, std_num_features,
+                np.mean(roc_aucs_cv), np.std(roc_aucs_cv),
+                np.mean(roc_aucs_te), np.std(roc_aucs_te),
+                np.mean(num_features), np.std(num_features),
             )
         )
         plt.figure(9)
@@ -968,9 +938,9 @@ elif args.analysis == 3:
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 dataset_te_name,
-                mean_bcr_cv, std_bcr_cv,
-                mean_bcr_te, std_bcr_te,
-                mean_num_features, std_num_features,
+                np.mean(bcrs_cv), np.std(bcrs_cv),
+                np.mean(bcrs_te), np.std(bcrs_te),
+                np.mean(num_features), np.std(num_features),
             )
         )
     plt.figure(8)
@@ -1009,16 +979,6 @@ elif args.analysis == 3:
             bcrs_cv.append(result['bcr_cv'])
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
-        mean_roc_auc_cv = np.mean(roc_aucs_cv)
-        mean_roc_auc_te = np.mean(roc_aucs_te)
-        mean_bcr_cv = np.mean(bcrs_cv)
-        mean_bcr_te = np.mean(bcrs_te)
-        mean_num_features = np.mean(num_features)
-        std_roc_auc_cv = np.std(roc_aucs_cv)
-        std_roc_auc_te = np.std(roc_aucs_te)
-        std_bcr_cv = np.std(bcrs_cv)
-        std_bcr_te = np.std(bcrs_te)
-        std_num_features = np.std(num_features)
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.figure(10)
         plt.plot(
@@ -1030,9 +990,9 @@ elif args.analysis == 3:
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 fs_methods[bc_idx],
-                mean_roc_auc_cv, std_roc_auc_cv,
-                mean_roc_auc_te, std_roc_auc_te,
-                mean_num_features, std_num_features,
+                np.mean(roc_aucs_cv), np.std(roc_aucs_cv),
+                np.mean(roc_aucs_te), np.std(roc_aucs_te),
+                np.mean(num_features), np.std(num_features),
             )
         )
         plt.figure(11)
@@ -1045,9 +1005,9 @@ elif args.analysis == 3:
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
                 fs_methods[bc_idx],
-                mean_bcr_cv, std_bcr_cv,
-                mean_bcr_te, std_bcr_te,
-                mean_num_features, std_num_features,
+                np.mean(bcrs_cv), np.std(bcrs_cv),
+                np.mean(bcrs_te), np.std(bcrs_te),
+                np.mean(num_features), np.std(num_features),
             )
         )
     plt.figure(10)
