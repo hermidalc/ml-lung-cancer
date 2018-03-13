@@ -105,11 +105,11 @@ else:
 if args.fs_sfm_c:
     SFM_SVC_C = sorted(args.fs_sfm_c)
 else:
-    SFM_SVC_C = [ 1e-3, 1e-2, 1e-1, 1, 10, 100 ]
+    SFM_SVC_C = [ 1e-2, 1e-1, 1, 10, 100 ]
 if args.fs_sfm_thres:
     SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
 else:
-    SFM_THRESHOLDS = [ 0.01, 0.02, 0.03, 0.04 ]
+    SFM_THRESHOLDS = [ 1e-8, 1e-7, 1e-6, 1e-5 ]
 if args.fs_num_select:
     SKB_N_FEATURES = sorted(args.fs_num_select)
 else:
@@ -126,26 +126,26 @@ else:
 pipelines = {
     'Limma-KBest': {
         'pipe_steps': [
-            ('fsl', SelectKBest(limma_cached)),
-            ('slr', StandardScaler()),
+            ('skb', SelectKBest(limma_cached)),
+            ('std', StandardScaler()),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
             {
-                'fsl__k': SKB_N_FEATURES,
+                'skb__k': SKB_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
     },
     'MI-KBest': {
         'pipe_steps': [
-            ('slr', StandardScaler()),
-            ('fsl', SelectKBest(mutual_info_classif_cached)),
+            ('std', StandardScaler()),
+            ('skb', SelectKBest(mutual_info_classif_cached)),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
             {
-                'fsl__k': SKB_N_FEATURES,
+                'skb__k': SKB_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -153,8 +153,8 @@ pipelines = {
     'Limma-Fpr-SVM-RFE': {
         'pipe_steps': [
             ('sfp', SelectFpr(limma_cached)),
-            ('slr', StandardScaler()),
-            ('fsl', RFE(
+            ('std', StandardScaler()),
+            ('rfe', RFE(
                 CachedLinearSVC(class_weight='balanced'),
                 step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
             )),
@@ -163,19 +163,19 @@ pipelines = {
         'param_grid': [
             {
                 'sfp__alpha': SFP_ALPHA,
-                'fsl__n_features_to_select': RFE_N_FEATURES,
-                'fsl__estimator__C': RFE_SVC_C,
+                'rfe__n_features_to_select': RFE_N_FEATURES,
+                'rfe__estimator__C': RFE_SVC_C,
                 'clf__C': CLF_SVC_C,
             },
         ],
     },
     'SVM-SFM-RFE': {
         'pipe_steps': [
-            ('slr', StandardScaler()),
+            ('std', StandardScaler()),
             ('sfm', SelectFromModel(
                 CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced'),
             )),
-            ('fsl', RFE(
+            ('rfe', RFE(
                 CachedLinearSVC(class_weight='balanced'),
                 step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
             )),
@@ -185,16 +185,16 @@ pipelines = {
             {
                 'sfm__threshold': SFM_THRESHOLDS,
                 'sfm__estimator__C': SFM_SVC_C,
-                'fsl__n_features_to_select': RFE_N_FEATURES,
-                'fsl__estimator__C': RFE_SVC_C,
+                'rfe__n_features_to_select': RFE_N_FEATURES,
+                'rfe__estimator__C': RFE_SVC_C,
                 'clf__C': CLF_SVC_C,
             },
         ],
     },
     'SVM-RFE': {
         'pipe_steps': [
-            ('slr', StandardScaler()),
-            ('fsl', RFE(
+            ('std', StandardScaler()),
+            ('rfe', RFE(
                 CachedLinearSVC(class_weight='balanced'),
                 step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
             )),
@@ -202,39 +202,39 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'fsl__n_features_to_select': RFE_N_FEATURES,
-                'fsl__estimator__C': RFE_SVC_C,
+                'rfe__n_features_to_select': RFE_N_FEATURES,
+                'rfe__estimator__C': RFE_SVC_C,
                 'clf__C': CLF_SVC_C,
             },
         ],
     },
     'SVM-SFM': {
         'pipe_steps': [
-            ('slr', StandardScaler()),
-            ('fsl', SelectFromModel(
+            ('std', StandardScaler()),
+            ('sfm', SelectFromModel(
                 CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
             )),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
             {
-                'fsl__threshold': SFM_THRESHOLDS,
-                'fsl__estimator__C': SFM_SVC_C,
+                'sfm__threshold': SFM_THRESHOLDS,
+                'sfm__estimator__C': SFM_SVC_C,
                 'clf__C': CLF_SVC_C,
             },
         ],
     },
     'ExtraTrees-SFM': {
         'pipe_steps': [
-            ('slr', StandardScaler()),
-            ('fsl', SelectFromModel(
+            ('std', StandardScaler()),
+            ('sfm', SelectFromModel(
                 ExtraTreesClassifier(),
             )),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
             {
-                'fsl__threshold': SFM_THRESHOLDS,
+                'sfm__threshold': SFM_THRESHOLDS,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -242,13 +242,27 @@ pipelines = {
     'Limma-Fpr-CFS': {
         'pipe_steps': [
             ('sfp', SelectFpr(limma_cached)),
-            ('slr', StandardScaler()),
-            ('fsl', CFS()),
+            ('std', StandardScaler()),
+            ('cfs', CFS()),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
             {
                 'sfp__alpha': SFP_ALPHA,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'Limma-KBest-CFS': {
+        'pipe_steps': [
+            ('skb', SelectKBest(limma_cached)),
+            ('std', StandardScaler()),
+            ('cfs', CFS()),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'skb__k': SKB_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -288,7 +302,8 @@ fs_methods = [
     #'SVM-RFE',
     #'SVM-SFM',
     #'ExtraTrees-SFM',
-    'Limma-Fpr-CFS',
+    #'Limma-Fpr-CFS',
+    #'Limma-KBest-CFS',
 ]
 
 # analyses
@@ -314,9 +329,12 @@ if args.analysis == 1:
     else:
         dump(grid, 'data/grid_' + args.dataset_tr + '_' + args.fs_meth.lower() + '.pkl')
     # print summary info
-    feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
-    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
-    feature_names = feature_names[feature_idxs]
+    feature_idxs = np.arange(X_tr.shape[1])
+    for step in grid.best_estimator_.named_steps:
+        if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
+            print(grid.best_estimator_.named_steps[step].get_support(indices=True))
+            feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
+    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
     coefs = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
     feature_ranks = sorted(
         zip(
@@ -343,30 +361,30 @@ if args.analysis == 1:
         dataset_tr_title = dataset_tr_title + '_' + args.bc_meth
     grid_params = pipelines[args.fs_meth]['param_grid'][0]
     new_shape = ()
-    if args.fs_meth in ('Limma-KBest', 'MI-KBest') and len(grid_params['fsl__k']) > 1:
+    if args.fs_meth in ('Limma-KBest', 'MI-KBest') and len(grid_params['skb__k']) > 1:
         new_shape = (
-            len(grid_params['fsl__k']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__k'])
+            len(grid_params['skb__k']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'skb__k'])
         )
         xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_fsl__k'])
+            np.ma.getdata(grid.cv_results_['param_skb__k'])
         )
     elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE') and \
-        len(grid_params['fsl__n_features_to_select']) > 1:
+        len(grid_params['rfe__n_features_to_select']) > 1:
         new_shape = (
-            len(grid_params['fsl__n_features_to_select']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__n_features_to_select'])
+            len(grid_params['rfe__n_features_to_select']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'rfe__n_features_to_select'])
         )
         xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_fsl__n_features_to_select'])
+            np.ma.getdata(grid.cv_results_['param_rfe__n_features_to_select'])
         )
-    elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM') and len(grid_params['fsl__threshold']) > 1:
+    elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM') and len(grid_params['sfm__threshold']) > 1:
         new_shape = (
-            len(grid_params['fsl__threshold']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__threshold'])
+            len(grid_params['sfm__threshold']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'sfm__threshold'])
         )
         xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_fsl__threshold']).astype(str)
+            np.ma.getdata(grid.cv_results_['param_sfm__threshold']).astype(str)
         )
     elif args.fs_meth in ('Limma-Fpr-CFS') and len(grid_params['sfp__alpha']) > 1:
         new_shape = (
@@ -375,6 +393,14 @@ if args.analysis == 1:
         )
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_sfp__alpha'])
+        )
+    elif args.fs_meth in ('Limma-KBest-CFS') and len(grid_params['skb__k']) > 1:
+        new_shape = (
+            len(grid_params['skb__k']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'skb__k'])
+        )
+        xaxis_group_sorted_idxs = np.argsort(
+            np.ma.getdata(grid.cv_results_['param_skb__k'])
         )
     if new_shape:
         mean_roc_aucs_cv = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
@@ -390,23 +416,27 @@ if args.analysis == 1:
         plt.figure(1)
         plt.rcParams['font.size'] = 20
         if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
-            x_axis = grid_params['fsl__k']
+            x_axis = grid_params['skb__k']
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
             x_label = 'Number of Top-Ranked Features Selected'
         elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE'):
-            x_axis = grid_params['fsl__n_features_to_select']
+            x_axis = grid_params['rfe__n_features_to_select']
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
             x_label = 'Number of Top-Ranked Features Selected'
         elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM'):
-            x_axis = range(len(grid_params['fsl__threshold']))
-            plt.xticks(x_axis, grid_params['fsl__threshold'])
+            x_axis = range(len(grid_params['sfm__threshold']))
+            plt.xticks(x_axis, grid_params['sfm__threshold'])
             x_label = 'SFM Threshold'
         elif args.fs_meth in ('Limma-Fpr-CFS'):
             x_axis = grange(len(grid_params['sfp__alpha']))
             plt.xticks(x_axis, grid_params['sfp__alpha'])
             x_label = 'Limma P-Value Threshold'
+        elif args.fs_meth in ('Limma-KBest-CFS'):
+            x_axis = grange(len(grid_params['skb__k']))
+            plt.xticks(x_axis, grid_params['skb__k'])
+            x_label = 'Limma K-Best Features Filtered'
         plt.title(
             dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
             'Effect of ' + x_label + ' on CV Performance Metrics'
@@ -440,13 +470,13 @@ if args.analysis == 1:
     # plot clf or rfe svm c vs cv perf metrics
     new_shape = ()
     if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE') and \
-        len(grid_params['fsl__estimator__C']) > 1:
+        len(grid_params['rfe__estimator__C']) > 1:
         new_shape = (
-            len(grid_params['fsl__estimator__C']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'fsl__estimator__C'])
+            len(grid_params['rfe__estimator__C']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'rfe__estimator__C'])
         )
         xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_fsl__estimator__C'])
+            np.ma.getdata(grid.cv_results_['param_rfe__estimator__C'])
         )
     elif len(grid_params['clf__C']) > 1:
         new_shape = (
@@ -470,8 +500,8 @@ if args.analysis == 1:
         plt.figure(2)
         plt.rcParams['font.size'] = 20
         if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE'):
-            x_axis = range(len(grid_params['fsl__estimator__C']))
-            plt.xticks(x_axis, grid_params['fsl__estimator__C'])
+            x_axis = range(len(grid_params['rfe__estimator__C']))
+            plt.xticks(x_axis, grid_params['rfe__estimator__C'])
             x_label = 'SVM-RFE'
         else:
             x_axis = range(len(grid_params['clf__C']))
@@ -528,7 +558,7 @@ if args.analysis == 1:
     plt.xticks(x_axis)
     ranked_feature_idxs = [x for _, x, _, _ in feature_ranks]
     clf = Pipeline([
-        ('slr', StandardScaler()),
+        ('std', StandardScaler()),
         ('clf', LinearSVC(
             class_weight='balanced', C=grid.best_params_['clf__C'],
         )),
@@ -601,9 +631,12 @@ elif args.analysis == 2:
                 dump(grid, 'data/grid_' + dataset_tr_name + '_' + bc_method + '_' + args.fs_meth.lower() + '.pkl')
             else:
                 dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
-            feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
-            feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
-            feature_names = feature_names[feature_idxs]
+            feature_idxs = np.arange(X_tr.shape[1])
+            for step in grid.best_estimator_.named_steps:
+                if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
+                    print(grid.best_estimator_.named_steps[step].get_support(indices=True))
+                    feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
+            feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
             coefs = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
             roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
             bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
@@ -665,7 +698,7 @@ elif args.analysis == 2:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on ROC AUC\n' +
-        '(' + args.fs_meth + ' Feature Selection Best Scoring Selected Features)'
+        '(' + args.fs_meth + ' Feature Selection)'
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
@@ -674,7 +707,7 @@ elif args.analysis == 2:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on BCR\n' +
-        '(' + args.fs_meth + ' Feature Selection Best Scoring Selected Features)'
+        '(' + args.fs_meth + ' Feature Selection)'
     )
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('BCR')
@@ -735,7 +768,7 @@ elif args.analysis == 2:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Train/Held-Out Test Dataset on ROC AUC\n' +
-        '(' + args.fs_meth + ' Feature Selection Best Scoring Selected Features)'
+        '(' + args.fs_meth + ' Feature Selection)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
@@ -744,7 +777,7 @@ elif args.analysis == 2:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Train/Held-Out Test Dataset on BCR\n' +
-        '(' + args.fs_meth + ' Feature Selection Best Scoring Selected Features)'
+        '(' + args.fs_meth + ' Feature Selection)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('BCR')
@@ -823,9 +856,12 @@ elif args.analysis == 3:
                 dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + fs_method.lower() + '.pkl')
             else:
                 dump(grid, 'data/grid_' + dataset_tr_name + '_' + fs_method.lower() + '.pkl')
-            feature_idxs = grid.best_estimator_.named_steps['fsl'].get_support(indices=True)
-            feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)
-            feature_names = feature_names[feature_idxs]
+            feature_idxs = np.arange(X_tr.shape[1])
+            for step in grid.best_estimator_.named_steps:
+                if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
+                    print(grid.best_estimator_.named_steps[step].get_support(indices=True))
+                    feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
+            feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
             coefs = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
             roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
             bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
@@ -887,7 +923,7 @@ elif args.analysis == 3:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Feature Selection Method on ROC AUC\n' +
-        '(' + args.bc_meth + ' Batch Effect Correction Best Scoring Selected Features)'
+        '(' + args.bc_meth + ' Batch Effect Correction)'
     )
     plt.xlabel('Feature Selection Method')
     plt.ylabel('ROC AUC')
@@ -896,7 +932,7 @@ elif args.analysis == 3:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Feature Selection Method on BCR\n' +
-        '(' + args.bc_meth + ' Batch Effect Correction Best Scoring Selected Features)'
+        '(' + args.bc_meth + ' Batch Effect Correction)'
     )
     plt.xlabel('Feature Selection Method')
     plt.ylabel('BCR')
@@ -957,7 +993,7 @@ elif args.analysis == 3:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on ROC AUC\n' +
-        '(' + args.bc_meth + ' Batch Effect Correction Best Scoring Selected Features)'
+        '(' + args.bc_meth + ' Batch Effect Correction)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
@@ -966,7 +1002,7 @@ elif args.analysis == 3:
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on BCR\n' +
-        '(' + args.bc_meth + ' Batch Effect Correction Best Scoring Selected Features)'
+        '(' + args.bc_meth + ' Batch Effect Correction)'
     )
     plt.xlabel('Test Dataset')
     plt.ylabel('BCR')
