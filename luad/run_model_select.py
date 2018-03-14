@@ -101,7 +101,7 @@ else:
 if args.fs_rfe_c:
     RFE_SVC_C = sorted(args.fs_rfe_c)
 else:
-    RFE_SVC_C = [ 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100, 1000 ]
+    RFE_SVC_C = [ 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100 ]
 if args.fs_sfm_c:
     SFM_SVC_C = sorted(args.fs_sfm_c)
 else:
@@ -183,6 +183,27 @@ pipelines = {
             {
                 'sfm__threshold': SFM_THRESHOLDS,
                 'sfm__estimator__C': SFM_SVC_C,
+                'rfe__n_features_to_select': RFE_N_FEATURES,
+                'rfe__estimator__C': RFE_SVC_C,
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'ExtraTrees-SFM-RFE': {
+        'pipe_steps': [
+            ('std', StandardScaler()),
+            ('sfm', SelectFromModel(
+                ExtraTreesClassifier(),
+            )),
+            ('rfe', RFE(
+                CachedLinearSVC(class_weight='balanced'),
+                step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
+            )),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'sfm__threshold': SFM_THRESHOLDS,
                 'rfe__n_features_to_select': RFE_N_FEATURES,
                 'rfe__estimator__C': RFE_SVC_C,
                 'clf__C': CLF_SVC_C,
@@ -294,9 +315,10 @@ bc_methods = [
 ]
 fs_methods = [
     'Limma-KBest',
-    'MI-KBest',
+    #'MI-KBest',
     'Limma-Fpr-SVM-RFE',
     'SVM-SFM-RFE',
+    'ExtraTrees-SFM-RFE',
     #'SVM-RFE',
     #'SFM-SVM',
     #'ExtraTrees-SFM',
@@ -366,7 +388,7 @@ if args.analysis == 1:
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_skb__k'])
         )
-    elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE') and \
+    elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'ExtraTrees-SFM-RFE', 'SVM-RFE') and \
         len(grid_params['rfe__n_features_to_select']) > 1:
         new_shape = (
             len(grid_params['rfe__n_features_to_select']),
@@ -425,7 +447,7 @@ if args.analysis == 1:
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
             x_label = 'Number of Top-Ranked Features Selected'
-        elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE'):
+        elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'ExtraTrees-SFM-RFE', 'SVM-RFE'):
             x_axis = grid_params['rfe__n_features_to_select']
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
@@ -478,7 +500,7 @@ if args.analysis == 1:
         plt.grid('on')
     # plot clf or rfe svm c vs cv perf metrics
     new_shape = ()
-    if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE') and \
+    if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'ExtraTrees-SFM-RFE', 'SVM-RFE') and \
         len(grid_params['rfe__estimator__C']) > 1:
         new_shape = (
             len(grid_params['rfe__estimator__C']),
@@ -508,17 +530,17 @@ if args.analysis == 1:
         std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
         plt.figure(2)
         plt.rcParams['font.size'] = 20
-        if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'SVM-RFE'):
+        if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'ExtraTrees-SFM-RFE', 'SVM-RFE'):
             x_axis = range(len(grid_params['rfe__estimator__C']))
             plt.xticks(x_axis, grid_params['rfe__estimator__C'])
-            x_label = 'SVM-RFE'
+            x_label = 'SVM-RFE C'
         else:
             x_axis = range(len(grid_params['clf__C']))
             plt.xticks(x_axis, grid_params['clf__C'])
-            x_label = 'Classifier SVM'
+            x_label = 'Classifier SVM C'
         plt.title(
             dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
-            'Effect of ' + x_label + ' C Hyperparameter on CV Performance Metrics'
+            'Effect of ' + x_label + ' Hyperparameter on CV Performance Metrics'
         )
         plt.xlabel(x_label)
         plt.ylabel('CV Score')
@@ -1033,7 +1055,7 @@ elif args.analysis == 3:
             plt_fig_x_axis, roc_aucs_te,
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
-                fs_methods[bc_idx],
+                fs_methods[fs_idx],
                 np.mean(roc_aucs_cv), np.std(roc_aucs_cv),
                 np.mean(roc_aucs_te), np.std(roc_aucs_te),
                 np.mean(num_features), np.std(num_features),
@@ -1048,7 +1070,7 @@ elif args.analysis == 3:
             plt_fig_x_axis, bcrs_te,
             lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
             label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
-                fs_methods[bc_idx],
+                fs_methods[fs_idx],
                 np.mean(bcrs_cv), np.std(bcrs_cv),
                 np.mean(bcrs_te), np.std(bcrs_te),
                 np.mean(num_features), np.std(num_features),
