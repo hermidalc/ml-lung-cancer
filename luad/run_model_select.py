@@ -109,19 +109,17 @@ else:
 if args.fs_sfm_thres:
     SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
 else:
-    SFM_THRESHOLDS = [ 1e-8, 1e-7, 1e-6, 1e-5 ]
+    SFM_THRESHOLDS = [ 1e-9, 1e-8, 1e-7, 1e-6, 1e-5 ]
 if args.fs_num_select:
     SKB_N_FEATURES = sorted(args.fs_num_select)
-else:
-    SKB_N_FEATURES = list(range(1, args.fs_num_max + 1))
-if args.fs_num_select:
     RFE_N_FEATURES = sorted(args.fs_num_select)
 else:
+    SKB_N_FEATURES = list(range(1, args.fs_num_max + 1))
     RFE_N_FEATURES = list(range(1, args.fs_num_max + 1))
 if args.fs_fpr_pval:
     SFP_ALPHA = sorted(args.fs_fpr_pval)
 else:
-    SFP_ALPHA = [ 0.001, 0.01 ]
+    SFP_ALPHA = [ 1e-3, 1e-2 ]
 
 pipelines = {
     'Limma-KBest': {
@@ -298,9 +296,9 @@ fs_methods = [
     'Limma-KBest',
     'MI-KBest',
     'Limma-Fpr-SVM-RFE',
-    #'SVM-SFM-RFE',
+    'SVM-SFM-RFE',
     #'SVM-RFE',
-    #'SVM-SFM',
+    #'SFM-SVM',
     #'ExtraTrees-SFM',
     #'Limma-Fpr-CFS',
     #'Limma-KBest-CFS',
@@ -332,7 +330,6 @@ if args.analysis == 1:
     feature_idxs = np.arange(X_tr.shape[1])
     for step in grid.best_estimator_.named_steps:
         if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
-            print(grid.best_estimator_.named_steps[step].get_support(indices=True))
             feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
     coefs = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
@@ -378,7 +375,15 @@ if args.analysis == 1:
         xaxis_group_sorted_idxs = np.argsort(
             np.ma.getdata(grid.cv_results_['param_rfe__n_features_to_select'])
         )
-    elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM') and len(grid_params['sfm__threshold']) > 1:
+    elif args.fs_meth in ('SVM-SFM') and len(grid_params['sfm__estimator__C']) > 1:
+        new_shape = (
+            len(grid_params['sfm__estimator__C']),
+            np.prod([len(v) for k,v in grid_params.items() if k != 'sfm__estimator__C'])
+        )
+        xaxis_group_sorted_idxs = np.argsort(
+            np.ma.getdata(grid.cv_results_['param_sfm__estimator__C'])
+        )
+    elif args.fs_meth in ('ExtraTrees-SFM') and len(grid_params['sfm__threshold']) > 1:
         new_shape = (
             len(grid_params['sfm__threshold']),
             np.prod([len(v) for k,v in grid_params.items() if k != 'sfm__threshold'])
@@ -425,7 +430,11 @@ if args.analysis == 1:
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
             x_label = 'Number of Top-Ranked Features Selected'
-        elif args.fs_meth in ('SVM-SFM', 'ExtraTrees-SFM'):
+        elif args.fs_meth in ('SVM-SFM'):
+            x_axis = range(len(grid_params['sfm__estimator__C']))
+            plt.xticks(x_axis, grid_params['sfm__estimator__C'])
+            x_label = 'SFM SVM C'
+        elif args.fs_meth in ('ExtraTrees-SFM'):
             x_axis = range(len(grid_params['sfm__threshold']))
             plt.xticks(x_axis, grid_params['sfm__threshold'])
             x_label = 'SFM Threshold'
@@ -634,7 +643,6 @@ elif args.analysis == 2:
             feature_idxs = np.arange(X_tr.shape[1])
             for step in grid.best_estimator_.named_steps:
                 if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
-                    print(grid.best_estimator_.named_steps[step].get_support(indices=True))
                     feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
             feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
             coefs = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
@@ -859,7 +867,6 @@ elif args.analysis == 3:
             feature_idxs = np.arange(X_tr.shape[1])
             for step in grid.best_estimator_.named_steps:
                 if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
-                    print(grid.best_estimator_.named_steps[step].get_support(indices=True))
                     feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
             feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
             coefs = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
