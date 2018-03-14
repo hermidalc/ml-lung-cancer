@@ -42,7 +42,7 @@ parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
-parser.add_argument('--gscv-pipe-mem', type=bool, default=True, help='gscv pipeline memory')
+parser.add_argument('--gscv-no-memory', default=False, action='store_true', help='gscv no pipeline memory')
 parser.add_argument('--dataset-tr', type=str, help='dataset tr')
 args = parser.parse_args()
 
@@ -54,11 +54,11 @@ r_filter_eset_relapse_labels = robjects.globalenv['filterEsetRelapseLabels']
 r_get_gene_symbols = robjects.globalenv['getGeneSymbols']
 r_limma = robjects.globalenv['limma']
 numpy2ri.activate()
-if args.gscv_pipe_mem:
+if args.gscv_no_memory:
+    memory = None
+else:
     cachedir = mkdtemp()
     memory = Memory(cachedir=cachedir, verbose=0)
-else:
-    memory = None
 
 # custom mixin and class for caching pipeline nested LinearSVC fits
 class CachedFitMixin:
@@ -93,16 +93,16 @@ def bcr_score(y_true, y_pred):
         return (tp / mes1 + tn / mes2) / 2
 
 # config
-if args.gscv_pipe_mem:
-    limma_score_func = memory.cache(limma)
-    mi_score_func = memory.cache(mutual_info_classif)
-    rfe_svm_estimator = CachedLinearSVC(class_weight='balanced')
-    sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
-else:
+if args.gscv_no_memory:
     limma_score_func = limma
     mi_score_func = mutual_info_classif
     rfe_svm_estimator = LinearSVC(class_weight='balanced')
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, class_weight='balanced')
+else:
+    limma_score_func = memory.cache(limma)
+    mi_score_func = memory.cache(mutual_info_classif)
+    rfe_svm_estimator = CachedLinearSVC(class_weight='balanced')
+    sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
 
 gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
@@ -307,7 +307,7 @@ bc_methods = [
 ]
 fs_methods = [
     'Limma-KBest',
-    #'MI-KBest',
+    'MI-KBest',
     'Limma-Fpr-SVM-RFE',
     'SVM-SFM-RFE',
     'ExtraTrees-SFM-RFE',
@@ -1076,5 +1076,4 @@ elif args.analysis == 3:
     plt.grid('on')
 
 plt.show()
-if args.gscv_pipe_mem:
-    rmtree(cachedir)
+if not args.gscv_no_memory: rmtree(cachedir)
