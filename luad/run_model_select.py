@@ -42,6 +42,7 @@ parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
+parser.add_argument('--gscv-pipe-mem', type=bool, default=True, help='gscv pipeline memory')
 parser.add_argument('--dataset-tr', type=str, help='dataset tr')
 args = parser.parse_args()
 
@@ -53,8 +54,11 @@ r_filter_eset_relapse_labels = robjects.globalenv['filterEsetRelapseLabels']
 r_get_gene_symbols = robjects.globalenv['getGeneSymbols']
 r_limma = robjects.globalenv['limma']
 numpy2ri.activate()
-cachedir = mkdtemp()
-memory = Memory(cachedir=cachedir, verbose=0)
+if args.gscv_pipe_mem:
+    cachedir = mkdtemp()
+    memory = Memory(cachedir=cachedir, verbose=0)
+else:
+    memory = None
 
 # custom mixin and class for caching pipeline nested LinearSVC fits
 class CachedFitMixin:
@@ -89,10 +93,18 @@ def bcr_score(y_true, y_pred):
         return (tp / mes1 + tn / mes2) / 2
 
 # config
-limma_cached = memory.cache(limma)
-mutual_info_classif_cached = memory.cache(mutual_info_classif)
-gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
+if args.gscv_pipe_mem:
+    limma_score_func = memory.cache(limma)
+    mi_score_func = memory.cache(mutual_info_classif)
+    rfe_svm_estimator = CachedLinearSVC(class_weight='balanced')
+    sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
+else:
+    limma_score_func = limma
+    mi_score_func = mutual_info_classif
+    rfe_svm_estimator = LinearSVC(class_weight='balanced')
+    sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, class_weight='balanced')
 
+gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 if args.clf_svm_c:
     CLF_SVC_C = sorted(args.clf_svm_c)
@@ -124,7 +136,7 @@ else:
 pipelines = {
     'Limma-KBest': {
         'pipe_steps': [
-            ('skb', SelectKBest(limma_cached)),
+            ('skb', SelectKBest(limma_score_func)),
             ('std', StandardScaler()),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
@@ -138,7 +150,7 @@ pipelines = {
     'MI-KBest': {
         'pipe_steps': [
             ('std', StandardScaler()),
-            ('skb', SelectKBest(mutual_info_classif_cached)),
+            ('skb', SelectKBest(mi_score_func)),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
@@ -150,12 +162,9 @@ pipelines = {
     },
     'Limma-Fpr-SVM-RFE': {
         'pipe_steps': [
-            ('sfp', SelectFpr(limma_cached)),
+            ('sfp', SelectFpr(limma_score_func)),
             ('std', StandardScaler()),
-            ('rfe', RFE(
-                CachedLinearSVC(class_weight='balanced'),
-                step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
-            )),
+            ('rfe', RFE(rfe_svm_estimator, step=args.fs_rfe_step, verbose=args.fs_rfe_verbose)),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
@@ -170,13 +179,8 @@ pipelines = {
     'SVM-SFM-RFE': {
         'pipe_steps': [
             ('std', StandardScaler()),
-            ('sfm', SelectFromModel(
-                CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced'),
-            )),
-            ('rfe', RFE(
-                CachedLinearSVC(class_weight='balanced'),
-                step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
-            )),
+            ('sfm', SelectFromModel(sfm_svm_estimator)),
+            ('rfe', RFE(rfe_svm_estimator, step=args.fs_rfe_step, verbose=args.fs_rfe_verbose)),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
@@ -192,13 +196,8 @@ pipelines = {
     'ExtraTrees-SFM-RFE': {
         'pipe_steps': [
             ('std', StandardScaler()),
-            ('sfm', SelectFromModel(
-                ExtraTreesClassifier(),
-            )),
-            ('rfe', RFE(
-                CachedLinearSVC(class_weight='balanced'),
-                step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
-            )),
+            ('sfm', SelectFromModel(ExtraTreesClassifier())),
+            ('rfe', RFE(rfe_svm_estimator, step=args.fs_rfe_step, verbose=args.fs_rfe_verbose)),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
@@ -213,10 +212,7 @@ pipelines = {
     'SVM-RFE': {
         'pipe_steps': [
             ('std', StandardScaler()),
-            ('rfe', RFE(
-                CachedLinearSVC(class_weight='balanced'),
-                step=args.fs_rfe_step, verbose=args.fs_rfe_verbose,
-            )),
+            ('rfe', RFE(rfe_svm_estimator, step=args.fs_rfe_step, verbose=args.fs_rfe_verbose)),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
@@ -230,9 +226,7 @@ pipelines = {
     'SVM-SFM': {
         'pipe_steps': [
             ('std', StandardScaler()),
-            ('sfm', SelectFromModel(
-                CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
-            )),
+            ('sfm', SelectFromModel(sfm_svm_estimator)),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
@@ -246,9 +240,7 @@ pipelines = {
     'ExtraTrees-SFM': {
         'pipe_steps': [
             ('std', StandardScaler()),
-            ('sfm', SelectFromModel(
-                ExtraTreesClassifier(),
-            )),
+            ('sfm', SelectFromModel(ExtraTreesClassifier())),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
@@ -260,7 +252,7 @@ pipelines = {
     },
     'Limma-Fpr-CFS': {
         'pipe_steps': [
-            ('sfp', SelectFpr(limma_cached)),
+            ('sfp', SelectFpr(limma_score_func)),
             ('std', StandardScaler()),
             ('cfs', CFS()),
             ('clf', LinearSVC(class_weight='balanced')),
@@ -274,7 +266,7 @@ pipelines = {
     },
     'Limma-KBest-CFS': {
         'pipe_steps': [
-            ('skb', SelectKBest(limma_cached)),
+            ('skb', SelectKBest(limma_score_func)),
             ('std', StandardScaler()),
             ('cfs', CFS()),
             ('clf', LinearSVC(class_weight='balanced')),
@@ -288,13 +280,13 @@ pipelines = {
     },
 }
 dataset_pair_names = [
-    # ('gse31210_gse30219', 'gse8894'),
-    # ('gse31210_gse8894', 'gse30219'),
-    # ('gse8894_gse30219', 'gse31210'),
-    ('gse31210_gse30219_gse37745', 'gse8894'),
-    ('gse31210_gse8894_gse37745', 'gse30219'),
-    ('gse8894_gse30219_gse37745', 'gse31210'),
-    ('gse31210_gse8894_gse30219', 'gse37745'),
+    ('gse31210_gse30219', 'gse8894'),
+    ('gse31210_gse8894', 'gse30219'),
+    ('gse8894_gse30219', 'gse31210'),
+    # ('gse31210_gse30219_gse37745', 'gse8894'),
+    # ('gse31210_gse8894_gse37745', 'gse30219'),
+    # ('gse8894_gse30219_gse37745', 'gse31210'),
+    # ('gse31210_gse8894_gse30219', 'gse37745'),
     # ('gse31210_gse8894_gse30219_gse37745', 'gse50081'),
     # ('gse31210_gse8894_gse30219_gse50081', 'gse37745'),
     # ('gse31210_gse8894_gse37745_gse50081', 'gse30219'),
@@ -1084,4 +1076,5 @@ elif args.analysis == 3:
     plt.grid('on')
 
 plt.show()
-rmtree(cachedir)
+if args.gscv_pipe_mem:
+    rmtree(cachedir)
