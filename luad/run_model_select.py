@@ -27,17 +27,19 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, help='feature selection method')
-parser.add_argument('--fs-num-max', type=int, default=30, help='fs num max')
-parser.add_argument('--fs-num-select', type=int, nargs="+", help='fs num select')
-parser.add_argument('--fs-fpr-pval', type=float, nargs="+", help='fs fpr p-value')
+parser.add_argument('--fs-skb-k', type=int, nargs="+", help='fs skb k')
+parser.add_argument('--fs-skb-max', type=int, default=30, help='fs skb k max')
+parser.add_argument('--fs-fpr-p', type=float, nargs="+", help='fs fpr p-value')
 parser.add_argument('--fs-sfm-thres', type=float, nargs="+", help='fs sfm threshold')
 parser.add_argument('--fs-sfm-c', type=float, nargs="+", help='fs sfm c')
+parser.add_argument('--fs-rfe-n', type=int, nargs="+", help='fs rfe n')
+parser.add_argument('--fs-rfe-max', type=int, default=30, help='fs rfe n max')
 parser.add_argument('--fs-rfe-c', type=float, nargs="+", help='fs rfe c')
 parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='fs rank method (mean_coefs or mean_roc_aucs)')
 parser.add_argument('--clf-svm-c', type=float, nargs="+", help='clf svm c')
-parser.add_argument('--gscv-splits', type=int, default=32, help='gscv splits')
+parser.add_argument('--gscv-splits', type=int, default=40, help='gscv splits')
 parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
@@ -122,14 +124,16 @@ if args.fs_sfm_thres:
     SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
 else:
     SFM_THRESHOLDS = [ 1e-9, 1e-8, 1e-7, 1e-6, 1e-5 ]
-if args.fs_num_select:
-    SKB_N_FEATURES = sorted(args.fs_num_select)
-    RFE_N_FEATURES = sorted(args.fs_num_select)
+if args.fs_skb_k:
+    SKB_N_FEATURES = sorted(args.fs_skb_k)
 else:
-    SKB_N_FEATURES = list(range(1, args.fs_num_max + 1))
-    RFE_N_FEATURES = list(range(1, args.fs_num_max + 1))
-if args.fs_fpr_pval:
-    SFP_ALPHA = sorted(args.fs_fpr_pval)
+    SKB_N_FEATURES = list(range(1, args.fs_skb_max + 1))
+if args.fs_rfe_n:
+    RFE_N_FEATURES = sorted(args.fs_rfe_n)
+else:
+    RFE_N_FEATURES = list(range(1, args.fs_rfe_max + 1))
+if args.fs_fpr_p:
+    SFP_ALPHA = sorted(args.fs_fpr_p)
 else:
     SFP_ALPHA = [ 1e-3, 1e-2 ]
 
@@ -280,13 +284,13 @@ pipelines = {
     },
 }
 dataset_pair_names = [
-    ('gse31210_gse30219', 'gse8894'),
-    ('gse31210_gse8894', 'gse30219'),
-    ('gse8894_gse30219', 'gse31210'),
-    # ('gse31210_gse30219_gse37745', 'gse8894'),
-    # ('gse31210_gse8894_gse37745', 'gse30219'),
-    # ('gse8894_gse30219_gse37745', 'gse31210'),
-    # ('gse31210_gse8894_gse30219', 'gse37745'),
+    # ('gse31210_gse30219', 'gse8894'),
+    # ('gse31210_gse8894', 'gse30219'),
+    # ('gse8894_gse30219', 'gse31210'),
+    ('gse31210_gse30219_gse37745', 'gse8894'),
+    ('gse31210_gse8894_gse37745', 'gse30219'),
+    ('gse8894_gse30219_gse37745', 'gse31210'),
+    ('gse31210_gse8894_gse30219', 'gse37745'),
     # ('gse31210_gse8894_gse30219_gse37745', 'gse50081'),
     # ('gse31210_gse8894_gse30219_gse50081', 'gse37745'),
     # ('gse31210_gse8894_gse37745_gse50081', 'gse30219'),
@@ -312,7 +316,7 @@ fs_methods = [
     'SVM-SFM-RFE',
     'ExtraTrees-SFM-RFE',
     #'SVM-RFE',
-    #'SFM-SVM',
+    #'SVM-SFM',
     #'ExtraTrees-SFM',
     #'Limma-Fpr-CFS',
     #'Limma-KBest-CFS',
