@@ -615,7 +615,7 @@ elif args.analysis == 2:
             ): print(feature, '\t', symbol, '\t', rank)
     # plot bc method vs train/test scores
     plt_fig_x_axis = range(1, len(bc_methods) + 1)
-    plt.figure(3)
+    plt.figure('Figure 3-1')
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on ROC AUC\n' +
@@ -624,7 +624,7 @@ elif args.analysis == 2:
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, bc_methods)
-    plt.figure(4)
+    plt.figure('Figure 3-2')
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on BCR\n' +
@@ -646,7 +646,7 @@ elif args.analysis == 2:
         dataset_tr_name = dataset_tr_name.upper()
         dataset_te_name = dataset_te_name.upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure(3)
+        plt.figure('Figure 3-1')
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -661,7 +661,7 @@ elif args.analysis == 2:
                 np.mean(num_features), np.std(num_features),
             )
         )
-        plt.figure(4)
+        plt.figure('Figure 3-2')
         plt.plot(
             plt_fig_x_axis, bcrs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -676,16 +676,16 @@ elif args.analysis == 2:
                 np.mean(num_features), np.std(num_features),
             )
         )
-    plt.figure(3)
+    plt.figure('Figure 3-1')
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    plt.figure(4)
+    plt.figure('Figure 3-2')
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
     # plot train/test dataset vs bc method
     dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
     plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
-    plt.figure(5)
+    plt.figure('Figure 4-1')
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Train/Held-Out Test Dataset on ROC AUC\n' +
@@ -694,7 +694,7 @@ elif args.analysis == 2:
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, dataset_te_names)
-    plt.figure(6)
+    plt.figure('Figure 4-2')
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Train/Held-Out Test Dataset on BCR\n' +
@@ -713,7 +713,7 @@ elif args.analysis == 2:
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure(5)
+        plt.figure('Figure 4-1')
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -728,7 +728,7 @@ elif args.analysis == 2:
                 np.mean(num_features), np.std(num_features),
             )
         )
-        plt.figure(6)
+        plt.figure('Figure 4-2')
         plt.plot(
             plt_fig_x_axis, bcrs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -743,10 +743,10 @@ elif args.analysis == 2:
                 np.mean(num_features), np.std(num_features),
             )
         )
-    plt.figure(5)
+    plt.figure('Figure 4-1')
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    plt.figure(6)
+    plt.figure('Figure 4-2')
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
 elif args.analysis == 3:
@@ -839,7 +839,7 @@ elif args.analysis == 3:
             ): print(feature, '\t', symbol, '\t', rank)
     # plot fs method vs train/test dataset
     plt_fig_x_axis = range(1, len(fs_methods) + 1)
-    plt.figure(7)
+    plt.figure('Figure 5-1')
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Feature Selection Method on ROC AUC\n' +
@@ -848,7 +848,7 @@ elif args.analysis == 3:
     plt.xlabel('Feature Selection Method')
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, fs_methods)
-    plt.figure(8)
+    plt.figure('Figure 5-2')
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Feature Selection Method on BCR\n' +
@@ -870,7 +870,7 @@ elif args.analysis == 3:
         dataset_tr_name = dataset_tr_name.upper()
         dataset_te_name = dataset_te_name.upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure(7)
+        plt.figure('Figure 5-1')
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -885,7 +885,7 @@ elif args.analysis == 3:
                 np.mean(num_features), np.std(num_features),
             )
         )
-        plt.figure(8)
+        plt.figure('Figure 5-2')
         plt.plot(
             plt_fig_x_axis, bcrs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -900,16 +900,16 @@ elif args.analysis == 3:
                 np.mean(num_features), np.std(num_features),
             )
         )
-    plt.figure(7)
+    plt.figure('Figure 5-1')
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    plt.figure(8)
+    plt.figure('Figure 5-2')
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
     # plot train/test dataset vs fs method
     dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
     plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
-    plt.figure(9)
+    plt.figure('Figure 6-1')
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on ROC AUC\n' +
@@ -918,7 +918,7 @@ elif args.analysis == 3:
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, dataset_te_names)
-    plt.figure(10)
+    plt.figure('Figure 6-2')
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on BCR\n' +
@@ -937,7 +937,7 @@ elif args.analysis == 3:
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure(9)
+        plt.figure('Figure 6-1')
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -952,7 +952,7 @@ elif args.analysis == 3:
                 np.mean(num_features), np.std(num_features),
             )
         )
-        plt.figure(10)
+        plt.figure('Figure 6-2')
         plt.plot(
             plt_fig_x_axis, bcrs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -967,10 +967,10 @@ elif args.analysis == 3:
                 np.mean(num_features), np.std(num_features),
             )
         )
-    plt.figure(9)
+    plt.figure('Figure 6-1')
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    plt.figure(10)
+    plt.figure('Figure 6-2')
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
 
