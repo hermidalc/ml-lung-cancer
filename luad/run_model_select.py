@@ -27,13 +27,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, help='feature selection method')
-parser.add_argument('--fs-skb-k', type=int, nargs="+", help='fs skb k')
-parser.add_argument('--fs-skb-max', type=int, default=30, help='fs skb k max')
+parser.add_argument('--fs-skb-k', type=int, nargs="+", help='fs skb k select')
+parser.add_argument('--fs-skb-k-max', type=int, default=30, help='fs skb k max')
 parser.add_argument('--fs-fpr-p', type=float, nargs="+", help='fs fpr p-value')
 parser.add_argument('--fs-sfm-thres', type=float, nargs="+", help='fs sfm threshold')
-parser.add_argument('--fs-sfm-c', type=float, nargs="+", help='fs sfm c')
-parser.add_argument('--fs-rfe-n', type=int, nargs="+", help='fs rfe n')
-parser.add_argument('--fs-rfe-max', type=int, default=30, help='fs rfe n max')
+parser.add_argument('--fs-sfm-c', type=float, nargs="+", help='fs sfm svm c')
+parser.add_argument('--fs-sfm-n', type=int, nargs="+", help='fs sfm ext n')
+parser.add_argument('--fs-sfm-n-max', type=int, default=100, help='fs sfm ext n max')
+parser.add_argument('--fs-rfe-n', type=int, nargs="+", help='fs rfe n select')
+parser.add_argument('--fs-rfe-n-max', type=int, default=30, help='fs rfe n max')
 parser.add_argument('--fs-rfe-c', type=float, nargs="+", help='fs rfe c')
 parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
@@ -73,6 +75,9 @@ class CachedFitMixin:
 class CachedLinearSVC(CachedFitMixin, LinearSVC):
     pass
 
+class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
+    pass
+
 # limma feature selection scoring function
 def limma(X, y):
     f, pv = r_limma(np.transpose(X), y)
@@ -100,12 +105,13 @@ if args.gscv_no_memory:
     mi_score_func = mutual_info_classif
     rfe_svm_estimator = LinearSVC(class_weight='balanced')
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, class_weight='balanced')
+    sfm_ext_estimator = ExtraTreesClassifier(class_weight='balanced')
 else:
     limma_score_func = memory.cache(limma)
     mi_score_func = memory.cache(mutual_info_classif)
     rfe_svm_estimator = CachedLinearSVC(class_weight='balanced')
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
-
+    sfm_ext_estimator = CachedExtraTreesClassifier(class_weight='balanced')
 gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 if args.clf_svm_c:
@@ -120,6 +126,10 @@ if args.fs_sfm_c:
     SFM_SVC_C = sorted(args.fs_sfm_c)
 else:
     SFM_SVC_C = [ 1e-2, 1e-1, 1, 10, 100 ]
+if args.fs_sfm_n:
+    SFM_EXT_N_ESTIMATORS = sorted(args.fs_sfm_n)
+else:
+    SFM_EXT_N_ESTIMATORS = list(range(10, args.fs_sfm_n_max + 1, 10))
 if args.fs_sfm_thres:
     SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
 else:
@@ -127,11 +137,11 @@ else:
 if args.fs_skb_k:
     SKB_N_FEATURES = sorted(args.fs_skb_k)
 else:
-    SKB_N_FEATURES = list(range(1, args.fs_skb_max + 1))
+    SKB_N_FEATURES = list(range(1, args.fs_skb_k_max + 1))
 if args.fs_rfe_n:
     RFE_N_FEATURES = sorted(args.fs_rfe_n)
 else:
-    RFE_N_FEATURES = list(range(1, args.fs_rfe_max + 1))
+    RFE_N_FEATURES = list(range(1, args.fs_rfe_n_max + 1))
 if args.fs_fpr_p:
     SFP_ALPHA = sorted(args.fs_fpr_p)
 else:
@@ -174,8 +184,8 @@ pipelines = {
         'param_grid': [
             {
                 'sfp__alpha': SFP_ALPHA,
-                'rfe__n_features_to_select': RFE_N_FEATURES,
                 'rfe__estimator__C': RFE_SVC_C,
+                'rfe__n_features_to_select': RFE_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -189,8 +199,8 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'sfm__threshold': SFM_THRESHOLDS,
                 'sfm__estimator__C': SFM_SVC_C,
+                'sfm__threshold': SFM_THRESHOLDS,
                 'rfe__n_features_to_select': RFE_N_FEATURES,
                 'rfe__estimator__C': RFE_SVC_C,
                 'clf__C': CLF_SVC_C,
@@ -200,12 +210,13 @@ pipelines = {
     'ExtraTrees-SFM-RFE': {
         'pipe_steps': [
             ('std', StandardScaler()),
-            ('sfm', SelectFromModel(ExtraTreesClassifier())),
+            ('sfm', SelectFromModel(sfm_ext_estimator)),
             ('rfe', RFE(rfe_svm_estimator, step=args.fs_rfe_step, verbose=args.fs_rfe_verbose)),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
             {
+                'sfm__estimator__n_estimators': SFM_EXT_N_ESTIMATORS,
                 'sfm__threshold': SFM_THRESHOLDS,
                 'rfe__n_features_to_select': RFE_N_FEATURES,
                 'rfe__estimator__C': RFE_SVC_C,
@@ -221,8 +232,8 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'rfe__n_features_to_select': RFE_N_FEATURES,
                 'rfe__estimator__C': RFE_SVC_C,
+                'rfe__n_features_to_select': RFE_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -235,8 +246,8 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'sfm__threshold': SFM_THRESHOLDS,
                 'sfm__estimator__C': SFM_SVC_C,
+                'sfm__threshold': SFM_THRESHOLDS,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -244,11 +255,12 @@ pipelines = {
     'ExtraTrees-SFM': {
         'pipe_steps': [
             ('std', StandardScaler()),
-            ('sfm', SelectFromModel(ExtraTreesClassifier())),
+            ('sfm', SelectFromModel(sfm_ext_estimator)),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
             {
+                'sfm__estimator__n_estimators': SFM_EXT_N_ESTIMATORS,
                 'sfm__threshold': SFM_THRESHOLDS,
                 'clf__C': CLF_SVC_C,
             },
@@ -284,9 +296,9 @@ pipelines = {
     },
 }
 dataset_pair_names = [
-    # ('gse31210_gse30219', 'gse8894'),
-    # ('gse31210_gse8894', 'gse30219'),
-    # ('gse8894_gse30219', 'gse31210'),
+    ('gse31210_gse30219', 'gse8894'),
+    ('gse31210_gse8894', 'gse30219'),
+    ('gse8894_gse30219', 'gse31210'),
     ('gse31210_gse30219_gse37745', 'gse8894'),
     ('gse31210_gse8894_gse37745', 'gse30219'),
     ('gse8894_gse30219_gse37745', 'gse31210'),
@@ -370,200 +382,83 @@ if args.analysis == 1:
     )
     print('Rankings:')
     for coef, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', coef)
-    # plot feature selection search vs cv perf metrics
-    dataset_tr_title = args.dataset_tr.replace('gse', 'GSE')
-    if args.bc_meth:
-        dataset_tr_title = dataset_tr_title + '_' + args.bc_meth
+    # plot grid search parameters vs cv perf metrics
     grid_params = pipelines[args.fs_meth]['param_grid'][0]
-    new_shape = ()
-    if args.fs_meth in ('Limma-KBest', 'MI-KBest') and len(grid_params['skb__k']) > 1:
-        new_shape = (
-            len(grid_params['skb__k']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'skb__k'])
-        )
-        xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_skb__k'])
-        )
-    elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'ExtraTrees-SFM-RFE', 'SVM-RFE') and \
-        len(grid_params['rfe__n_features_to_select']) > 1:
-        new_shape = (
-            len(grid_params['rfe__n_features_to_select']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'rfe__n_features_to_select'])
-        )
-        xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_rfe__n_features_to_select'])
-        )
-    elif args.fs_meth in ('SVM-SFM') and len(grid_params['sfm__estimator__C']) > 1:
-        new_shape = (
-            len(grid_params['sfm__estimator__C']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'sfm__estimator__C'])
-        )
-        xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_sfm__estimator__C'])
-        )
-    elif args.fs_meth in ('ExtraTrees-SFM') and len(grid_params['sfm__threshold']) > 1:
-        new_shape = (
-            len(grid_params['sfm__threshold']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'sfm__threshold'])
-        )
-        xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_sfm__threshold']).astype(str)
-        )
-    elif args.fs_meth in ('Limma-Fpr-CFS') and len(grid_params['sfp__alpha']) > 1:
-        new_shape = (
-            len(grid_params['sfp__alpha']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'sfp__alpha'])
-        )
-        xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_sfp__alpha'])
-        )
-    elif args.fs_meth in ('Limma-KBest-CFS') and len(grid_params['skb__k']) > 1:
-        new_shape = (
-            len(grid_params['skb__k']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'skb__k'])
-        )
-        xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_skb__k'])
-        )
-    if new_shape:
-        mean_roc_aucs_cv = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-        std_roc_aucs_cv = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-        mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv, axis=1)
-        mean_roc_aucs_cv = mean_roc_aucs_cv[np.arange(len(mean_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
-        std_roc_aucs_cv = std_roc_aucs_cv[np.arange(len(std_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
-        mean_bcrs_cv = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-        std_bcrs_cv = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-        mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv, axis=1)
-        mean_bcrs_cv = mean_bcrs_cv[np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs]
-        std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
-        plt.figure(1)
-        plt.rcParams['font.size'] = 20
-        if args.fs_meth in ('Limma-KBest', 'MI-KBest'):
-            x_axis = grid_params['skb__k']
-            plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
-            plt.xticks(x_axis)
-            x_label = 'Number of Top-Ranked Features Selected'
-        elif args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'ExtraTrees-SFM-RFE', 'SVM-RFE'):
-            x_axis = grid_params['rfe__n_features_to_select']
-            plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
-            plt.xticks(x_axis)
-            x_label = 'Number of Top-Ranked Features Selected'
-        elif args.fs_meth in ('SVM-SFM'):
-            x_axis = range(len(grid_params['sfm__estimator__C']))
-            plt.xticks(x_axis, grid_params['sfm__estimator__C'])
-            x_label = 'SFM SVM C'
-        elif args.fs_meth in ('ExtraTrees-SFM'):
-            x_axis = range(len(grid_params['sfm__threshold']))
-            plt.xticks(x_axis, grid_params['sfm__threshold'])
-            x_label = 'SFM Threshold'
-        elif args.fs_meth in ('Limma-Fpr-CFS'):
-            x_axis = grange(len(grid_params['sfp__alpha']))
-            plt.xticks(x_axis, grid_params['sfp__alpha'])
-            x_label = 'Limma P-Value Threshold'
-        elif args.fs_meth in ('Limma-KBest-CFS'):
-            x_axis = grange(len(grid_params['skb__k']))
-            plt.xticks(x_axis, grid_params['skb__k'])
-            x_label = 'Limma K-Best Features Filtered'
-        plt.title(
-            dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
-            'Effect of ' + x_label + ' on CV Performance Metrics'
-        )
-        plt.xlabel(x_label)
-        plt.ylabel('CV Score')
-        plt.plot(
-            x_axis,
-            mean_roc_aucs_cv,
-            lw=4, alpha=0.8, label='Mean ROC AUC'
-        )
-        plt.fill_between(
-            x_axis,
-            [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-            [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-            color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
-        )
-        plt.plot(
-            x_axis,
-            mean_bcrs_cv,
-            lw=4, alpha=0.8, label='Mean BCR'
-        )
-        plt.fill_between(
-            x_axis,
-            [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-            [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-            color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
-        )
-        plt.legend(loc='lower right', fontsize='small')
-        plt.grid('on')
-    # plot clf or rfe svm c vs cv perf metrics
-    new_shape = ()
-    if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'ExtraTrees-SFM-RFE', 'SVM-RFE') and \
-        len(grid_params['rfe__estimator__C']) > 1:
-        new_shape = (
-            len(grid_params['rfe__estimator__C']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'rfe__estimator__C'])
-        )
-        xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_rfe__estimator__C'])
-        )
-    elif len(grid_params['clf__C']) > 1:
-        new_shape = (
-            len(grid_params['clf__C']),
-            np.prod([len(v) for k,v in grid_params.items() if k != 'clf__C'])
-        )
-        xaxis_group_sorted_idxs = np.argsort(
-            np.ma.getdata(grid.cv_results_['param_clf__C'])
-        )
-    if new_shape:
-        mean_roc_aucs_cv = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-        std_roc_aucs_cv = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
-        mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv, axis=1)
-        mean_roc_aucs_cv = mean_roc_aucs_cv[np.arange(len(mean_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
-        std_roc_aucs_cv = std_roc_aucs_cv[np.arange(len(std_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
-        mean_bcrs_cv = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-        std_bcrs_cv = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
-        mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv, axis=1)
-        mean_bcrs_cv = mean_bcrs_cv[np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs]
-        std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
-        plt.figure(2)
-        plt.rcParams['font.size'] = 20
-        if args.fs_meth in ('Limma-Fpr-SVM-RFE', 'SVM-SFM-RFE', 'ExtraTrees-SFM-RFE', 'SVM-RFE'):
-            x_axis = range(len(grid_params['rfe__estimator__C']))
-            plt.xticks(x_axis, grid_params['rfe__estimator__C'])
-            x_label = 'SVM-RFE C'
-        else:
-            x_axis = range(len(grid_params['clf__C']))
-            plt.xticks(x_axis, grid_params['clf__C'])
-            x_label = 'Classifier SVM C'
-        plt.title(
-            dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
-            'Effect of ' + x_label + ' Hyperparameter on CV Performance Metrics'
-        )
-        plt.xlabel(x_label)
-        plt.ylabel('CV Score')
-        plt.plot(
-            x_axis,
-            mean_roc_aucs_cv,
-            lw=4, alpha=0.8, label='Mean ROC AUC'
-        )
-        plt.fill_between(
-            x_axis,
-            [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-            [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-            color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
-        )
-        plt.plot(
-            x_axis,
-            mean_bcrs_cv,
-            lw=4, alpha=0.8, label='Mean BCR'
-        )
-        plt.fill_between(
-            x_axis,
-            [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-            [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-            color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
-        )
-        plt.legend(loc='lower right', fontsize='small')
-        plt.grid('on')
+    for idx, param in enumerate(grid_params):
+        new_shape = ()
+        if param in (
+            'skb__k', 'rfe__n_features_to_select', 'sfm__estimator__C', 'sfm__estimator__n_estimators',
+            'sfm__threshold', 'sfp__alpha', 'rfe__estimator__C', 'clf__C',
+        ) and len(grid_params[param]) > 1:
+            new_shape = (
+                len(grid_params[param]),
+                np.prod([len(v) for k,v in grid_params.items() if k != param])
+            )
+            if param in ('sfm__threshold'):
+                xaxis_group_sorted_idxs = np.argsort(
+                    np.ma.getdata(grid.cv_results_['param_' + param]).astype(str)
+                )
+            else:
+                xaxis_group_sorted_idxs = np.argsort(
+                    np.ma.getdata(grid.cv_results_['param_' + param])
+                )
+        if new_shape:
+            mean_roc_aucs_cv = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+            std_roc_aucs_cv = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+            mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv, axis=1)
+            mean_roc_aucs_cv = mean_roc_aucs_cv[np.arange(len(mean_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
+            std_roc_aucs_cv = std_roc_aucs_cv[np.arange(len(std_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs]
+            mean_bcrs_cv = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+            std_bcrs_cv = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+            mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv, axis=1)
+            mean_bcrs_cv = mean_bcrs_cv[np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs]
+            std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
+            plt.figure('Figure 1-' + str(idx + 1))
+            plt.rcParams['font.size'] = 20
+            if param in (
+                'skb__k', 'rfe__n_features_to_select', 'sfm__estimator__n_estimators',
+            ):
+                x_axis = grid_params[param]
+                plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+                plt.xticks(x_axis)
+            elif param in (
+                'sfm__estimator__C', 'sfm__threshold', 'sfp__alpha', 'rfe__estimator__C', 'clf__C',
+            ):
+                x_axis = range(len(grid_params[param]))
+                plt.xticks(x_axis, grid_params[param])
+            dataset_tr_title = args.dataset_tr.replace('gse', 'GSE')
+            if args.bc_meth:
+                dataset_tr_title = dataset_tr_title + '_' + args.bc_meth
+            plt.title(
+                dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+                'Effect of ' + param + ' on CV Performance Metrics'
+            )
+            plt.xlabel(param)
+            plt.ylabel('CV Score')
+            plt.plot(
+                x_axis,
+                mean_roc_aucs_cv,
+                lw=4, alpha=0.8, label='Mean ROC AUC'
+            )
+            plt.fill_between(
+                x_axis,
+                [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+                [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+                color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+            )
+            plt.plot(
+                x_axis,
+                mean_bcrs_cv,
+                lw=4, alpha=0.8, label='Mean BCR'
+            )
+            plt.fill_between(
+                x_axis,
+                [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+                [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+                color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
+            )
+            plt.legend(loc='lower right', fontsize='small')
+            plt.grid('on')
     # plot num top-ranked features selected vs test dataset perf metrics
     dataset_te_names = []
     for dataset_tr_name, dataset_te_name in dataset_pair_names:
@@ -572,7 +467,7 @@ if args.analysis == 1:
             break
         elif args.dataset_tr != dataset_te_name:
             dataset_te_names.append(dataset_te_name)
-    plt.figure(3)
+    plt.figure('Figure 2')
     plt.rcParams['font.size'] = 20
     plt.title(
         dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
@@ -720,7 +615,7 @@ elif args.analysis == 2:
             ): print(feature, '\t', symbol, '\t', rank)
     # plot bc method vs train/test scores
     plt_fig_x_axis = range(1, len(bc_methods) + 1)
-    plt.figure(4)
+    plt.figure(3)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on ROC AUC\n' +
@@ -729,7 +624,7 @@ elif args.analysis == 2:
     plt.xlabel('Batch Effect Correction Method')
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, bc_methods)
-    plt.figure(5)
+    plt.figure(4)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Batch Effect Correction Method on BCR\n' +
@@ -751,7 +646,7 @@ elif args.analysis == 2:
         dataset_tr_name = dataset_tr_name.upper()
         dataset_te_name = dataset_te_name.upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure(4)
+        plt.figure(3)
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -766,7 +661,7 @@ elif args.analysis == 2:
                 np.mean(num_features), np.std(num_features),
             )
         )
-        plt.figure(5)
+        plt.figure(4)
         plt.plot(
             plt_fig_x_axis, bcrs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -781,16 +676,16 @@ elif args.analysis == 2:
                 np.mean(num_features), np.std(num_features),
             )
         )
-    plt.figure(4)
+    plt.figure(3)
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    plt.figure(5)
+    plt.figure(4)
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
     # plot train/test dataset vs bc method
     dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
     plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
-    plt.figure(6)
+    plt.figure(5)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Train/Held-Out Test Dataset on ROC AUC\n' +
@@ -799,7 +694,7 @@ elif args.analysis == 2:
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, dataset_te_names)
-    plt.figure(7)
+    plt.figure(6)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Train/Held-Out Test Dataset on BCR\n' +
@@ -818,7 +713,7 @@ elif args.analysis == 2:
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure(6)
+        plt.figure(5)
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -833,7 +728,7 @@ elif args.analysis == 2:
                 np.mean(num_features), np.std(num_features),
             )
         )
-        plt.figure(7)
+        plt.figure(6)
         plt.plot(
             plt_fig_x_axis, bcrs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -848,10 +743,10 @@ elif args.analysis == 2:
                 np.mean(num_features), np.std(num_features),
             )
         )
-    plt.figure(6)
+    plt.figure(5)
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    plt.figure(7)
+    plt.figure(6)
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
 elif args.analysis == 3:
@@ -944,7 +839,7 @@ elif args.analysis == 3:
             ): print(feature, '\t', symbol, '\t', rank)
     # plot fs method vs train/test dataset
     plt_fig_x_axis = range(1, len(fs_methods) + 1)
-    plt.figure(8)
+    plt.figure(7)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Feature Selection Method on ROC AUC\n' +
@@ -953,7 +848,7 @@ elif args.analysis == 3:
     plt.xlabel('Feature Selection Method')
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, fs_methods)
-    plt.figure(9)
+    plt.figure(8)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Feature Selection Method on BCR\n' +
@@ -975,7 +870,7 @@ elif args.analysis == 3:
         dataset_tr_name = dataset_tr_name.upper()
         dataset_te_name = dataset_te_name.upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure(8)
+        plt.figure(7)
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -990,7 +885,7 @@ elif args.analysis == 3:
                 np.mean(num_features), np.std(num_features),
             )
         )
-        plt.figure(9)
+        plt.figure(8)
         plt.plot(
             plt_fig_x_axis, bcrs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -1005,16 +900,16 @@ elif args.analysis == 3:
                 np.mean(num_features), np.std(num_features),
             )
         )
-    plt.figure(8)
+    plt.figure(7)
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    plt.figure(9)
+    plt.figure(8)
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
     # plot train/test dataset vs fs method
     dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
     plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
-    plt.figure(10)
+    plt.figure(9)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on ROC AUC\n' +
@@ -1023,7 +918,7 @@ elif args.analysis == 3:
     plt.xlabel('Test Dataset')
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, dataset_te_names)
-    plt.figure(11)
+    plt.figure(10)
     plt.rcParams['font.size'] = 20
     plt.title(
         'Effect of Training/Held-Out Test Dataset on BCR\n' +
@@ -1042,7 +937,7 @@ elif args.analysis == 3:
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure(10)
+        plt.figure(9)
         plt.plot(
             plt_fig_x_axis, roc_aucs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -1057,7 +952,7 @@ elif args.analysis == 3:
                 np.mean(num_features), np.std(num_features),
             )
         )
-        plt.figure(11)
+        plt.figure(10)
         plt.plot(
             plt_fig_x_axis, bcrs_cv,
             lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
@@ -1072,10 +967,10 @@ elif args.analysis == 3:
                 np.mean(num_features), np.std(num_features),
             )
         )
-    plt.figure(10)
+    plt.figure(9)
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-    plt.figure(11)
+    plt.figure(10)
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
 
