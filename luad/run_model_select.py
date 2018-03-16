@@ -32,8 +32,8 @@ parser.add_argument('--fs-skb-k-max', type=int, default=30, help='fs skb k max')
 parser.add_argument('--fs-fpr-p', type=float, nargs="+", help='fs fpr p-value')
 parser.add_argument('--fs-sfm-thres', type=float, nargs="+", help='fs sfm threshold')
 parser.add_argument('--fs-sfm-c', type=float, nargs="+", help='fs sfm svm c')
-parser.add_argument('--fs-sfm-n', type=int, nargs="+", help='fs sfm ext n')
-parser.add_argument('--fs-sfm-n-max', type=int, default=100, help='fs sfm ext n max')
+parser.add_argument('--fs-sfm-e', type=int, nargs="+", help='fs sfm ext estimators')
+parser.add_argument('--fs-sfm-e-max', type=int, default=100, help='fs sfm ext estimators max')
 parser.add_argument('--fs-rfe-n', type=int, nargs="+", help='fs rfe n select')
 parser.add_argument('--fs-rfe-n-max', type=int, default=30, help='fs rfe n max')
 parser.add_argument('--fs-rfe-c', type=float, nargs="+", help='fs rfe c')
@@ -126,10 +126,10 @@ if args.fs_sfm_c:
     SFM_SVC_C = sorted(args.fs_sfm_c)
 else:
     SFM_SVC_C = [ 1e-2, 1e-1, 1, 10, 100 ]
-if args.fs_sfm_n:
-    SFM_EXT_N_ESTIMATORS = sorted(args.fs_sfm_n)
+if args.fs_sfm_e:
+    SFM_EXT_N_ESTIMATORS = sorted(args.fs_sfm_e)
 else:
-    SFM_EXT_N_ESTIMATORS = list(range(10, args.fs_sfm_n_max + 1, 10))
+    SFM_EXT_N_ESTIMATORS = list(range(10, args.fs_sfm_e_max + 1, 10))
 if args.fs_sfm_thres:
     SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
 else:
