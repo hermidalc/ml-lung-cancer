@@ -21,6 +21,7 @@ conda config --add channels conda-forge
 conda config --add channels bioconda
 conda install -v -y \
 r-essentials \
+r-devtools \
 r-lintr \
 r-pamr \
 r-minqa \
@@ -60,4 +61,12 @@ biocLite("hgu133plus2probe", suppressUpdates=TRUE)
 biocLite("pvca", suppressUpdates=TRUE)
 biocLite("LiblineaR", suppressUpdates=TRUE)
 biocLite("JADE", suppressUpdates=TRUE)
+```
+5. Install Brainarray Custom Microarray Annotation DBs and CDFs
+
+```R
+library(devtools)
+install_url("http://brainarray.mbni.med.umich.edu/bioc/src/contrib/hgu133plus2hsentrezg.db_22.0.0.tar.gz")
+install_url("http://brainarray.mbni.med.umich.edu/bioc/src/contrib/hgu133plus2hsentrezgcdf_22.0.0.tar.gz")
+install_url("http://brainarray.mbni.med.umich.edu/bioc/src/contrib/hgu133plus2hsentrezgprobe_22.0.0.tar.gz")
 ```
