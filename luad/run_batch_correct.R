@@ -10,7 +10,7 @@ source("lib/R/config.R")
 cmd_args <- commandArgs(trailingOnly=TRUE)
 dataset_name_combos <- combn(dataset_names, length(dataset_names) - 1)
 for (bc_type in cmd_args) {
-    if (bc_type %in% c("cbt", "fab", "std", "sva", "stica", "svd")) {
+    if (bc_type %in% c("cbt", "fab", "qnorm", "std", "sva", "stica", "svd")) {
         for (col in 1:ncol(dataset_name_combos)) {
             eset_tr_name <- paste0(c("eset", dataset_name_combos[,col]), collapse="_")
             dataset_te_name <- setdiff(dataset_names, dataset_name_combos[,col])
@@ -73,7 +73,7 @@ for (bc_type in cmd_args) {
                     remove(list=c(eset_tr_bc_obj_name, eset_tr_bc_name, eset_te_bc_name))
                 }
             }
-            else if (bc_type %in% c("cbt", "fab", "std", "sva")) {
+            else if (bc_type %in% c("cbt", "fab", "qnorm", "std", "sva")) {
                 eset_tr_bc_name <- paste0(eset_tr_name, "_tr_", bc_type)
                 eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
                 print(paste(eset_tr_bc_name, "->", eset_te_bc_name))
@@ -91,20 +91,27 @@ for (bc_type in cmd_args) {
                 eset_tr_bc <- get(eset_tr_name)
                 if (bc_type == "cbt") {
                     bc_obj <- combatba(Xtr, btr)
+                    exprs(eset_tr_bc) <- t(bc_obj$xadj)
                 }
                 else if (bc_type == "fab") {
                     bc_obj <- fabatch(Xtr, ytr, btr)
+                    exprs(eset_tr_bc) <- t(bc_obj$xadj)
+                }
+                else if (bc_type == "qnorm") {
+                    bc_obj <- qunormtrain(Xtr)
+                    exprs(eset_tr_bc) <- t(bc_obj$xnorm)
                 }
                 else if (bc_type == "std") {
                     bc_obj <- standardize(Xtr, btr)
+                    exprs(eset_tr_bc) <- t(bc_obj$xadj)
                 }
                 else if (bc_type == "sva") {
                     mod <- model.matrix(~as.factor(Relapse), data=ptr)
                     mod0 <- model.matrix(~1, data=ptr)
                     # ctrls <- as.numeric(grepl("^AFFX", rownames(t(Xtr))))
                     bc_obj <- svaba(Xtr, btr, mod, mod0, algorithm="fast")
+                    exprs(eset_tr_bc) <- t(bc_obj$xadj)
                 }
-                exprs(eset_tr_bc) <- t(bc_obj$xadj)
                 assign(eset_tr_bc_name, eset_tr_bc)
                 save(list=eset_tr_bc_name, file=paste0("data/", eset_tr_bc_name, ".Rda"))
                 eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
@@ -127,6 +134,9 @@ for (bc_type in cmd_args) {
                 else if (bc_type == "fab") {
                     exprs(eset_te_bc) <- t(fabatchaddon(bc_obj, Xte, bte))
                 }
+                else if (bc_type == "qnorm") {
+                    exprs(eset_te_bc) <- t(qunormaddon(bc_obj, Xte))
+                }
                 else if (bc_type == "std") {
                     exprs(eset_te_bc) <- t(standardizeaddon(bc_obj, Xte, bte))
                 }
@@ -137,37 +147,6 @@ for (bc_type in cmd_args) {
                 save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
                 remove(list=c(eset_tr_bc_obj_name, eset_tr_bc_name, eset_te_bc_name))
             }
-        }
-    }
-    else if (bc_type %in% c("qnorm")) {
-        # currently take first dataset as train
-        eset_tr_name <- paste0(c("eset", dataset_names[1]), collapse="_")
-        eset_tr_norm_name <- paste0(eset_tr_name, "_tr_", bc_type)
-        print(eset_tr_norm_name)
-        load(paste0("data/", eset_tr_name, ".Rda"))
-        Xtr <- t(exprs(get(eset_tr_name)))
-        if (bc_type == "qnorm") {
-            norm_obj <- qunormtrain(Xtr)
-        }
-        eset_tr_norm <- get(eset_tr_name)
-        exprs(eset_tr_norm) <- t(norm_obj$xnorm)
-        assign(eset_tr_norm_name, eset_tr_norm)
-        save(list=eset_tr_norm_name, file=paste0("data/", eset_tr_norm_name, ".Rda"))
-        eset_tr_norm_obj_name <- paste0(eset_tr_norm_name, "_obj")
-        assign(eset_tr_norm_obj_name, norm_obj)
-        save(list=eset_tr_norm_obj_name, file=paste0("data/", eset_tr_norm_obj_name, ".Rda"))
-        for (j in 2:length(dataset_names)) {
-            eset_te_name <- paste0(c("eset", dataset_names[j]), collapse="_")
-            eset_te_norm_name <- paste0(eset_tr_norm_name, "_", dataset_names[j], "_te")
-            print(paste(eset_tr_norm_name, "->", eset_te_norm_name))
-            load(paste0("data/", eset_te_name, ".Rda"))
-            Xte <- t(exprs(get(eset_te_name)))
-            eset_te_norm <- get(eset_te_name)
-            if (bc_type == "qnorm") {
-                exprs(eset_te_norm) <- t(qunormaddon(norm_obj, Xte))
-            }
-            assign(eset_te_norm_name, eset_te_norm)
-            save(list=eset_te_norm_name, file=paste0("data/", eset_te_norm_name, ".Rda"))
         }
     }
 }
