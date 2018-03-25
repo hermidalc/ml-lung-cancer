@@ -50,6 +50,8 @@ for (dataset_name in cmd_args) {
     else if (dataset_name == "gse67639") {
         eset <- eset[,eset$Histology == "ADC"]
         eset <- eset[,eset$Stage %in% c("1","1A","1B","2","2A","2B")]
+        impute_results <- impute.knn(exprs(eset), k=15)
+        exprs(eset) <- impute_results$data
     }
     # annotate eset
     probeset_ids <- featureNames(eset)
