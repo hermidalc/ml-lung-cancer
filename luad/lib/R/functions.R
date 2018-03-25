@@ -32,7 +32,7 @@ filterEsetControlProbesets <- function(eset) {
     ))
 }
 
-filterEsetRelapseLabels <- function(eset, samples=NULL) {
+getEsetClassLabels <- function(eset, samples=NULL) {
     if (!is.null(samples)) {
         return(eset$Relapse[c(samples)])
     }
@@ -41,10 +41,9 @@ filterEsetRelapseLabels <- function(eset, samples=NULL) {
     }
 }
 
-getGeneSymbols <- function(eset, features=NULL) {
+getEsetGeneSymbols <- function(eset, features=NULL) {
     if (!is.null(features)) {
         symbols <- as.character(featureData(eset)[c(features)]$Symbol)
-
     }
     else {
         symbols <- as.character(featureData(eset)$Symbol)
@@ -53,7 +52,7 @@ getGeneSymbols <- function(eset, features=NULL) {
     return(symbols)
 }
 
-limma <- function(exprs, groups) {
+limmaFeatureScore <- function(exprs, groups) {
     design <- model.matrix(~0 + factor(groups))
     colnames(design) <- c("Group0", "Group1")
     fit <- lmFit(exprs, design)

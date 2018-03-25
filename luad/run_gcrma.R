@@ -4,7 +4,7 @@ suppressPackageStartupMessages(library("gcrma"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
-affybatch <- ReadAffy(celfile.path=cmd_args[2], verbose=TRUE)
+affybatch <- ReadAffy(celfile.path=cmd_args[2], cdfname="hgu133plus2", verbose=TRUE)
 affinities <- compute.affinities("hgu133plus2", verbose=TRUE)
 # fails with strange error
 #check.probes("hgu133plus2", "hgu133plus2")

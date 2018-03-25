@@ -39,6 +39,7 @@ bioconductor-limma \
 bioconductor-sva \
 bioconductor-vsn \
 bioconductor-gcrma \
+bioconductor-impute \
 'icu=58.*' \
 lxml \
 natsort \

@@ -27,22 +27,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, help='feature selection method')
-parser.add_argument('--fs-skb-k', type=int, nargs="+", help='fs skb k select')
+parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=30, help='fs skb k max')
-parser.add_argument('--fs-fpr-p', type=float, nargs="+", help='fs fpr p-value')
-parser.add_argument('--fs-sfm-thres', type=float, nargs="+", help='fs sfm threshold')
-parser.add_argument('--fs-sfm-c', type=float, nargs="+", help='fs sfm svm c')
-parser.add_argument('--fs-sfm-e', type=int, nargs="+", help='fs sfm ext estimators')
+parser.add_argument('--fs-fpr-p', type=float, nargs='+', help='fs fpr p-value')
+parser.add_argument('--fs-sfm-thres', type=float, nargs='+', help='fs sfm threshold')
+parser.add_argument('--fs-sfm-c', type=float, nargs='+', help='fs sfm svm c')
+parser.add_argument('--fs-sfm-e', type=int, nargs='+', help='fs sfm ext estimators')
 parser.add_argument('--fs-sfm-e-max', type=int, default=100, help='fs sfm ext estimators max')
-parser.add_argument('--fs-rfe-n', type=int, nargs="+", help='fs rfe n select')
+parser.add_argument('--fs-rfe-n', type=int, nargs='+', help='fs rfe n select')
 parser.add_argument('--fs-rfe-n-max', type=int, default=30, help='fs rfe n max')
-parser.add_argument('--fs-rfe-c', type=float, nargs="+", help='fs rfe c')
+parser.add_argument('--fs-rfe-c', type=float, nargs='+', help='fs rfe c')
 parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_coefs', help='fs rank method (mean_coefs or mean_roc_aucs)')
-parser.add_argument('--clf-svm-c', type=float, nargs="+", help='clf svm c')
-parser.add_argument('--gscv-splits', type=int, default=40, help='gscv splits')
-parser.add_argument('--gscv-size', type=int, default=0.3, help='gscv size')
+parser.add_argument('--clf-svm-c', type=float, nargs='+', help='clf svm c')
+parser.add_argument('--gscv-splits', type=int, default=80, help='gscv splits')
+parser.add_argument('--gscv-size', type=float, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
@@ -54,9 +54,9 @@ base = importr('base')
 biobase = importr('Biobase')
 base.source('lib/R/functions.R')
 r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']
-r_filter_eset_relapse_labels = robjects.globalenv['filterEsetRelapseLabels']
-r_get_gene_symbols = robjects.globalenv['getGeneSymbols']
-r_limma = robjects.globalenv['limma']
+r_get_eset_class_labels = robjects.globalenv['getEsetClassLabels']
+r_get_eset_gene_symbols = robjects.globalenv['getEsetGeneSymbols']
+r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
 numpy2ri.activate()
 if args.gscv_no_memory:
     memory = None
@@ -80,7 +80,7 @@ class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
 
 # limma feature selection scoring function
 def limma(X, y):
-    f, pv = r_limma(np.transpose(X), y)
+    f, pv = r_limma_feature_score(np.transpose(X), y)
     return np.array(f), np.array(pv)
 
 # bcr performance metrics scoring function
@@ -295,23 +295,31 @@ pipelines = {
         ],
     },
 }
+dataset_names = [
+    'gse31210',
+    'gse8894',
+    'gse30219',
+    'gse37745',
+    'gse50081'
+]
 dataset_pair_names = [
-    ('gse31210_gse30219', 'gse8894'),
-    ('gse31210_gse8894', 'gse30219'),
-    ('gse8894_gse30219', 'gse31210'),
-    ('gse31210_gse30219_gse37745', 'gse8894'),
-    ('gse31210_gse8894_gse37745', 'gse30219'),
-    ('gse8894_gse30219_gse37745', 'gse31210'),
-    ('gse31210_gse8894_gse30219', 'gse37745'),
-    # ('gse31210_gse8894_gse30219_gse37745', 'gse50081'),
-    # ('gse31210_gse8894_gse30219_gse50081', 'gse37745'),
-    # ('gse31210_gse8894_gse37745_gse50081', 'gse30219'),
-    # ('gse31210_gse30219_gse37745_gse50081', 'gse8894'),
-    # ('gse8894_gse30219_gse37745_gse50081', 'gse31210'),
+    # ('gse31210_gse30219', 'gse8894'),
+    # ('gse31210_gse8894', 'gse30219'),
+    # ('gse8894_gse30219', 'gse31210'),
+    # ('gse31210_gse30219_gse37745', 'gse8894'),
+    # ('gse31210_gse8894_gse37745', 'gse30219'),
+    # ('gse8894_gse30219_gse37745', 'gse31210'),
+    # ('gse31210_gse8894_gse30219', 'gse37745'),
+    ('gse31210_gse30219_gse37745_gse50081', 'gse8894'),
+    ('gse31210_gse8894_gse37745_gse50081', 'gse30219'),
+    ('gse8894_gse30219_gse37745_gse50081', 'gse31210'),
+    ('gse31210_gse8894_gse30219_gse50081', 'gse37745'),
+    ('gse31210_gse8894_gse30219_gse37745', 'gse50081'),
 ]
 bc_methods = [
     'none',
     'std',
+    'qnorm',
     'cbt',
     #'fab',
     'sva',
@@ -344,7 +352,7 @@ if args.analysis == 1:
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-    y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
+    y_tr = np.array(r_get_eset_class_labels(eset_tr), dtype=int)
     grid = GridSearchCV(
         Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
         param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
@@ -366,7 +374,7 @@ if args.analysis == 1:
     feature_ranks = sorted(
         zip(
             coefs, feature_idxs, feature_names,
-            r_get_gene_symbols(
+            r_get_eset_gene_symbols(
                 eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
             ),
         ),
@@ -383,6 +391,7 @@ if args.analysis == 1:
     print('Rankings:')
     for coef, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', coef)
     # plot grid search parameters vs cv perf metrics
+    dataset_tr_title = args.dataset_tr.replace('gse', 'GSE')
     grid_params = pipelines[args.fs_meth]['param_grid'][0]
     for idx, param in enumerate(grid_params):
         new_shape = ()
@@ -426,7 +435,6 @@ if args.analysis == 1:
             ):
                 x_axis = range(len(grid_params[param]))
                 plt.xticks(x_axis, grid_params[param])
-            dataset_tr_title = args.dataset_tr.replace('gse', 'GSE')
             if args.bc_meth:
                 dataset_tr_title = dataset_tr_title + '_' + args.bc_meth
             plt.title(
@@ -493,7 +501,7 @@ if args.analysis == 1:
         base.load('data/' + eset_te_name + '.Rda')
         eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         X_te = np.array(base.t(biobase.exprs(eset_te)))
-        y_te = np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
+        y_te = np.array(r_get_eset_class_labels(eset_te), dtype=int)
         roc_aucs_te, bcrs_te = [], []
         for num_features in range(1, len(ranked_feature_idxs) + 1):
             top_feature_idxs = ranked_feature_idxs[:num_features]
@@ -519,7 +527,7 @@ if args.analysis == 1:
         )
         # print summary info
         print(
-            'Dataset: %3s' % eset_te_name,
+            'Dataset: %3s' % dataset_te_name,
             ' ROC AUC: %.4f' % np.max(roc_aucs_te),
             ' BCR: %.4f' % np.max(bcrs_te),
         )
@@ -541,7 +549,7 @@ elif args.analysis == 2:
             base.load('data/' + eset_tr_name + '.Rda')
             eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
             X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-            y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
+            y_tr = np.array(r_get_eset_class_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
                 Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
                 param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
@@ -564,7 +572,7 @@ elif args.analysis == 2:
             base.load('data/' + eset_te_name + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
             X_te = np.array(base.t(biobase.exprs(eset_te)))
-            y_te = np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
+            y_te = np.array(r_get_eset_class_labels(eset_te), dtype=int)
             y_score = grid.decision_function(X_te)
             fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
             roc_auc_te = roc_auc_score(y_te, y_score)
@@ -607,7 +615,7 @@ elif args.analysis == 2:
                 zip(
                     coefs,
                     feature_names,
-                    r_get_gene_symbols(
+                    r_get_eset_gene_symbols(
                         eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
                     ),
                 ),
@@ -765,7 +773,7 @@ elif args.analysis == 3:
             base.load('data/' + eset_tr_name + '.Rda')
             eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
             X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-            y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
+            y_tr = np.array(r_get_eset_class_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
                 Pipeline(pipelines[fs_method]['pipe_steps'], memory=memory),
                 param_grid=pipelines[fs_method]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
@@ -788,7 +796,7 @@ elif args.analysis == 3:
             base.load('data/' + eset_te_name + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
             X_te = np.array(base.t(biobase.exprs(eset_te)))
-            y_te = np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
+            y_te = np.array(r_get_eset_class_labels(eset_te), dtype=int)
             y_score = grid.decision_function(X_te)
             fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
             roc_auc_te = roc_auc_score(y_te, y_score)
@@ -831,7 +839,7 @@ elif args.analysis == 3:
                 zip(
                     coefs,
                     feature_names,
-                    r_get_gene_symbols(
+                    r_get_eset_gene_symbols(
                         eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
                     ),
                 ),

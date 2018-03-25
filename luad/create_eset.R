@@ -3,7 +3,9 @@
 suppressPackageStartupMessages(library("tibble"))
 suppressPackageStartupMessages(library("readxl"))
 suppressPackageStartupMessages(library("Biobase"))
+suppressPackageStartupMessages(library("impute"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
+suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db")))
 suppressPackageStartupMessages(library("annotate"))
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
@@ -23,11 +25,7 @@ for (dataset_name in cmd_args) {
         trim_ws=TRUE
     )), var="Sample_geo_accession"))
     # build eset
-    eset <- ExpressionSet(
-        assayData=exprs,
-        phenoData=pheno,
-        annotation="hgu133plus2"
-    )
+    eset <- ExpressionSet(assayData=exprs, phenoData=pheno)
     # filter eset
     if (dataset_name == "gse31210") {
         eset <- eset[,eset$"Exclude Prognosis Analysis Incomplete Resection/Adjuvant Therapy" == 0]
@@ -49,9 +47,20 @@ for (dataset_name in cmd_args) {
         eset <- eset[,eset$Stage %in% c("1A","1B","2A","2B")]
         eset <- eset[,eset$Relapse %in% c(0,1)]
     }
+    else if (dataset_name == "gse67639") {
+        eset <- eset[,eset$Histology == "ADC"]
+        eset <- eset[,eset$Stage %in% c("1","1A","1B","2","2A","2B")]
+    }
     # annotate eset
-    probesetIds <- featureNames(eset)
-    geneSymbols <- getSYMBOL(probesetIds, "hgu133plus2.db")
+    probeset_ids <- featureNames(eset)
+    if (dataset_name %in% c("gse31210","gse8894","gse30219","gse37745","gse50081")) {
+        annotation(eset) <- "hgu133plus2"
+        geneSymbols <- getSYMBOL(probeset_ids, "hgu133plus2.db")
+    }
+    else if (dataset_name %in% c("gse67639")) {
+        annotation(eset) <- "hgu133plus2hsentrezg"
+        geneSymbols <- getSYMBOL(probeset_ids, "hgu133plus2hsentrezg.db")
+    }
     fData(eset) <- data.frame(Symbol=geneSymbols)
     eset_name <- paste0(c("eset", dataset_name), collapse="_")
     assign(eset_name, eset)
