@@ -9,7 +9,7 @@ for (dataset_name in dataset_names) {
     load(paste0("data/", eset_name, ".Rda"))
     # subset common pheno data
     eset <- get(eset_name)
-    pData(eset) <- pData(eset)[c("Relapse","Gender","Batch")]
+    pData(eset) <- pData(eset)[common_pheno_colnames]
     assign(eset_name, eset)
 }
 # merge (leaving one out each time)

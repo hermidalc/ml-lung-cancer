@@ -31,20 +31,20 @@ for (dataset_name in cmd_args) {
         eset <- eset[,eset$"Exclude Prognosis Analysis Incomplete Resection/Adjuvant Therapy" == 0]
     }
     else if (dataset_name == "gse8894") {
-        eset <- eset[,eset$Histology == "adenocarcinoma"]
+        eset <- eset[,eset$Histology == "ADC"]
     }
     else if (dataset_name == "gse30219") {
         eset <- eset[,eset$Histology == "ADC"]
-        eset <- eset[,eset$"T Stage" %in% c("T1","T2")]
+        eset <- eset[,eset$Stage %in% c("1","1A","1B","2","2A","2B")]
     }
     else if (dataset_name == "gse37745") {
-        eset <- eset[,eset$Histology == "adeno"]
-        eset <- eset[,eset$Stage %in% c("1a","1b","2a","2b")]
+        eset <- eset[,eset$Histology == "ADC"]
+        eset <- eset[,eset$Stage %in% c("1","1A","1B","2","2A","2B")]
         eset <- eset[,eset$Relapse %in% c(0,1)]
     }
     else if (dataset_name == "gse50081") {
-        eset <- eset[,eset$Histology == "adenocarcinoma"]
-        eset <- eset[,eset$Stage %in% c("1A","1B","2A","2B")]
+        eset <- eset[,eset$Histology == "ADC"]
+        eset <- eset[,eset$Stage %in% c("1","1A","1B","2","2A","2B")]
         eset <- eset[,eset$Relapse %in% c(0,1)]
     }
     else if (dataset_name == "gse67639") {

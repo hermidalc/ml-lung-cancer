@@ -361,9 +361,9 @@ if args.analysis == 1:
     )
     grid.fit(X_tr, y_tr)
     if args.bc_meth:
-        dump(grid, 'data/grid_' + args.dataset_tr + '_' + args.bc_meth + '_' + args.fs_meth.lower() + '.pkl')
+        dump(grid, 'results/grid_' + args.dataset_tr + '_' + args.bc_meth + '_' + args.fs_meth.lower() + '.pkl')
     else:
-        dump(grid, 'data/grid_' + args.dataset_tr + '_' + args.fs_meth.lower() + '.pkl')
+        dump(grid, 'results/grid_' + args.dataset_tr + '_' + args.fs_meth.lower() + '.pkl')
     # print summary info
     feature_idxs = np.arange(X_tr.shape[1])
     for step in grid.best_estimator_.named_steps:
@@ -558,9 +558,9 @@ elif args.analysis == 2:
             )
             grid.fit(X_tr, y_tr)
             if bc_method != 'none':
-                dump(grid, 'data/grid_' + dataset_tr_name + '_' + bc_method + '_' + args.fs_meth.lower() + '.pkl')
+                dump(grid, 'results/grid_' + dataset_tr_name + '_' + bc_method + '_' + args.fs_meth.lower() + '.pkl')
             else:
-                dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
+                dump(grid, 'results/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
             feature_idxs = np.arange(X_tr.shape[1])
             for step in grid.best_estimator_.named_steps:
                 if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
@@ -782,9 +782,9 @@ elif args.analysis == 3:
             )
             grid.fit(X_tr, y_tr)
             if args.bc_meth:
-                dump(grid, 'data/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + fs_method.lower() + '.pkl')
+                dump(grid, 'results/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + fs_method.lower() + '.pkl')
             else:
-                dump(grid, 'data/grid_' + dataset_tr_name + '_' + fs_method.lower() + '.pkl')
+                dump(grid, 'results/grid_' + dataset_tr_name + '_' + fs_method.lower() + '.pkl')
             feature_idxs = np.arange(X_tr.shape[1])
             for step in grid.best_estimator_.named_steps:
                 if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
