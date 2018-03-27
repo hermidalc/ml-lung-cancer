@@ -15,14 +15,19 @@ dataset_name_combos <- combn(dataset_names, length(dataset_names) - 1)
 for (bc_type in cmd_args[3:length(cmd_args)]) {
     if (bc_type %in% c("cbt", "fab", "qnorm", "std", "sva", "stica", "svd")) {
         for (col in 1:ncol(dataset_name_combos)) {
-            eset_tr_name <- paste0(c("eset", dataset_name_combos[,col]), collapse="_")
+            if (norm_meth == "none") {
+                eset_tr_name <- paste0(c("eset", dataset_name_combos[,col]), collapse="_")
+            }
+            else {
+                eset_tr_name <- paste0(c("eset", dataset_name_combos[,col], norm_meth, "tr"), collapse="_")
+            }
             load(paste0("data/", eset_tr_name, ".Rda"))
             if (bc_type %in% c("stica", "svd")) {
                 Xtr <- exprs(get(eset_tr_name))
                 ptr <- pData(get(eset_tr_name))
                 if (bc_type == "stica") {
                     for (alpha in stica_alphas) {
-                        eset_tr_bc_name <- paste0(eset_tr_name, bc_type, gsub("[^0-9]", "", alpha), "_tr")
+                        eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_type, gsub("[^0-9]", "", alpha), "_tr")
                         print(paste("Creating: ", eset_tr_bc_name))
                         bc_obj <- normFact(
                             "stICA", Xtr, ptr$Batch, "categorical",
@@ -36,7 +41,12 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                         assign(eset_tr_bc_obj_name, bc_obj)
                         save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
                         for (dataset_te_name in setdiff(dataset_names, dataset_name_combos[,col])) {
-                            eset_te_name <- paste0("eset_", dataset_te_name)
+                            if (norm_meth == "none") {
+                                eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
+                            }
+                            else {
+                                eset_te_name <- paste0(c("eset", dataset_te_name, norm_meth, "te"), collapse="_")
+                            }
                             load(paste0("data/", eset_te_name, ".Rda"))
                             Xte <- exprs(get(eset_te_name))
                             eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
@@ -54,7 +64,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                     }
                 }
                 else if (bc_type == "svd") {
-                    eset_tr_bc_name <- paste0(eset_tr_name, bc_type, "_tr")
+                    eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_type, "_tr")
                     print(paste("Creating: ", eset_tr_bc_name))
                     bc_obj <- normFact(
                         "SVD", Xtr, ptr$Batch, "categorical",
@@ -68,7 +78,12 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                     assign(eset_tr_bc_obj_name, bc_obj)
                     save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
                     for (dataset_te_name in setdiff(dataset_names, dataset_name_combos[,col])) {
-                        eset_te_name <- paste0("eset_", dataset_te_name)
+                        if (norm_meth == "none") {
+                            eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
+                        }
+                        else {
+                            eset_te_name <- paste0(c("eset", dataset_te_name, norm_meth, "te"), collapse="_")
+                        }
                         load(paste0("data/", eset_te_name, ".Rda"))
                         Xte <- exprs(get(eset_te_name))
                         eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
@@ -86,7 +101,6 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 }
             }
             else if (bc_type %in% c("cbt", "fab", "qnorm", "std", "sva")) {
-                eset_tr_bc_name <- paste0(eset_tr_name, bc_type, "_tr")
                 Xtr <- t(exprs(get(eset_tr_name)))
                 ptr <- pData(get(eset_tr_name))
                 ytr <- as.factor(ptr$Relapse + 1)
@@ -98,6 +112,8 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                     }
                 }
                 btr <- as.factor(btr)
+                eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_type, "_tr")
+                print(paste("Creating: ", eset_tr_bc_name))
                 eset_tr_bc <- get(eset_tr_name)
                 if (bc_type == "cbt") {
                     bc_obj <- combatba(Xtr, btr)
@@ -128,8 +144,13 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 assign(eset_tr_bc_obj_name, bc_obj)
                 save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
                 for (dataset_te_name in setdiff(dataset_names, dataset_name_combos[,col])) {
-                    eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
-                    print(paste("Creating: ", eset_te_bc_name))
+                    if (norm_meth == "none") {
+                        eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
+                    }
+                    else {
+                        eset_te_name <- paste0(c("eset", dataset_te_name, norm_meth, "te"), collapse="_")
+                    }
+                    load(paste0("data/", eset_te_name, ".Rda"))
                     Xte <- t(exprs(get(eset_te_name)))
                     pte <- pData(get(eset_te_name))
                     bte <- pte$Batch
@@ -140,6 +161,8 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                         }
                     }
                     bte <- as.factor(bte)
+                    eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
+                    print(paste("Creating: ", eset_te_bc_name))
                     eset_te_bc <- get(eset_te_name)
                     if (bc_type == "cbt") {
                         exprs(eset_te_bc) <- t(combatbaaddon(bc_obj, Xte, bte))
