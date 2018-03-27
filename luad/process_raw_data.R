@@ -38,7 +38,7 @@ for (norm_type in cmd_args[2:length(cmd_args)]) {
                 }
             }
             if (!is.null(cel_files)) {
-                eset_norm_name <- paste0(c("eset", dataset_name_combos[,col], "gcrma"), collapse="_")
+                eset_norm_name <- paste0(c("eset", dataset_name_combos[,col], norm_type), collapse="_")
                 print(paste("Creating: ", eset_norm_name))
                 affybatch <- ReadAffy(filenames=cel_files, cdfname="hgu133plus2", verbose=TRUE)
                 if (norm_type == "gcrma") {
