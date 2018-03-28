@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 
-suppressPackageStartupMessages(library("affy"))
+suppressPackageStartupMessages(library("Biobase"))
+suppressPackageStartupMessages(library("gcrma"))
 suppressPackageStartupMessages(library("bapred"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db")))
@@ -22,6 +23,9 @@ for (dataset_te_name in dataset_names) {
     print(paste("Loading:", eset_te_name))
     load(paste0("data/", eset_te_name, ".Rda"))
 }
+if ("gcrma" %in% cmd_args[3:length(cmd_args)]) {
+    affinities <- compute.affinities(cdfname, verbose=TRUE)
+}
 for (col in 1:ncol(dataset_tr_name_combos)) {
     cel_files_tr <- c()
     for (dataset_tr_name in dataset_tr_name_combos[,col]) {
@@ -40,14 +44,15 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
     eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
     for (norm_type in cmd_args[3:length(cmd_args)]) {
         eset_tr_norm_name <- paste0(c(eset_tr_name, norm_type, "tr"), collapse="_")
-        print(paste("Creating:", eset_tr_norm_name))
-        eset_tr_norm <- get(eset_tr_name)
+        cat(paste("Creating:", eset_tr_norm_name))
         if (norm_type == "gcrma") {
-            norm_obj <- gcrmatrain(affybatch_tr)
+            norm_obj <- gcrmatrain(affybatch_tr, affinities)
         }
         else if (norm_type == "rma") {
             norm_obj <- rmatrain(affybatch_tr)
         }
+        rownames(norm_obj$xnorm) <- sub("\\.CEL$", "", rownames(norm_obj$xnorm))
+        eset_tr_norm <- get(eset_tr_name)
         exprs(eset_tr_norm) <- t(norm_obj$xnorm)
         assign(eset_tr_norm_name, eset_tr_norm)
         save(list=eset_tr_norm_name, file=paste0("data/", eset_tr_norm_name, ".Rda"))
@@ -62,13 +67,15 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             print(paste("Creating AffyBatch:", dataset_te_name))
             affybatch_te <- ReadAffy(filenames=cel_files_te, cdfname=cdfname, verbose=TRUE)
             print(paste("Creating:", eset_te_norm_name))
-            eset_te_norm <- get(eset_te_name)
             if (norm_type == "gcrma") {
-                exprs(eset_te_norm) <- t(gcrmaaddon(norm_obj, affybatch_te))
+                xnorm_te <- gcrmaaddon(norm_obj, affybatch_te, affinities)
             }
             else if (norm_type == "rma") {
-                exprs(eset_te_norm) <- t(rmaaddon(norm_obj, affybatch_te))
+                xnorm_te <- rmaaddon(norm_obj, affybatch_te)
             }
+            rownames(xnorm_te) <- sub("\\.CEL$", "", rownames(xnorm_te))
+            eset_te_norm <- get(eset_te_name)
+            exprs(eset_te_norm) <- t(xnorm_te)
             assign(eset_te_norm_name, eset_te_norm)
             save(list=eset_te_norm_name, file=paste0("data/", eset_te_norm_name, ".Rda"))
             remove(list=c(eset_te_norm_name))

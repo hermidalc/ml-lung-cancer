@@ -1,6 +1,6 @@
-gcrmatrain <- function(affybatchtrain) {
+gcrmatrain <- function(affybatchtrain, affinities) {
     # perform GCRMA
-    abg <- gcrma::bg.adjust.gcrma(affybatchtrain, type="fullmodel", verbose=TRUE, fast=FALSE)
+    abg <- gcrma::bg.adjust.gcrma(affybatchtrain, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE)
     a.nrm.rma <- bapred::normalizeAffyBatchqntval(abg,'pmonly')
     # store parameters for add-on quantile normalization
     rmadoc <- Biobase::experimentData(a.nrm.rma)@preprocessing[['val']]
@@ -13,17 +13,20 @@ gcrmatrain <- function(affybatchtrain) {
     return(gcrma_obj)
 }
 
-gcrmaaddon <- function(gcrma_obj, affybatchtest) {
+gcrmaaddon <- function(gcrma_obj, affybatchtest, affinities) {
     if (class(gcrma_obj) != "gcrmatrain")
         stop("Input parameter 'gcrma_obj' has to be of class 'gcrmatrain'.")
     # perform GCRMA with add-on quantile normalization
-    exprs.test.rma <- matrix(0,nrow=length(affybatchtest),ncol=gcrma_obj$nfeature)
-    for (cel in 1:length(affybatchtest)) {
-        system.time(ab.add <- bapred::extractAffybatch(cel, affybatchtest))
-        abg <- gcrma::bg.adjust.gcrma(ab.add, type="fullmodel", verbose=TRUE, fast=FALSE)
-        abo.nrm.rma  <- bapred::normalizeqntadd(abg, gcrma_obj$rmadoc$mqnts)
+    abg <- gcrma::bg.adjust.gcrma(affybatchtest, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE)
+    cat("Performing add-on normalization/summarization")
+    exprs.test.rma <- matrix(0, nrow=gcrma_obj$nfeature, ncol=length(abg))
+    for (cel in 1:length(abg)) {
+        ab.add <- bapred::extractAffybatch(cel, abg)
+        abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, gcrma_obj$rmadoc$mqnts)
         eset <- bapred::summarizeadd2(abo.nrm.rma, gcrma_obj$sumdoc.rma)
-        exprs.test.rma[cel,] <- t(exprs(eset))
+        exprs.test.rma[,cel] <- exprs(eset)
+        cat(".")
     }
-    return(exprs.test.rma)
+    cat("Done.\n")
+    return(t(exprs.test.rma))
 }
