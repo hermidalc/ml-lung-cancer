@@ -7,7 +7,7 @@ cmd_args <- commandArgs(trailingOnly=TRUE)
 num_subset <- cmd_args[1]
 dataset_names <- dataset_names[1:num_subset]
 for (dataset_name in dataset_names) {
-    eset_name <- paste0(c("eset", dataset_name), collapse="_")
+    eset_name <- paste0("eset_", dataset_name)
     print(paste("Loading:", eset_name))
     load(paste0("data/", eset_name, ".Rda"))
     # subset common pheno data
