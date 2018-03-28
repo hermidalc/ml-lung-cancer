@@ -8,36 +8,36 @@ source("lib/R/config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
 num_subset_tr <- cmd_args[1]
-norm_meth <- cmd_args[2]
+norm_type <- cmd_args[2]
 dataset_names_tr <- dataset_names[1:num_subset_tr]
 dataset_name_combos_tr <- combn(dataset_names_tr, length(dataset_names_tr) - 1)
 for (col in 1:ncol(dataset_name_combos_tr)) {
-    if (norm_meth == "none") {
+    if (norm_type == "none") {
         eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col]), collapse="_")
     }
     else {
-        eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col], norm_meth, "tr"), collapse="_")
+        eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col], norm_type, "tr"), collapse="_")
     }
     print(paste("Loading:", eset_tr_name))
     load(paste0("data/", eset_tr_name, ".Rda"))
 }
 for (dataset_te_name in dataset_names) {
-    if (norm_meth == "none") {
+    if (norm_type == "none") {
         eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
     }
     else {
-        eset_te_name <- paste0(c("eset", dataset_te_name, norm_meth, "te"), collapse="_")
+        eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
     }
     print(paste("Loading:", eset_te_name))
     load(paste0("data/", eset_te_name, ".Rda"))
 }
 for (bc_type in cmd_args[3:length(cmd_args)]) {
     for (col in 1:ncol(dataset_name_combos_tr)) {
-        if (norm_meth == "none") {
+        if (norm_type == "none") {
             eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col]), collapse="_")
         }
         else {
-            eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col], norm_meth, "tr"), collapse="_")
+            eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col], norm_type, "tr"), collapse="_")
         }
         if (bc_type %in% c("stica", "svd")) {
             Xtr <- exprs(get(eset_tr_name))
@@ -58,11 +58,11 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                     assign(eset_tr_bc_obj_name, bc_obj)
                     save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
                     for (dataset_te_name in setdiff(dataset_names, dataset_name_combos_tr[,col])) {
-                        if (norm_meth == "none") {
+                        if (norm_type == "none") {
                             eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
                         }
                         else {
-                            eset_te_name <- paste0(c("eset", dataset_te_name, norm_meth, "te"), collapse="_")
+                            eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
                         }
                         Xte <- exprs(get(eset_te_name))
                         eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
@@ -94,11 +94,11 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 assign(eset_tr_bc_obj_name, bc_obj)
                 save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
                 for (dataset_te_name in setdiff(dataset_names, dataset_name_combos_tr[,col])) {
-                    if (norm_meth == "none") {
+                    if (norm_type == "none") {
                         eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
                     }
                     else {
-                        eset_te_name <- paste0(c("eset", dataset_te_name, norm_meth, "te"), collapse="_")
+                        eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
                     }
                     Xte <- exprs(get(eset_te_name))
                     eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
@@ -159,11 +159,11 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
             assign(eset_tr_bc_obj_name, bc_obj)
             save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
             for (dataset_te_name in setdiff(dataset_names, dataset_name_combos_tr[,col])) {
-                if (norm_meth == "none") {
+                if (norm_type == "none") {
                     eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
                 }
                 else {
-                    eset_te_name <- paste0(c("eset", dataset_te_name, norm_meth, "te"), collapse="_")
+                    eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
                 }
                 Xte <- t(exprs(get(eset_te_name)))
                 pte <- pData(get(eset_te_name))
