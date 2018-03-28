@@ -7,16 +7,16 @@ source("lib/R/normFact.R")
 source("lib/R/config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
-num_subset_tr <- cmd_args[1]
+num_tr_subset <- cmd_args[1]
 norm_type <- cmd_args[2]
-dataset_names_tr <- dataset_names[1:num_subset_tr]
-dataset_name_combos_tr <- combn(dataset_names_tr, length(dataset_names_tr) - 1)
-for (col in 1:ncol(dataset_name_combos_tr)) {
+dataset_tr_names <- dataset_names[1:num_tr_subset]
+dataset_tr_name_combos <- combn(dataset_tr_names, length(dataset_tr_names) - 1)
+for (col in 1:ncol(dataset_tr_name_combos)) {
     if (norm_type == "none") {
-        eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col]), collapse="_")
+        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
     }
     else {
-        eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col], norm_type, "tr"), collapse="_")
+        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], norm_type, "tr"), collapse="_")
     }
     print(paste("Loading:", eset_tr_name))
     load(paste0("data/", eset_tr_name, ".Rda"))
@@ -32,12 +32,12 @@ for (dataset_te_name in dataset_names) {
     load(paste0("data/", eset_te_name, ".Rda"))
 }
 for (bc_type in cmd_args[3:length(cmd_args)]) {
-    for (col in 1:ncol(dataset_name_combos_tr)) {
+    for (col in 1:ncol(dataset_tr_name_combos)) {
         if (norm_type == "none") {
-            eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col]), collapse="_")
+            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
         }
         else {
-            eset_tr_name <- paste0(c("eset", dataset_name_combos_tr[,col], norm_type, "tr"), collapse="_")
+            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], norm_type, "tr"), collapse="_")
         }
         if (bc_type %in% c("stica", "svd")) {
             Xtr <- exprs(get(eset_tr_name))
@@ -57,7 +57,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                     eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
                     assign(eset_tr_bc_obj_name, bc_obj)
                     save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
-                    for (dataset_te_name in setdiff(dataset_names, dataset_name_combos_tr[,col])) {
+                    for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
                         if (norm_type == "none") {
                             eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
                         }
@@ -93,7 +93,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
                 assign(eset_tr_bc_obj_name, bc_obj)
                 save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
-                for (dataset_te_name in setdiff(dataset_names, dataset_name_combos_tr[,col])) {
+                for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
                     if (norm_type == "none") {
                         eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
                     }
@@ -158,7 +158,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
             eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
             assign(eset_tr_bc_obj_name, bc_obj)
             save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
-            for (dataset_te_name in setdiff(dataset_names, dataset_name_combos_tr[,col])) {
+            for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
                 if (norm_type == "none") {
                     eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
                 }
