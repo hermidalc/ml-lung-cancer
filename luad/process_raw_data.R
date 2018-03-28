@@ -1,54 +1,76 @@
 #!/usr/bin/env Rscript
 
-suppressPackageStartupMessages(library("tibble"))
-suppressPackageStartupMessages(library("readxl"))
-suppressPackageStartupMessages(library("Biobase"))
-suppressPackageStartupMessages(library("impute"))
-suppressPackageStartupMessages(library("gcrma"))
+suppressPackageStartupMessages(library("affy"))
 suppressPackageStartupMessages(library("bapred"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db")))
-suppressPackageStartupMessages(library("annotate"))
 source("lib/R/gcrmapred.R")
 source("lib/R/config.R")
 
-# cmd_args <- commandArgs(trailingOnly=TRUE)
-# affybatch <- ReadAffy(celfile.path=cmd_args[2], cdfname="hgu133plus2", verbose=TRUE)
-# write.table(exprs(eset), file=paste0(cmd_args[1], "_series_matrix.txt"), sep="\t")
-# eset_name <- paste0(c("eset", cmd_args[1], "gcrma"), collapse="_")
-# assign(eset_name, eset)
-# save(list=eset_name, file=paste0(eset_name, ".Rda"))
-
 cmd_args <- commandArgs(trailingOnly=TRUE)
-num_subset <- cmd_args[1]
-dataset_names <- dataset_names[1:num_subset]
-dataset_name_combos <- combn(dataset_names, length(dataset_names) - 1)
-for (norm_type in cmd_args[2:length(cmd_args)]) {
-    if (norm_type %in% c("gcrma", "rma")) {
-        for (col in 1:ncol(dataset_name_combos)) {
-            cel_files <- c()
-            for (dataset_name in dataset_name_combos[,col]) {
-                cel_path <- paste0("data/raw/", dataset_name)
-                if (dir.exists(cel_path)) {
-                    cel_files <- append(cel_files, list.files(path=cel_path, full.names=TRUE, pattern="\\.CEL$"))
-                }
-                else {
-                    cel_files <- NULL
-                    break
-                }
+num_tr_subset <- cmd_args[1]
+cdfname <- cmd_args[2]
+dataset_tr_names <- dataset_names[1:num_tr_subset]
+dataset_tr_name_combos <- combn(dataset_tr_names, length(dataset_tr_names) - 1)
+for (col in 1:ncol(dataset_tr_name_combos)) {
+    eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
+    print(paste("Loading:", eset_tr_name))
+    load(paste0("data/", eset_tr_name, ".Rda"))
+}
+for (dataset_te_name in dataset_names) {
+    eset_te_name <- paste0("eset_", dataset_te_name)
+    print(paste("Loading:", eset_te_name))
+    load(paste0("data/", eset_te_name, ".Rda"))
+}
+for (norm_type in cmd_args[3:length(cmd_args)]) {
+    for (col in 1:ncol(dataset_tr_name_combos)) {
+        cel_files_tr <- c()
+        for (dataset_tr_name in dataset_tr_name_combos[,col]) {
+            cel_path_tr <- paste0("data/raw/", dataset_tr_name)
+            if (dir.exists(cel_path_tr)) {
+                cel_files_tr <- append(cel_files_tr, list.files(path=cel_path_tr, full.names=TRUE, pattern="\\.CEL$"))
             }
-            if (!is.null(cel_files)) {
-                eset_norm_name <- paste0(c("eset", dataset_name_combos[,col], norm_type), collapse="_")
-                print(paste("Creating: ", eset_norm_name))
-                affybatch <- ReadAffy(filenames=cel_files, cdfname="hgu133plus2", verbose=TRUE)
-                if (norm_type == "gcrma") {
-                    norm_obj <- gcrmatrain(affybatch)
-                }
-                else if (norm_type == "rma") {
-                    norm_obj <- rmatrain(affybatch)
-                }
-                eset_norm <- ExpressionSet(assayData=t(norm_obj$xnorm), phenoData=pheno)
+            else {
+                cel_files_tr <- NULL
+                break
             }
         }
+        if (is.null(cel_files_tr)) next
+        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
+        eset_tr_norm_name <- paste0(c(eset_tr_name, norm_type, "tr"), collapse="_")
+        print(paste("Creating: ", eset_tr_norm_name))
+        affybatch_tr <- ReadAffy(filenames=cel_files_tr, cdfname=cdfname, verbose=TRUE)
+        eset_tr_norm <- get(eset_tr_name)
+        if (norm_type == "gcrma") {
+            norm_obj <- gcrmatrain(affybatch_tr)
+        }
+        else if (norm_type == "rma") {
+            norm_obj <- rmatrain(affybatch_tr)
+        }
+        exprs(eset_tr_norm) <- t(norm_obj$xnorm)
+        assign(eset_tr_norm_name, eset_tr_norm)
+        save(list=eset_tr_norm_name, file=paste0("data/", eset_tr_norm_name, ".Rda"))
+        eset_tr_norm_obj_name <- paste0(eset_tr_norm_name, "_obj")
+        assign(eset_tr_norm_obj_name, norm_obj)
+        save(list=eset_tr_norm_obj_name, file=paste0("data/", eset_tr_norm_obj_name, ".Rda"))
+        for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
+            cel_path_te <- paste0("data/raw/", dataset_te_name)
+            cel_files_te <- list.files(path=cel_path_te, full.names=TRUE, pattern="\\.CEL$")
+            eset_te_name <- paste0("eset_", dataset_te_name)
+            eset_te_norm_name <- paste0(eset_tr_norm_name, "_", dataset_te_name, "_te")
+            print(paste("Creating:", eset_te_norm_name))
+            affybatch_te <- ReadAffy(filenames=cel_files_te, cdfname=cdfname, verbose=TRUE)
+            eset_te_norm <- get(eset_te_name)
+            if (norm_type == "gcrma") {
+                exprs(eset_te_norm) <- t(gcrmaaddon(norm_obj, affybatch_te))
+            }
+            else if (norm_type == "rma") {
+                exprs(eset_te_norm) <- t(rmaaddon(norm_obj, affybatch_te))
+            }
+            assign(eset_te_norm_name, eset_te_norm)
+            save(list=eset_te_norm_name, file=paste0("data/", eset_te_norm_name, ".Rda"))
+            remove(list=c(eset_te_norm_name))
+        }
+        remove(list=c(eset_tr_norm_obj_name, eset_tr_norm_name))
     }
 }
