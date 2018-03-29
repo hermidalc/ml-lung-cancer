@@ -8,7 +8,7 @@ rmatrain <- function(affybatchtrain) {
     sumdoc.rma <- Biobase::experimentData(summ.rma)@preprocessing$val$probe.effects
     # extract gene expressions
     exprs.train.rma <- exprs(summ.rma)
-    rma_obj <- list(xnorm=t(exprs.train.rma), rmadoc=rmadoc, sumdoc.rma=sumdoc.rma, nfeature=nrow(exp.train.rma))
+    rma_obj <- list(xnorm=t(exprs.train.rma), rmadoc=rmadoc, sumdoc.rma=sumdoc.rma, nfeature=nrow(exprs.train.rma))
     class(rma_obj) <- "rmatrain"
     return(rma_obj)
 }
