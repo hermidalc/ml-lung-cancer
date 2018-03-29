@@ -2,10 +2,10 @@
 
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("gcrma"))
-suppressPackageStartupMessages(library("bapred"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db")))
 source("lib/R/gcrmapred.R")
+source("lib/R/rmapred.R")
 source("lib/R/config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
@@ -44,7 +44,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
     eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
     for (norm_type in cmd_args[3:length(cmd_args)]) {
         eset_tr_norm_name <- paste0(c(eset_tr_name, norm_type, "tr"), collapse="_")
-        cat(paste("Creating:", eset_tr_norm_name))
+        print(paste("Creating:", eset_tr_norm_name))
         if (norm_type == "gcrma") {
             norm_obj <- gcrmatrain(affybatch_tr, affinities)
         }
