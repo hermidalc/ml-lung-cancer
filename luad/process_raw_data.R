@@ -1,7 +1,6 @@
 #!/usr/bin/env Rscript
 
 suppressPackageStartupMessages(library("Biobase"))
-suppressPackageStartupMessages(library("gcrma"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db")))
 source("lib/R/gcrmapred.R")
@@ -23,7 +22,7 @@ for (dataset_te_name in dataset_names) {
     load(paste0("data/", eset_te_name, ".Rda"))
 }
 if ("gcrma" %in% cmd_args[3:length(cmd_args)]) {
-    affinities <- compute.affinities(cdfname, verbose=TRUE)
+    affinities <- gcrma::compute.affinities(cdfname, verbose=TRUE)
 }
 for (col in 1:ncol(dataset_tr_name_combos)) {
     cel_files_tr <- c()
