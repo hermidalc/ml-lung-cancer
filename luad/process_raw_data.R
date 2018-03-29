@@ -9,10 +9,10 @@ source("lib/R/rmapred.R")
 source("lib/R/config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
-num_tr_subset <- cmd_args[1]
+num_tr_subset <- as.integer(cmd_args[1])
 cdfname <- cmd_args[2]
 dataset_tr_names <- dataset_names[1:num_tr_subset]
-dataset_tr_name_combos <- combn(dataset_tr_names, length(dataset_tr_names) - 1)
+dataset_tr_name_combos <- combn(dataset_tr_names, num_tr_subset)
 for (col in 1:ncol(dataset_tr_name_combos)) {
     eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
     print(paste("Loading:", eset_tr_name))

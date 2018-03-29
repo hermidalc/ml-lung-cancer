@@ -4,8 +4,7 @@ suppressPackageStartupMessages(library("Biobase"))
 source("lib/R/config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
-num_subset <- cmd_args[1]
-dataset_names <- dataset_names[1:num_subset]
+num_subset <- as.integer(cmd_args[1])
 for (dataset_name in dataset_names) {
     eset_name <- paste0("eset_", dataset_name)
     print(paste("Loading:", eset_name))
@@ -15,8 +14,7 @@ for (dataset_name in dataset_names) {
     pData(eset) <- pData(eset)[common_pheno_colnames]
     assign(eset_name, eset)
 }
-# merge (leaving one out each time)
-dataset_name_combos <- combn(dataset_names, length(dataset_names) - 1)
+dataset_name_combos <- combn(dataset_names, num_subset)
 for (col in 1:ncol(dataset_name_combos)) {
     eset_merged_name <- paste0(c("eset", dataset_name_combos[,col]), collapse="_")
     print(paste("Creating:", eset_merged_name))
