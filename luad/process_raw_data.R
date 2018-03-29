@@ -60,6 +60,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         save(list=eset_tr_norm_obj_name, file=paste0("data/", eset_tr_norm_obj_name, ".Rda"))
         for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
             cel_path_te <- paste0("data/raw/", dataset_te_name)
+            if (!dir.exists(cel_path_te)) next
             cel_files_te <- list.files(path=cel_path_te, full.names=TRUE, pattern="\\.CEL$")
             eset_te_name <- paste0("eset_", dataset_te_name)
             eset_te_norm_name <- paste0(eset_tr_norm_name, "_", dataset_te_name, "_te")
