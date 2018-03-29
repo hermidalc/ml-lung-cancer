@@ -9,7 +9,7 @@ source("lib/R/config.R")
 cmd_args <- commandArgs(trailingOnly=TRUE)
 num_tr_subset <- as.integer(cmd_args[1])
 norm_type <- cmd_args[2]
-dataset_tr_name_combos <- combn(dataset_tr_names, num_tr_subset)
+dataset_tr_name_combos <- combn(dataset_names, num_tr_subset)
 for (col in 1:ncol(dataset_tr_name_combos)) {
     if (norm_type == "none") {
         eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
