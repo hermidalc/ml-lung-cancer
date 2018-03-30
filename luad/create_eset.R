@@ -12,20 +12,20 @@ cmd_args <- commandArgs(trailingOnly=TRUE)
 for (dataset_name in cmd_args) {
     print(paste("Creating eset:", dataset_name))
     datafile <- paste0("data/", dataset_name, "_series_matrix.xlsx")
-    exprs <- as.matrix(column_to_rownames(as.data.frame(read_excel(
-        datafile,
-        sheet=3,
-        col_names=TRUE,
-        trim_ws=TRUE
-    )), var="ID_REF"))
-    pheno <- AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
-        datafile,
-        sheet=2,
-        col_names=TRUE,
-        trim_ws=TRUE
-    )), var="Sample_geo_accession"))
-    # build eset
-    eset <- ExpressionSet(assayData=exprs, phenoData=pheno)
+    eset <- ExpressionSet(
+        assayData=as.matrix(column_to_rownames(as.data.frame(read_excel(
+            datafile,
+            sheet=3,
+            col_names=TRUE,
+            trim_ws=TRUE
+        )), var="ID_REF")),
+        phenoData=AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
+            datafile,
+            sheet=2,
+            col_names=TRUE,
+            trim_ws=TRUE
+        )), var="Sample_geo_accession"))
+    )
     # filter eset
     if (dataset_name == "gse31210") {
         eset <- eset[,eset$"Exclude Prognosis Analysis Incomplete Resection/Adjuvant Therapy" == 0]
@@ -66,7 +66,7 @@ for (dataset_name in cmd_args) {
         geneSymbols <- getSYMBOL(probeset_ids, "hgu133plus2hsentrezg.db")
         eset_name <- paste0(c("eset", dataset_name, "gene"), collapse="_")
     }
-    fData(eset) <- data.frame(Symbol=geneSymbols)
+    featureData(eset) <- AnnotatedDataFrame(Symbol=geneSymbols)
     assign(eset_name, eset)
     save(list=eset_name, file=paste0("data/", eset_name, ".Rda"))
 }
