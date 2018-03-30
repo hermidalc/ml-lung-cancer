@@ -59,13 +59,14 @@ for (dataset_name in cmd_args) {
     if (dataset_name %in% c("gse31210","gse8894","gse30219","gse37745","gse50081")) {
         annotation(eset) <- "hgu133plus2"
         geneSymbols <- getSYMBOL(probeset_ids, "hgu133plus2.db")
+        eset_name <- paste0(c("eset", dataset_name), collapse="_")
     }
     else if (dataset_name %in% c("gse67639")) {
         annotation(eset) <- "hgu133plus2hsentrezg"
         geneSymbols <- getSYMBOL(probeset_ids, "hgu133plus2hsentrezg.db")
+        eset_name <- paste0(c("eset", dataset_name, "gene"), collapse="_")
     }
     fData(eset) <- data.frame(Symbol=geneSymbols)
-    eset_name <- paste0(c("eset", dataset_name), collapse="_")
     assign(eset_name, eset)
     save(list=eset_name, file=paste0("data/", eset_name, ".Rda"))
 }
