@@ -14,8 +14,8 @@ rmatrain <- function(affybatchtrain) {
 }
 
 rmaaddon <- function(rma_obj, affybatchtest) {
-    if(class(params) != "rmatrain")
-        stop("Input parameter 'params' has to be of class 'rmatrain'.")
+    if(class(rma_obj) != "rmatrain")
+        stop("Input parameter 'rma_obj' has to be of class 'rmatrain'.")
     # perform RMA with add-on quantile normalization
     abg <- affy::bg.correct.rma(affybatchtest)
     cat("Performing add-on normalization/summarization")
