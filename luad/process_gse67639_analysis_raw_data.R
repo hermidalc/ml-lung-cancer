@@ -15,15 +15,15 @@ for (dataset_te_name in c("gse30219", "gse37745", "gse50081")) {
     eset_te_name <- paste0("eset_", dataset_te_name)
     print(paste("Loading:", eset_te_name))
     load(paste0("data/", eset_te_name, ".Rda"))
-    for (norm_type in c("gcrma", "rma")) {
+    for (norm_type in c("gcrma")) {
         eset_te_norm_name <- paste0(eset_te_name, "_gene")
         print(paste("Creating:", eset_te_norm_name))
         if (norm_type == "gcrma") {
             eset_te_norm <- gcrma(affybatch_te, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE)
         }
-        else if (norm_type == "rma") {
-            eset_te_norm <- rma(affybatch_te, verbose=TRUE)
-        }
+        # else if (norm_type == "rma") {
+        #     eset_te_norm <- rma(affybatch_te, verbose=TRUE)
+        # }
         colnames(eset_te_norm) <- sub("\\.CEL$", "", colnames(eset_te_norm))
         phenoData(eset_te_norm) <- phenoData(get(eset_te_name))
         featureData(eset_te_norm) <- AnnotatedDataFrame(data.frame(
