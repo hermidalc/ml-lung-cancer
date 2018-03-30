@@ -296,9 +296,9 @@ pipelines = {
     },
 }
 dataset_names = [
-    'gse31210',
     'gse8894',
     'gse30219',
+    'gse31210',
     'gse37745',
     'gse50081'
 ]
@@ -306,10 +306,10 @@ dataset_pair_names = [
     # ('gse31210_gse30219', 'gse8894'),
     # ('gse31210_gse8894', 'gse30219'),
     # ('gse8894_gse30219', 'gse31210'),
-    ('gse31210_gse30219_gse37745', 'gse8894'),
-    ('gse31210_gse8894_gse37745', 'gse30219'),
-    ('gse8894_gse30219_gse37745', 'gse31210'),
-    ('gse31210_gse8894_gse30219', 'gse37745'),
+    # ('gse31210_gse30219_gse37745', 'gse8894'),
+    # ('gse31210_gse8894_gse37745', 'gse30219'),
+    # ('gse8894_gse30219_gse37745', 'gse31210'),
+    # ('gse31210_gse8894_gse30219', 'gse37745'),
     # ('gse31210_gse30219_gse37745_gse50081', 'gse8894'),
     # ('gse31210_gse8894_gse37745_gse50081', 'gse30219'),
     # ('gse8894_gse30219_gse37745_gse50081', 'gse31210'),
@@ -321,7 +321,7 @@ bc_methods = [
     'std',
     'qnorm',
     'cbt',
-    'fab',
+    #'fab',
     'sva',
     'stica0',
     'stica025',
