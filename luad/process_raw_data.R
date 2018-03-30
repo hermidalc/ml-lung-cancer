@@ -56,9 +56,9 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             eset_tr_norm <- ExpressionSet(
                 assayData=t(norm_obj$xnorm),
                 phenoData=phenoData(get(eset_tr_name)),
-                featureData=AnnotatedDataFrame(
+                featureData=AnnotatedDataFrame(data.frame(
                     Symbol=getSYMBOL(featureNames(eset_tr_norm), paste0(cdfname, ".db"))
-                ),
+                )),
                 annotation=cdfname
             )
         }
@@ -91,9 +91,9 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 eset_te_norm <- ExpressionSet(
                     assayData=t(xnorm_te),
                     phenoData=phenoData(get(eset_te_name)),
-                    featureData=AnnotatedDataFrame(
+                    featureData=AnnotatedDataFrame(data.frame(
                         Symbol=getSYMBOL(featureNames(eset_te_norm), paste0(cdfname, ".db"))
-                    ),
+                    )),
                     annotation=cdfname
                 )
             }

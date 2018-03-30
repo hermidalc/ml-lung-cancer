@@ -26,9 +26,9 @@ for (dataset_te_name in c("gse30219", "gse37745", "gse50081")) {
         }
         colnames(eset_te_norm) <- sub("\\.CEL$", "", colnames(eset_te_norm))
         phenoData(eset_te_norm) <- phenoData(get(eset_te_name))
-        featureData(eset_te_norm) <- AnnotatedDataFrame(
+        featureData(eset_te_norm) <- AnnotatedDataFrame(data.frame(
             Symbol=getSYMBOL(featureNames(eset_te_norm), paste0(cdfname, ".db"))
-        )
+        ))
         annotation(eset_te_norm) <- cdfname
         assign(eset_te_norm_name, eset_te_norm)
         save(list=eset_te_norm_name, file=paste0("data/", eset_te_norm_name, ".Rda"))

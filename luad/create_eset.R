@@ -66,7 +66,7 @@ for (dataset_name in cmd_args) {
         geneSymbols <- getSYMBOL(probeset_ids, "hgu133plus2hsentrezg.db")
         eset_name <- paste0(c("eset", dataset_name, "gene"), collapse="_")
     }
-    featureData(eset) <- AnnotatedDataFrame(Symbol=geneSymbols)
+    featureData(eset) <- AnnotatedDataFrame(data.frame(Symbol=geneSymbols))
     assign(eset_name, eset)
     save(list=eset_name, file=paste0("data/", eset_name, ".Rda"))
 }
