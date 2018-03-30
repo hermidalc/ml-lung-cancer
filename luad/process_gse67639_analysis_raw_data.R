@@ -3,8 +3,6 @@
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("gcrma"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db")))
-source("lib/R/gcrmapred.R")
-source("lib/R/rmapred.R")
 
 cdfname <- "hgu133plus2hsentrezg"
 affinities <- compute.affinities(cdfname, verbose=TRUE)
