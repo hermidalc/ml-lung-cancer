@@ -51,8 +51,20 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             norm_obj <- rmatrain(affybatch_tr)
         }
         rownames(norm_obj$xnorm) <- sub("\\.CEL$", "", rownames(norm_obj$xnorm))
-        eset_tr_norm <- get(eset_tr_name)
-        exprs(eset_tr_norm) <- t(norm_obj$xnorm)
+        if (cdfname == "hgu133plus2hsentrezg") {
+            eset_tr_norm <- ExpressionSet(
+                assayData=t(norm_obj$xnorm),
+                phenoData=phenoData(get(eset_tr_name)),
+                featureData=AnnotatedDataFrame(
+                    Symbol=getSYMBOL(featureNames(eset_tr_norm), paste0(cdfname, ".db"))
+                ),
+                annotation=cdfname
+            )
+        }
+        else {
+            eset_tr_norm <- get(eset_tr_name)
+            exprs(eset_tr_norm) <- t(norm_obj$xnorm)
+        }
         assign(eset_tr_norm_name, eset_tr_norm)
         save(list=eset_tr_norm_name, file=paste0("data/", eset_tr_norm_name, ".Rda"))
         eset_tr_norm_obj_name <- paste0(eset_tr_norm_name, "_obj")
@@ -74,8 +86,20 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 xnorm_te <- rmaaddon(norm_obj, affybatch_te)
             }
             rownames(xnorm_te) <- sub("\\.CEL$", "", rownames(xnorm_te))
-            eset_te_norm <- get(eset_te_name)
-            exprs(eset_te_norm) <- t(xnorm_te)
+            if (cdfname == "hgu133plus2hsentrezg") {
+                eset_te_norm <- ExpressionSet(
+                    assayData=t(xnorm_te),
+                    phenoData=phenoData(get(eset_te_name)),
+                    featureData=AnnotatedDataFrame(
+                        Symbol=getSYMBOL(featureNames(eset_te_norm), paste0(cdfname, ".db"))
+                    ),
+                    annotation=cdfname
+                )
+            }
+            else {
+                eset_te_norm <- get(eset_te_name)
+                exprs(eset_te_norm) <- t(xnorm_te)
+            }
             assign(eset_te_norm_name, eset_te_norm)
             save(list=eset_te_norm_name, file=paste0("data/", eset_te_norm_name, ".Rda"))
             remove(list=c(eset_te_norm_name))
