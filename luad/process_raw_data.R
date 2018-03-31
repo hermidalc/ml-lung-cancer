@@ -14,14 +14,25 @@ num_tr_subset <- as.integer(cmd_args[1])
 cdfname <- cmd_args[2]
 dataset_tr_name_combos <- combn(dataset_names, num_tr_subset)
 for (col in 1:ncol(dataset_tr_name_combos)) {
-    eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
-    print(paste("Loading:", eset_tr_name))
-    load(paste0("data/", eset_tr_name, ".Rda"))
+    load_data <- TRUE
+    for (dataset_tr_name in dataset_tr_name_combos[,col]) {
+        if (!dir.exists(paste0("data/raw/", dataset_tr_name))) {
+            load_data <- FALSE
+            break
+        }
+    }
+    if (load_data) {
+        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
+        print(paste("Loading:", eset_tr_name))
+        load(paste0("data/", eset_tr_name, ".Rda"))
+    }
 }
 for (dataset_te_name in dataset_names) {
-    eset_te_name <- paste0("eset_", dataset_te_name)
-    print(paste("Loading:", eset_te_name))
-    load(paste0("data/", eset_te_name, ".Rda"))
+    if (dir.exists(paste0("data/raw/", dataset_te_name))) {
+        eset_te_name <- paste0("eset_", dataset_te_name)
+        print(paste("Loading:", eset_te_name))
+        load(paste0("data/", eset_te_name, ".Rda"))
+    }
 }
 if ("gcrma" %in% cmd_args[3:length(cmd_args)]) {
     affinities <- compute.affinities(cdfname, verbose=TRUE)
