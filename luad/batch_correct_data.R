@@ -22,18 +22,25 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         print(paste("Loading:", eset_tr_name))
         load(eset_tr_file)
     }
+    if (norm_type != "none") {
+        for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
+            eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
+            eset_te_file <- paste0("data/", eset_te_name, ".Rda")
+            if (file.exists(eset_te_file)) {
+                print(paste("Loading:", eset_te_name))
+                load(eset_te_file)
+            }
+        }
+    }
 }
-for (dataset_te_name in dataset_names) {
-    if (norm_type == "none") {
+if (norm_type == "none") {
+    for (dataset_te_name in dataset_names) {
         eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
-    }
-    else {
-        eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
-    }
-    eset_te_file <- paste0("data/", eset_te_name, ".Rda")
-    if (file.exists(eset_te_file)) {
-        print(paste("Loading:", eset_te_name))
-        load(eset_te_file)
+        eset_te_file <- paste0("data/", eset_te_name, ".Rda")
+        if (file.exists(eset_te_file)) {
+            print(paste("Loading:", eset_te_name))
+            load(eset_te_file)
+        }
     }
 }
 for (bc_type in cmd_args[3:length(cmd_args)]) {
@@ -68,11 +75,11 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                             eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
                         }
                         else {
-                            eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
+                            eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
                         }
                         if (!exists(eset_te_name)) next
                         Xte <- exprs(get(eset_te_name))
-                        eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
+                        eset_te_bc_name <- paste0(c(eset_tr_bc_name, dataset_te_name, "te"), collapse="_")
                         print(paste("Creating:", eset_te_bc_name))
                         eset_te_bc <- get(eset_te_name)
                         # Renard et al stICA IEEE 2017 paper code add-on batch effect correction
@@ -105,11 +112,11 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                         eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
                     }
                     else {
-                        eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
+                        eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
                     }
                     if (!exists(eset_te_name)) next
                     Xte <- exprs(get(eset_te_name))
-                    eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
+                    eset_te_bc_name <- paste0(c(eset_tr_bc_name, dataset_te_name, "te"), collapse="_")
                     print(paste("Creating:", eset_te_bc_name))
                     eset_te_bc <- get(eset_te_name)
                     # Renard et al stICA IEEE 2017 paper code add-on batch effect correction
@@ -171,7 +178,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                     eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
                 }
                 else {
-                    eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
+                    eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
                 }
                 if (!exists(eset_te_name)) next
                 Xte <- t(exprs(get(eset_te_name)))
@@ -184,7 +191,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                     }
                 }
                 bte <- as.factor(bte)
-                eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
+                eset_te_bc_name <- paste0(c(eset_tr_bc_name, dataset_te_name, "te"), collapse="_")
                 print(paste("Creating:", eset_te_bc_name))
                 eset_te_bc <- get(eset_te_name)
                 if (bc_type == "cbt") {
