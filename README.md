@@ -5,7 +5,7 @@
 1. Install System Dependencies
 
 ```bash
-sudo dnf install -y libxml-devel libxml2-devel
+sudo dnf install -y libxml-devel libxml2-devel mesa-libGL-devel mesa-libGLU-devel
 ```
 
 2. Install Anaconda3
@@ -29,6 +29,7 @@ r-nloptr \
 r-rcppeigen \
 r-lme4 \
 r-corpcor \
+r-rgl \
 rpy2 \
 libiconv \
 bioconductor-biocinstaller \
@@ -44,15 +45,34 @@ bioconductor-impute \
 lxml \
 natsort \
 mlxtend
-
 ```
-3. Install CRAN Packages (not available via Conda)
+
+3. Setup for rJava (used by some R packages)
+
+In .bashrc/.bash_profile:
+```bash
+JAVA_HOME=/usr/lib/jvm/java
+export JAVA_HOME
+
+LD_LIBRARY_PATH=/usr/lib/jvm/java/jre/lib/amd64:/usr/lib/jvm/java/jre/lib/amd64/server
+export LD_LIBRARY_PATH
+```
+Then run:
+```bash
+source .bashrc
+R CMD javareconf
+```
+
+4. Install CRAN Packages (not available via Conda)
 
 ```R
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
+install.packages("rJava", type="source")
+install.packages("Biocomb")
 install.packages("bapred")
 ```
-4. Install Bioconductor Packages (not available via Conda)
+
+5. Install Bioconductor Packages (not available via Conda)
 
 ```R
 source("https://bioconductor.org/biocLite.R")
@@ -63,7 +83,8 @@ biocLite("pvca", suppressUpdates=TRUE)
 biocLite("LiblineaR", suppressUpdates=TRUE)
 biocLite("JADE", suppressUpdates=TRUE)
 ```
-5. Install Brainarray Custom Microarray Annotation DBs and CDFs
+
+6. Install Brainarray Custom Microarray Annotation DBs and CDFs
 
 ```R
 library(devtools)
