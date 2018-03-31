@@ -17,8 +17,11 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
     else {
         eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], norm_type, "tr"), collapse="_")
     }
-    print(paste("Loading:", eset_tr_name))
-    load(paste0("data/", eset_tr_name, ".Rda"))
+    eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
+    if (file.exists(eset_tr_file)) {
+        print(paste("Loading:", eset_tr_name))
+        load(eset_tr_file)
+    }
 }
 for (dataset_te_name in dataset_names) {
     if (norm_type == "none") {
@@ -27,8 +30,11 @@ for (dataset_te_name in dataset_names) {
     else {
         eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
     }
-    print(paste("Loading:", eset_te_name))
-    load(paste0("data/", eset_te_name, ".Rda"))
+    eset_te_file <- paste0("data/", eset_te_name, ".Rda")
+    if (file.exists(eset_te_file)) {
+        print(paste("Loading:", eset_te_name))
+        load(eset_te_file)
+    }
 }
 for (bc_type in cmd_args[3:length(cmd_args)]) {
     for (col in 1:ncol(dataset_tr_name_combos)) {
@@ -38,6 +44,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
         else {
             eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], norm_type, "tr"), collapse="_")
         }
+        if (!exists(eset_tr_name)) next
         if (bc_type %in% c("stica", "svd")) {
             Xtr <- exprs(get(eset_tr_name))
             ptr <- pData(get(eset_tr_name))
@@ -63,6 +70,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                         else {
                             eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
                         }
+                        if (!exists(eset_te_name)) next
                         Xte <- exprs(get(eset_te_name))
                         eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
                         print(paste("Creating:", eset_te_bc_name))
@@ -99,6 +107,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                     else {
                         eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
                     }
+                    if (!exists(eset_te_name)) next
                     Xte <- exprs(get(eset_te_name))
                     eset_te_bc_name <- paste0(eset_tr_bc_name, "_", dataset_te_name, "_te")
                     print(paste("Creating:", eset_te_bc_name))
@@ -164,6 +173,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 else {
                     eset_te_name <- paste0(c("eset", dataset_te_name, norm_type, "te"), collapse="_")
                 }
+                if (!exists(eset_te_name)) next
                 Xte <- t(exprs(get(eset_te_name)))
                 pte <- pData(get(eset_te_name))
                 bte <- pte$Batch
