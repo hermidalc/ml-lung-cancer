@@ -3,8 +3,8 @@
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("bapred"))
 source("lib/R/svapred.R")
-source("lib/R/normFact.R")
-source("lib/R/config.R")
+source("lib/R/stICA.R")
+source("config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
 num_tr_subset <- as.integer(cmd_args[1])

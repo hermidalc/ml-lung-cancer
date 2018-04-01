@@ -7,7 +7,7 @@ suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db
 suppressPackageStartupMessages(library("annotate"))
 source("lib/R/gcrmapred.R")
 source("lib/R/rmapred.R")
-source("lib/R/config.R")
+source("config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
 num_tr_subset <- as.integer(cmd_args[1])

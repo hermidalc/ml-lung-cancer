@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 suppressPackageStartupMessages(library("Biobase"))
-source("lib/R/config.R")
+source("config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
 num_subset <- as.integer(cmd_args[1])
