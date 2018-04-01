@@ -2,7 +2,7 @@
 
 suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("bapred"))
-source("lib/R/svaba.R")
+source("lib/R/svapred.R")
 source("lib/R/normFact.R")
 source("lib/R/config.R")
 
