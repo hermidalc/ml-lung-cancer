@@ -80,7 +80,6 @@ biocLite("hgu133plus2.db", suppressUpdates=TRUE)
 biocLite("hgu133plus2cdf", suppressUpdates=TRUE)
 biocLite("hgu133plus2probe", suppressUpdates=TRUE)
 biocLite("pvca", suppressUpdates=TRUE)
-biocLite("LiblineaR", suppressUpdates=TRUE)
 biocLite("JADE", suppressUpdates=TRUE)
 ```
 
