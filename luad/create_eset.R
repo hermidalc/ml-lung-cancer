@@ -9,18 +9,29 @@ suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db
 suppressPackageStartupMessages(library("annotate"))
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
-for (dataset_name in cmd_args) {
-    print(paste("Creating eset:", dataset_name))
-    datafile <- paste0("data/", dataset_name, "_series_matrix.xlsx")
+for (file in cmd_args) {
+    dir <- dirname(file)
+    file_name_parts <- strsplit(basename(file), split="_", fixed=TRUE)[[1]]
+    dataset_name <- file_name_parts[1]
+    norm_type <- file_name_parts[2]
+    if (length(file_name_parts) == 4) {
+        eset_name <- paste0(c("eset", file_name_parts[1:2]), collapse="_")
+        id_type <- "none"
+    }
+    else {
+        eset_name <- paste0(c("eset", file_name_parts[1:3]), collapse="_")
+        id_type <- file_name_parts[3]
+    }
+    print(paste("Creating:", eset_name), quote=FALSE, row.names=FALSE)
     eset <- ExpressionSet(
         assayData=as.matrix(column_to_rownames(as.data.frame(read_excel(
-            datafile,
+            file,
             sheet=3,
             col_names=TRUE,
             trim_ws=TRUE
         )), var="ID_REF")),
         phenoData=AnnotatedDataFrame(column_to_rownames(as.data.frame(read_excel(
-            datafile,
+            file,
             sheet=2,
             col_names=TRUE,
             trim_ws=TRUE
@@ -59,12 +70,10 @@ for (dataset_name in cmd_args) {
     if (dataset_name %in% c("gse31210","gse8894","gse30219","gse37745","gse50081")) {
         annotation(eset) <- "hgu133plus2"
         geneSymbols <- getSYMBOL(probeset_ids, "hgu133plus2.db")
-        eset_name <- paste0(c("eset", dataset_name), collapse="_")
     }
     else if (dataset_name %in% c("gse67639")) {
         annotation(eset) <- "hgu133plus2hsentrezg"
         geneSymbols <- getSYMBOL(probeset_ids, "hgu133plus2hsentrezg.db")
-        eset_name <- paste0(c("eset", dataset_name, "gene"), collapse="_")
     }
     featureData(eset) <- AnnotatedDataFrame(data.frame(Symbol=geneSymbols))
     assign(eset_name, eset)
