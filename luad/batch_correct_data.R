@@ -130,7 +130,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 remove(list=c(eset_tr_bc_obj_name, eset_tr_bc_name))
             }
         }
-        else if (bc_type %in% c("cbt", "fab", "qnorm", "std", "sva")) {
+        else if (bc_type %in% c("cbt", "ctr", "fab", "qnorm", "rta", "rtg", "std", "sva")) {
             Xtr <- t(exprs(get(eset_tr_name)))
             ptr <- pData(get(eset_tr_name))
             ytr <- as.factor(ptr$Relapse + 1)
@@ -149,6 +149,10 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 bc_obj <- combatba(Xtr, btr)
                 exprs(eset_tr_bc) <- t(bc_obj$xadj)
             }
+            else if (bc_type == "ctr") {
+                bc_obj <- meancenter(Xtr, btr)
+                exprs(eset_tr_bc) <- t(bc_obj$xadj)
+            }
             else if (bc_type == "fab") {
                 bc_obj <- fabatch(Xtr, ytr, btr)
                 exprs(eset_tr_bc) <- t(bc_obj$xadj)
@@ -156,6 +160,14 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
             else if (bc_type == "qnorm") {
                 bc_obj <- qunormtrain(Xtr)
                 exprs(eset_tr_bc) <- t(bc_obj$xnorm)
+            }
+            else if (bc_type == "rta") {
+                bc_obj <- ratioa(Xtr, btr)
+                exprs(eset_tr_bc) <- t(bc_obj$xadj)
+            }
+            else if (bc_type == "rtg") {
+                bc_obj <- ratiog(Xtr, btr)
+                exprs(eset_tr_bc) <- t(bc_obj$xadj)
             }
             else if (bc_type == "std") {
                 bc_obj <- standardize(Xtr, btr)
@@ -197,11 +209,20 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 if (bc_type == "cbt") {
                     exprs(eset_te_bc) <- t(combatbaaddon(bc_obj, Xte, bte))
                 }
+                else if (bc_type == "ctr") {
+                    exprs(eset_te_bc) <- t(meancenteraddon(bc_obj, Xte, bte))
+                }
                 else if (bc_type == "fab") {
                     exprs(eset_te_bc) <- t(fabatchaddon(bc_obj, Xte, bte))
                 }
                 else if (bc_type == "qnorm") {
                     exprs(eset_te_bc) <- t(qunormaddon(bc_obj, Xte))
+                }
+                else if (bc_type == "rta") {
+                    exprs(eset_te_bc) <- t(ratioaaddon(bc_obj, Xte, bte))
+                }
+                else if (bc_type == "rtg") {
+                    exprs(eset_te_bc) <- t(ratiogaddon(bc_obj, Xte, bte))
                 }
                 else if (bc_type == "std") {
                     exprs(eset_te_bc) <- t(standardizeaddon(bc_obj, Xte, bte))
