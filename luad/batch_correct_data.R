@@ -61,7 +61,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                     print(paste("Creating:", eset_tr_bc_name))
                     bc_obj <- normFact(
                         "stICA", Xtr, ptr$Batch, "categorical",
-                        ref2=ptr$Relapse, refType2="categorical", k=matfact_k, alpha=alpha
+                        ref2=ptr$Class, refType2="categorical", k=matfact_k, alpha=alpha
                     )
                     eset_tr_bc <- get(eset_tr_name)
                     exprs(eset_tr_bc) <- bc_obj$Xn
@@ -98,7 +98,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 print(paste("Creating:", eset_tr_bc_name))
                 bc_obj <- normFact(
                     "SVD", Xtr, ptr$Batch, "categorical",
-                    ref2=ptr$Relapse, refType2="categorical", k=matfact_k
+                    ref2=ptr$Class, refType2="categorical", k=matfact_k
                 )
                 eset_tr_bc <- get(eset_tr_name)
                 exprs(eset_tr_bc) <- bc_obj$Xn
@@ -133,7 +133,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
         else if (bc_type %in% c("cbt", "ctr", "fab", "qnorm", "rta", "rtg", "std", "sva")) {
             Xtr <- t(exprs(get(eset_tr_name)))
             ptr <- pData(get(eset_tr_name))
-            ytr <- as.factor(ptr$Relapse + 1)
+            ytr <- as.factor(ptr$Class + 1)
             btr <- ptr$Batch
             butr <- sort(unique(btr))
             for (j in 1:length(butr)) {
@@ -174,7 +174,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 exprs(eset_tr_bc) <- t(bc_obj$xadj)
             }
             else if (bc_type == "sva") {
-                mod <- model.matrix(~as.factor(Relapse), data=ptr)
+                mod <- model.matrix(~as.factor(Class), data=ptr)
                 mod0 <- model.matrix(~1, data=ptr)
                 # ctrls <- as.numeric(grepl("^AFFX", rownames(t(Xtr))))
                 bc_obj <- svaba(Xtr, btr, mod, mod0, algorithm="fast")

@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 
-import argparse, pprint
+import argparse, pprint, warnings
+from os import path
 from tempfile import mkdtemp
 from shutil import rmtree
+from natsort import natsorted
+import numpy as np
 import rpy2.robjects as robjects
+from rpy2.rinterface import RRuntimeWarning
 from rpy2.robjects.packages import importr
 from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
-import numpy as np
-from natsort import natsorted
 from sklearn.feature_selection import mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
 from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 from sklearn.ensemble import ExtraTreesClassifier
@@ -18,13 +20,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 from sklearn.metrics import roc_auc_score, roc_curve, make_scorer
 from sklearn.externals.joblib import dump, Memory
-from feature_selection import CFS
+from feature_selection import CFS, FCBF
 import matplotlib.pyplot as plt
 from matplotlib import style
 
 # config
 parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
+parser.add_argument('--norm-meth', type=str, help='preprocess/normalization method')
 parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, help='feature selection method')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
@@ -47,12 +50,16 @@ parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel job
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
 parser.add_argument('--gscv-no-memory', default=False, action='store_true', help='gscv no pipeline memory')
-parser.add_argument('--dataset-tr', type=str, help='dataset tr')
+parser.add_argument('--dataset-tr-num', type=int, help='dataset tr num combos')
+parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
+parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
 args = parser.parse_args()
 
 base = importr('base')
 biobase = importr('Biobase')
+warnings.filterwarnings('ignore', category=RRuntimeWarning)
 base.source('lib/R/functions.R')
+warnings.filterwarnings('always', category=RRuntimeWarning)
 r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']
 r_get_eset_class_labels = robjects.globalenv['getEsetClassLabels']
 r_get_eset_gene_symbols = robjects.globalenv['getEsetGeneSymbols']
@@ -117,15 +124,15 @@ gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 if args.clf_svm_c:
     CLF_SVC_C = sorted(args.clf_svm_c)
 else:
-    CLF_SVC_C = [ 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100, 1000 ]
+    CLF_SVC_C = np.logspace(-7, 3, 11)
 if args.fs_rfe_c:
     RFE_SVC_C = sorted(args.fs_rfe_c)
 else:
-    RFE_SVC_C = [ 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100 ]
+    RFE_SVC_C = np.logspace(-7, 2, 10)
 if args.fs_sfm_c:
     SFM_SVC_C = sorted(args.fs_sfm_c)
 else:
-    SFM_SVC_C = [ 1e-2, 1e-1, 1, 10, 100 ]
+    SFM_SVC_C = np.logspace(-2, 2, 5)
 if args.fs_sfm_e:
     SFM_EXT_N_ESTIMATORS = sorted(args.fs_sfm_e)
 else:
@@ -133,7 +140,7 @@ else:
 if args.fs_sfm_thres:
     SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
 else:
-    SFM_THRESHOLDS = [ 1e-9, 1e-8, 1e-7, 1e-6, 1e-5 ]
+    SFM_THRESHOLDS = np.logspace(-9, -5, 5)
 if args.fs_skb_k:
     SKB_N_FEATURES = sorted(args.fs_skb_k)
 else:
@@ -145,7 +152,7 @@ else:
 if args.fs_fpr_p:
     SFP_ALPHA = sorted(args.fs_fpr_p)
 else:
-    SFP_ALPHA = [ 1e-3, 1e-2 ]
+    SFP_ALPHA = np.logspace(-3, -2, 2)
 
 pipelines = {
     'Limma-KBest': {
@@ -289,7 +296,21 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'skb__k': SKB_N_FEATURES,
+                'skb__k': [ 200 ],
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'Limma-KBest-FCBF': {
+        'pipe_steps': [
+            ('skb', SelectKBest(limma_score_func)),
+            ('std', StandardScaler()),
+            ('fcbf', FCBF()),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'skb__k': [ 10000 ],
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -302,23 +323,12 @@ dataset_names = [
     'gse37745',
     'gse50081'
 ]
-dataset_pair_names = [
-    # ('gse31210_gse30219', 'gse8894'),
-    # ('gse31210_gse8894', 'gse30219'),
-    # ('gse8894_gse30219', 'gse31210'),
-    # ('gse31210_gse30219_gse37745', 'gse8894'),
-    # ('gse31210_gse8894_gse37745', 'gse30219'),
-    # ('gse8894_gse30219_gse37745', 'gse31210'),
-    # ('gse31210_gse8894_gse30219', 'gse37745'),
-    # ('gse31210_gse30219_gse37745_gse50081', 'gse8894'),
-    # ('gse31210_gse8894_gse37745_gse50081', 'gse30219'),
-    # ('gse8894_gse30219_gse37745_gse50081', 'gse31210'),
-    # ('gse31210_gse8894_gse30219_gse50081', 'gse37745'),
-    # ('gse31210_gse8894_gse30219_gse37745', 'gse50081'),
-]
 bc_methods = [
     'none',
+    'ctr',
     'std',
+    'rta',
+    'rtg',
     'qnorm',
     'cbt',
     #'fab',
@@ -335,6 +345,7 @@ fs_methods = [
     'Limma-Fpr-SVM-RFE',
     'SVM-SFM-RFE',
     'ExtraTrees-SFM-RFE',
+    'Limma-KBest-FCBF',
     #'SVM-RFE',
     #'SVM-SFM',
     #'ExtraTrees-SFM',
@@ -344,10 +355,14 @@ fs_methods = [
 
 # analyses
 if args.analysis == 1:
-    if args.bc_meth:
-        eset_tr_name = 'eset_' + args.dataset_tr + '_tr_' + args.bc_meth
-    else:
-        eset_tr_name = 'eset_' + args.dataset_tr
+    args.datasets_tr = sorted(args.datasets_tr)
+    if args.norm_meth and args.bc_meth:
+        dataset_tr_name = '_'.join(args.datasets_tr) + '_' + args.norm_meth + '_' + args.bc_meth + '_tr'
+    elif args.bc_meth:
+        dataset_tr_name = '_'.join(args.datasets_tr) + '_' + args.norm_meth + '_tr'
+    elif args.bc_meth:
+        dataset_tr_name = '_'.join(args.datasets_tr) + '_' + args.bc_meth + '_tr'
+    eset_tr_name = 'eset_' + dataset_tr_name
     print(eset_tr_name)
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
@@ -360,10 +375,7 @@ if args.analysis == 1:
         error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
     )
     grid.fit(X_tr, y_tr)
-    if args.bc_meth:
-        dump(grid, 'results/grid_' + args.dataset_tr + '_' + args.bc_meth + '_' + args.fs_meth.lower() + '.pkl')
-    else:
-        dump(grid, 'results/grid_' + args.dataset_tr + '_' + args.fs_meth.lower() + '.pkl')
+    dump(grid, 'results/grid_' + dataset_tr_name  + '_' + args.fs_meth.lower() + '.pkl')
     # print summary info
     feature_idxs = np.arange(X_tr.shape[1])
     for step in grid.best_estimator_.named_steps:
@@ -391,7 +403,7 @@ if args.analysis == 1:
     print('Rankings:')
     for coef, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', coef)
     # plot grid search parameters vs cv perf metrics
-    dataset_tr_title = args.dataset_tr.replace('gse', 'GSE')
+    dataset_tr_title = dataset_tr_name.replace('gse', 'GSE')
     grid_params = pipelines[args.fs_meth]['param_grid'][0]
     for idx, param in enumerate(grid_params):
         new_shape = ()
@@ -435,8 +447,6 @@ if args.analysis == 1:
             ):
                 x_axis = range(len(grid_params[param]))
                 plt.xticks(x_axis, grid_params[param])
-            if args.bc_meth:
-                dataset_tr_title = dataset_tr_title + '_' + args.bc_meth
             plt.title(
                 dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
                 'Effect of ' + param + ' on CV Performance Metrics'
@@ -468,13 +478,6 @@ if args.analysis == 1:
             plt.legend(loc='lower right', fontsize='small')
             plt.grid('on')
     # plot num top-ranked features selected vs test dataset perf metrics
-    dataset_te_names = []
-    for dataset_tr_name, dataset_te_name in dataset_pair_names:
-        if args.dataset_tr == dataset_tr_name:
-            dataset_te_names = [dataset_te_name]
-            break
-        elif args.dataset_tr != dataset_te_name:
-            dataset_te_names.append(dataset_te_name)
     plt.figure('Figure 2')
     plt.rcParams['font.size'] = 20
     plt.title(
@@ -493,12 +496,14 @@ if args.analysis == 1:
             class_weight='balanced', C=grid.best_params_['clf__C'],
         )),
     ])
-    for dataset_te_name in dataset_te_names:
-        if args.bc_meth:
+    for dataset_te_name in sorted(list(set(dataset_names) - set(args.datasets_tr))):
+        if args.norm_meth or args.bc_meth:
             eset_te_name = eset_tr_name + '_' + dataset_te_name + '_te'
         else:
             eset_te_name = 'eset_' + dataset_te_name
-        base.load('data/' + eset_te_name + '.Rda')
+        eset_te_file = 'data/' + eset_te_name + '.Rda'
+        if not path.isfile(eset_te_file): continue
+        base.load(eset_te_file)
         eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         X_te = np.array(base.t(biobase.exprs(eset_te)))
         y_te = np.array(r_get_eset_class_labels(eset_te), dtype=int)

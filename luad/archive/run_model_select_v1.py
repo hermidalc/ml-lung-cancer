@@ -23,8 +23,8 @@ base.source('lib/R/functions.R')
 r_rand_perm_sample_nums = robjects.globalenv['randPermSampleNums']
 r_filter_eset = robjects.globalenv['filterEset']
 r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']
-r_filter_eset_relapse_labels = robjects.globalenv['filterEsetRelapseLabels']
-r_get_gene_symbols = robjects.globalenv['getGeneSymbols']
+r_get_eset_class_labels = robjects.globalenv['getEsetClassLabels']
+r_get_gene_symbols = robjects.globalenv['getEsetGeneSymbols']
 r_get_limma_features = robjects.globalenv['getLimmaFeatures']
 # config
 parser = argparse.ArgumentParser()
@@ -59,7 +59,7 @@ args = parser.parse_args()
 
 def pipeline_one(eset, fs_meth, tr_meth):
     X = np.array(base.t(biobase.exprs(eset)))
-    y = np.array(r_filter_eset_relapse_labels(eset), dtype=int)
+    y = np.array(r_get_eset_class_labels(eset), dtype=int)
     results = []
     split_count = 0
     fs_fail_count = 0
@@ -85,13 +85,13 @@ def pipeline_one(eset, fs_meth, tr_meth):
 
 def pipeline_one_vs_many(eset_tr, esets_te, fs_meth, tr_meth):
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-    y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
+    y_tr = np.array(r_get_eset_class_labels(eset_tr), dtype=int)
     Xys_te = []
     for (eset_te_name, eset_te) in esets_te:
         Xys_te.append((
             eset_te_name,
             np.array(base.t(biobase.exprs(eset_te))),
-            np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
+            np.array(r_get_eset_class_labels(eset_te), dtype=int)
         ))
     results = []
     split_count = 0
@@ -122,9 +122,9 @@ def pipeline_one_vs_many(eset_tr, esets_te, fs_meth, tr_meth):
 
 def pipeline_one_vs_one(eset_tr, eset_te, fs_meth, tr_meth):
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-    y_tr = np.array(r_filter_eset_relapse_labels(eset_tr), dtype=int)
+    y_tr = np.array(r_get_eset_class_labels(eset_tr), dtype=int)
     X_te = np.array(base.t(biobase.exprs(eset_te)))
-    y_te = np.array(r_filter_eset_relapse_labels(eset_te), dtype=int)
+    y_te = np.array(r_get_eset_class_labels(eset_te), dtype=int)
     results = []
     split_count = 0
     fs_fail_count = 0

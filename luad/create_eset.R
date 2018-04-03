@@ -40,12 +40,12 @@ for (dataset_name in cmd_args) {
     else if (dataset_name == "gse37745") {
         eset <- eset[,eset$Histology == "ADC"]
         eset <- eset[,eset$Stage %in% c("1","1A","1B","2","2A","2B")]
-        eset <- eset[,eset$Relapse %in% c(0,1)]
+        eset <- eset[,eset$Class %in% c(0,1)]
     }
     else if (dataset_name == "gse50081") {
         eset <- eset[,eset$Histology == "ADC"]
         eset <- eset[,eset$Stage %in% c("1","1A","1B","2","2A","2B")]
-        eset <- eset[,eset$Relapse %in% c(0,1)]
+        eset <- eset[,eset$Class %in% c(0,1)]
     }
     else if (dataset_name == "gse67639") {
         eset <- eset[,eset$Histology == "ADC"]

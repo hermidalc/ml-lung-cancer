@@ -1,11 +1,9 @@
 suppressPackageStartupMessages(library("Biobase"))
-suppressPackageStartupMessages(library("genefilter"))
-suppressPackageStartupMessages(library("limma"))
 set.seed(1982)
 
-randPermSampleNums <- function(eset, is.relapse) {
-    is.relapse.num <- if (is.relapse) 1 else 0
-    return(sample(which(eset$Relapse == is.relapse.num)))
+randPermSampleNums <- function(eset, is.positive) {
+    is.positive.num <- if (is.positive) 1 else 0
+    return(sample(which(eset$Class == is.positive.num)))
 }
 
 filterEset <- function(eset, features=NULL, samples=NULL) {
@@ -24,6 +22,7 @@ filterEset <- function(eset, features=NULL, samples=NULL) {
 }
 
 filterEsetControlProbesets <- function(eset) {
+    suppressPackageStartupMessages(require("genefilter"))
     return(featureFilter(eset,
         require.entrez=FALSE,
         require.GOBP=FALSE, require.GOCC=FALSE,
@@ -34,10 +33,10 @@ filterEsetControlProbesets <- function(eset) {
 
 getEsetClassLabels <- function(eset, samples=NULL) {
     if (!is.null(samples)) {
-        return(eset$Relapse[c(samples)])
+        return(eset$Class[c(samples)])
     }
     else {
-        return(eset$Relapse)
+        return(eset$Class)
     }
 }
 
@@ -52,11 +51,12 @@ getEsetGeneSymbols <- function(eset, features=NULL) {
     return(symbols)
 }
 
-limmaFeatureScore <- function(exprs, groups) {
-    design <- model.matrix(~0 + factor(groups))
-    colnames(design) <- c("Group0", "Group1")
+limmaFeatureScore <- function(exprs, class) {
+    suppressPackageStartupMessages(require("limma"))
+    design <- model.matrix(~0 + factor(class))
+    colnames(design) <- c("Class0", "Class1")
     fit <- lmFit(exprs, design)
-    contrast.matrix <- makeContrasts(Group1VsGroup0=Group1-Group0, levels=design)
+    contrast.matrix <- makeContrasts(Class1VsClass0=Class1-Class0, levels=design)
     fit.contrasts <- contrasts.fit(fit, contrast.matrix)
     fit.b <- eBayes(fit.contrasts)
     results <- topTableF(fit.b, number=Inf, adjust.method="BH")
@@ -64,18 +64,62 @@ limmaFeatureScore <- function(exprs, groups) {
     return(list(results$F, results$adj.P.Val))
 }
 
-getLimmaFeatures <- function(eset, numbers=TRUE, min.p.value=0.05, min.lfc=0, max.num.features=Inf) {
-    design <- model.matrix(~0 + factor(pData(eset)$Relapse))
-    colnames(design) <- c("NoRelapse", "Relapse")
+limmaFeatures <- function(eset, numbers=TRUE, min.p.value=0.05, min.lfc=0, max.num.features=Inf) {
+    suppressPackageStartupMessages(require("limma"))
+    design <- model.matrix(~0 + factor(pData(eset)$Class))
+    colnames(design) <- c("Class0", "Class1")
     fit <- lmFit(eset, design)
-    contrast.matrix <- makeContrasts(RelapseVsNoRelapse=Relapse-NoRelapse, levels=design)
+    contrast.matrix <- makeContrasts(Class1VsClass0=Class1-Class0, levels=design)
     fit.contrasts <- contrasts.fit(fit, contrast.matrix)
     fit.b <- eBayes(fit.contrasts)
-    feature.names <- rownames(topTable(fit.b, number=max.num.features, p.value=min.p.value, lfc=min.lfc, adjust.method="BH", sort.by="P"))
+    feature.names <- rownames(topTable(
+        fit.b, number=max.num.features, p.value=min.p.value, lfc=min.lfc, adjust.method="BH", sort.by="P"
+    ))
     if (numbers) {
         return(which(featureNames(eset) %in% feature.names))
     }
     else {
         return(feature.names)
     }
+}
+
+fcbfFeatureIdxs <- function(X, y) {
+    results <- Biocomb::select.fast.filter(cbind(X, as.factor(y)), disc.method="MDL", threshold=0)
+    return(results$NumberFeature - 1)
+}
+
+cfsFeatureIdxs <- function(X, y) {
+    X <- as.data.frame(X)
+    colnames(X) <- seq(1, ncol(X))
+    feature_idxs <- FSelector::cfs(as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)))
+    return(as.integer(feature_idxs) - 1)
+}
+
+gainRatioFeatureIdxs <- function(X, y) {
+    X <- as.data.frame(X)
+    colnames(X) <- seq(1, ncol(X))
+    results <- FSelector::gain.ratio(
+        as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)), unit="log2"
+    )
+    results <- results[results$attr_importance > 0, , drop=FALSE]
+    results <- results[order(results$attr_importance, decreasing=TRUE), , drop=FALSE]
+    return(as.integer(row.names(results)) - 1)
+}
+
+symmUncertFeatureIdxs <- function(X, y) {
+    X <- as.data.frame(X)
+    colnames(X) <- seq(1, ncol(X))
+    results <- FSelector::symmetrical.uncertainty(
+        as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)), unit="log2"
+    )
+    results <- results[results$attr_importance > 0, , drop=FALSE]
+    results <- results[order(results$attr_importance, decreasing=TRUE), , drop=FALSE]
+    return(as.integer(row.names(results)) - 1)
+}
+
+reliefFeatureIdxs <- function(X, y) {
+    X <- as.data.frame(X)
+    colnames(X) <- seq(1, ncol(X))
+    results <- FSelector::relief(as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)))
+    return(results[order(results$attr_importance, decreasing=TRUE), , drop=FALSE])
 }
