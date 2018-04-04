@@ -9,126 +9,93 @@ source("config.R")
 cmd_args <- commandArgs(trailingOnly=TRUE)
 num_tr_subset <- as.integer(cmd_args[1])
 norm_type <- cmd_args[2]
+id_type <- cmd_args[3]
+merged_type <- cmd_args[4]
+suffixes <- c(norm_type)
+if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
 dataset_tr_name_combos <- combn(dataset_names, num_tr_subset)
 for (col in 1:ncol(dataset_tr_name_combos)) {
-    if (norm_type == "none") {
-        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
+    if (is.na(merged_type) | merged_type == "none") {
+        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "tr"), collapse="_")
     }
     else {
-        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], norm_type, "tr"), collapse="_")
+        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
     }
     eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
     if (file.exists(eset_tr_file)) {
-        print(paste("Loading:", eset_tr_name))
+        print(paste("Loading:", eset_tr_name), quote=FALSE)
         load(eset_tr_file)
     }
-    if (norm_type != "none") {
-        for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
+    for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
+        if (is.na(merged_type) | merged_type == "none") {
             eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
-            eset_te_file <- paste0("data/", eset_te_name, ".Rda")
-            if (file.exists(eset_te_file)) {
-                print(paste("Loading:", eset_te_name))
-                load(eset_te_file)
-            }
         }
-    }
-}
-if (norm_type == "none") {
-    for (dataset_te_name in dataset_names) {
-        eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
+        else {
+            eset_te_name <- paste0(c("eset", dataset_te_name, suffixes), collapse="_")
+        }
         eset_te_file <- paste0("data/", eset_te_name, ".Rda")
-        if (file.exists(eset_te_file)) {
-            print(paste("Loading:", eset_te_name))
+        if (!exists(eset_te_name) & file.exists(eset_te_file)) {
+            print(paste("Loading:", eset_te_name), quote=FALSE)
             load(eset_te_file)
         }
     }
 }
-for (bc_type in cmd_args[3:length(cmd_args)]) {
+if (length(cmd_args) > 4) bc_types <- cmd_args[5:length(cmd_args)]
+for (bc_type in bc_types) {
     for (col in 1:ncol(dataset_tr_name_combos)) {
-        if (norm_type == "none") {
-            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
+        if (is.na(merged_type) | merged_type == "none") {
+            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "tr"), collapse="_")
         }
         else {
-            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], norm_type, "tr"), collapse="_")
+            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
         }
         if (!exists(eset_tr_name)) next
-        if (bc_type %in% c("stica", "svd")) {
+        if (grepl("^(stica\\d+|svd)$", bc_type)) {
             Xtr <- exprs(get(eset_tr_name))
             ptr <- pData(get(eset_tr_name))
-            if (bc_type == "stica") {
-                for (alpha in stica_alphas) {
-                    eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_type, gsub("[^0-9]", "", alpha), "_tr")
-                    print(paste("Creating:", eset_tr_bc_name))
-                    bc_obj <- normFact(
-                        "stICA", Xtr, ptr$Batch, "categorical",
-                        ref2=ptr$Class, refType2="categorical", k=matfact_k, alpha=alpha
-                    )
-                    eset_tr_bc <- get(eset_tr_name)
-                    exprs(eset_tr_bc) <- bc_obj$Xn
-                    assign(eset_tr_bc_name, eset_tr_bc)
-                    save(list=eset_tr_bc_name, file=paste0("data/", eset_tr_bc_name, ".Rda"))
-                    eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
-                    assign(eset_tr_bc_obj_name, bc_obj)
-                    save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
-                    for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
-                        if (norm_type == "none") {
-                            eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
-                        }
-                        else {
-                            eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
-                        }
-                        if (!exists(eset_te_name)) next
-                        Xte <- exprs(get(eset_te_name))
-                        eset_te_bc_name <- paste0(c(eset_tr_bc_name, dataset_te_name, "te"), collapse="_")
-                        print(paste("Creating:", eset_te_bc_name))
-                        eset_te_bc <- get(eset_te_name)
-                        # Renard et al stICA IEEE 2017 paper code add-on batch effect correction
-                        # Vte = dot(dot(Xte.T,U),np.linalg.inv(dot(U.T,U)))
-                        # Xte_n = dot(U,Vte.T)
-                        exprs(eset_te_bc) <- bc_obj$U %*% t((t(Xte) %*% bc_obj$U) %*% solve(t(bc_obj$U) %*% bc_obj$U))
-                        assign(eset_te_bc_name, eset_te_bc)
-                        save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
-                        remove(list=c(eset_te_bc_name))
-                    }
-                    remove(list=c(eset_tr_bc_obj_name, eset_tr_bc_name))
-                }
+            eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_type, "_tr")
+            print(paste("Creating:", eset_tr_bc_name), quote=FALSE)
+            if (substr(bc_type, 1, 5) == "stica") {
+                bc_obj <- normFact(
+                    "stICA", Xtr, ptr$Batch, "categorical",
+                    ref2=ptr$Class, refType2="categorical", k=matfact_k,
+                    alpha=as.numeric(sub("^0", "0.", regmatches(bc_type, regexpr("\\d+$", bc_type))))
+                )
             }
             else if (bc_type == "svd") {
-                eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_type, "_tr")
-                print(paste("Creating:", eset_tr_bc_name))
                 bc_obj <- normFact(
                     "SVD", Xtr, ptr$Batch, "categorical",
                     ref2=ptr$Class, refType2="categorical", k=matfact_k
                 )
-                eset_tr_bc <- get(eset_tr_name)
-                exprs(eset_tr_bc) <- bc_obj$Xn
-                assign(eset_tr_bc_name, eset_tr_bc)
-                save(list=eset_tr_bc_name, file=paste0("data/", eset_tr_bc_name, ".Rda"))
-                eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
-                assign(eset_tr_bc_obj_name, bc_obj)
-                save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
-                for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
-                    if (norm_type == "none") {
-                        eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
-                    }
-                    else {
-                        eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
-                    }
-                    if (!exists(eset_te_name)) next
-                    Xte <- exprs(get(eset_te_name))
-                    eset_te_bc_name <- paste0(c(eset_tr_bc_name, dataset_te_name, "te"), collapse="_")
-                    print(paste("Creating:", eset_te_bc_name))
-                    eset_te_bc <- get(eset_te_name)
-                    # Renard et al stICA IEEE 2017 paper code add-on batch effect correction
-                    # Vte = dot(dot(Xte.T,U),np.linalg.inv(dot(U.T,U)))
-                    # Xte_n = dot(U,Vte.T)
-                    exprs(eset_te_bc) <- bc_obj$U %*% t((t(Xte) %*% bc_obj$U) %*% solve(t(bc_obj$U) %*% bc_obj$U))
-                    assign(eset_te_bc_name, eset_te_bc)
-                    save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
-                    remove(list=c(eset_te_bc_name))
-                }
-                remove(list=c(eset_tr_bc_obj_name, eset_tr_bc_name))
             }
+            eset_tr_bc <- get(eset_tr_name)
+            exprs(eset_tr_bc) <- bc_obj$Xn
+            assign(eset_tr_bc_name, eset_tr_bc)
+            save(list=eset_tr_bc_name, file=paste0("data/", eset_tr_bc_name, ".Rda"))
+            eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
+            assign(eset_tr_bc_obj_name, bc_obj)
+            save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
+            for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
+                if (is.na(merged_type) | merged_type == "none") {
+                    eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
+                }
+                else {
+                    eset_te_name <- paste0(c("eset", dataset_te_name, suffixes), collapse="_")
+                }
+                if (!exists(eset_te_name)) next
+                Xte <- exprs(get(eset_te_name))
+                eset_te_bc_name <- paste0(c(eset_tr_bc_name, dataset_te_name, "te"), collapse="_")
+                print(paste("Creating:", eset_te_bc_name), quote=FALSE)
+                eset_te_bc <- get(eset_te_name)
+                # Renard et al stICA IEEE 2017 paper code add-on batch effect correction
+                # Vte = dot(dot(Xte.T,U),np.linalg.inv(dot(U.T,U)))
+                # Xte_n = dot(U,Vte.T)
+                exprs(eset_te_bc) <- bc_obj$U %*% t((t(Xte) %*% bc_obj$U) %*% solve(t(bc_obj$U) %*% bc_obj$U))
+                assign(eset_te_bc_name, eset_te_bc)
+                save(list=eset_te_bc_name, file=paste0("data/", eset_te_bc_name, ".Rda"))
+                remove(list=c(eset_te_bc_name))
+            }
+            remove(list=c(eset_tr_bc_obj_name, eset_tr_bc_name))
         }
         else if (bc_type %in% c("cbt", "ctr", "fab", "qnorm", "rta", "rtg", "std", "sva")) {
             Xtr <- t(exprs(get(eset_tr_name)))
@@ -143,7 +110,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
             }
             btr <- as.factor(btr)
             eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_type, "_tr")
-            print(paste("Creating:", eset_tr_bc_name))
+            print(paste("Creating:", eset_tr_bc_name), quote=FALSE)
             eset_tr_bc <- get(eset_tr_name)
             if (bc_type == "cbt") {
                 bc_obj <- combatba(Xtr, btr)
@@ -186,11 +153,11 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
             assign(eset_tr_bc_obj_name, bc_obj)
             save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
             for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
-                if (norm_type == "none") {
-                    eset_te_name <- paste0(c("eset", dataset_te_name), collapse="_")
+                if (is.na(merged_type) | merged_type == "none") {
+                    eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
                 }
                 else {
-                    eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
+                    eset_te_name <- paste0(c("eset", dataset_te_name, suffixes), collapse="_")
                 }
                 if (!exists(eset_te_name)) next
                 Xte <- t(exprs(get(eset_te_name)))
@@ -204,7 +171,7 @@ for (bc_type in cmd_args[3:length(cmd_args)]) {
                 }
                 bte <- as.factor(bte)
                 eset_te_bc_name <- paste0(c(eset_tr_bc_name, dataset_te_name, "te"), collapse="_")
-                print(paste("Creating:", eset_te_bc_name))
+                print(paste("Creating:", eset_te_bc_name), quote=FALSE)
                 eset_te_bc <- get(eset_te_name)
                 if (bc_type == "cbt") {
                     exprs(eset_te_bc) <- t(combatbaaddon(bc_obj, Xte, bte))

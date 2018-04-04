@@ -1,6 +1,8 @@
 rmatrain <- function(affybatchtrain) {
     # perform RMA
+    cat("Background correction")
     abg <- affy::bg.correct.rma(affybatchtrain)
+    cat("Normalization/summarization\n")
     a.nrm.rma <- bapred::normalizeAffyBatchqntval(abg, 'pmonly')
     # store parameters for add-on quantile normalization
     rmadoc <- Biobase::experimentData(a.nrm.rma)@preprocessing[['val']]

@@ -11,30 +11,50 @@ source("config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
 num_tr_subset <- as.integer(cmd_args[1])
-cdfname <- cmd_args[2]
+id_type <- cmd_args[2]
+if (id_type == "gene") {
+    cdfname <- "hgu133plus2hsentrezg"
+} else {
+    cdfname <- "hgu133plus2"
+}
 dataset_tr_name_combos <- combn(dataset_names, num_tr_subset)
 for (col in 1:ncol(dataset_tr_name_combos)) {
-    load_data <- TRUE
+    no_raw_data <- FALSE
     for (dataset_tr_name in dataset_tr_name_combos[,col]) {
         if (!dir.exists(paste0("data/raw/", dataset_tr_name))) {
-            load_data <- FALSE
+            no_raw_data <- TRUE
             break
         }
     }
-    if (load_data) {
-        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
-        print(paste("Loading:", eset_tr_name))
-        load(paste0("data/", eset_tr_name, ".Rda"))
-    }
-}
-for (dataset_te_name in dataset_names) {
-    if (dir.exists(paste0("data/raw/", dataset_te_name))) {
-        eset_te_name <- paste0("eset_", dataset_te_name)
-        print(paste("Loading:", eset_te_name))
-        load(paste0("data/", eset_te_name, ".Rda"))
+    if (no_raw_data) next
+    # load a reference eset set
+    for (norm_type in norm_types) {
+        suffixes <- c(norm_type)
+        if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+        if (num_tr_subset > 1) {
+            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
+        }
+        else {
+            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes), collapse="_")
+        }
+        eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
+        if (file.exists(eset_tr_file) & !exists(eset_tr_name)) {
+            print(paste("Loading:", eset_tr_name), quote=FALSE)
+            load(eset_tr_file)
+            for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
+                if (!dir.exists(paste0("data/raw/", dataset_te_name))) next
+                eset_te_name <- paste0(c("eset", dataset_te_name, suffixes), collapse="_")
+                if (!exists(eset_te_name)) {
+                    print(paste("Loading:", eset_te_name), quote=FALSE)
+                    load(paste0("data/", eset_te_name, ".Rda"))
+                }
+            }
+            break
+        }
     }
 }
 if ("gcrma" %in% cmd_args[3:length(cmd_args)]) {
+    print(paste("Affinities:", cdfname), quote=FALSE)
     affinities <- compute.affinities(cdfname, verbose=TRUE)
 }
 for (col in 1:ncol(dataset_tr_name_combos)) {
@@ -50,12 +70,27 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         }
     }
     if (is.null(cel_tr_files)) next
-    print(paste0(c("Creating AffyBatch:", dataset_tr_name_combos[,col]), collapse=" "))
+    for (norm_type in norm_types) {
+        suffixes <- c(norm_type)
+        if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+        if (num_tr_subset > 1) {
+            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
+        }
+        else {
+            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes), collapse="_")
+        }
+        if (exists(eset_tr_name)) {
+            ref_suffixes <- suffixes
+            break
+        }
+    }
+    print(paste0(c("Creating AffyBatch:", dataset_tr_name_combos[,col]), collapse=" "), quote=FALSE)
     affybatch_tr <- ReadAffy(filenames=cel_tr_files, cdfname=cdfname, verbose=TRUE)
-    eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col]), collapse="_")
     for (norm_type in cmd_args[3:length(cmd_args)]) {
-        eset_tr_norm_name <- paste0(c(eset_tr_name, norm_type, "tr"), collapse="_")
-        print(paste("Creating:", eset_tr_norm_name))
+        suffixes <- c(norm_type)
+        if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+        eset_tr_norm_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "tr"), collapse="_")
+        print(paste("Creating:", eset_tr_norm_name), quote=FALSE)
         if (norm_type == "gcrma") {
             norm_obj <- gcrmatrain(affybatch_tr, affinities)
         }
@@ -63,7 +98,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             norm_obj <- rmatrain(affybatch_tr)
         }
         rownames(norm_obj$xnorm) <- sub("\\.CEL$", "", rownames(norm_obj$xnorm))
-        if (cdfname == "hgu133plus2hsentrezg") {
+        if (id_type == "gene") {
             eset_tr_norm <- ExpressionSet(
                 assayData=t(norm_obj$xnorm),
                 phenoData=phenoData(get(eset_tr_name)),
@@ -86,11 +121,11 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             cel_te_dir <- paste0("data/raw/", dataset_te_name)
             if (!dir.exists(cel_te_dir)) next
             cel_te_files <- list.files(path=cel_te_dir, full.names=TRUE, pattern="\\.CEL$")
-            eset_te_name <- paste0("eset_", dataset_te_name)
-            eset_te_norm_name <- paste0(eset_tr_norm_name, "_", dataset_te_name, "_te")
-            print(paste("Creating AffyBatch:", dataset_te_name))
+            print(paste("Creating AffyBatch:", dataset_te_name), quote=FALSE)
             affybatch_te <- ReadAffy(filenames=cel_te_files, cdfname=cdfname, verbose=TRUE)
-            print(paste("Creating:", eset_te_norm_name))
+            eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
+            eset_te_norm_name <- paste0(eset_tr_norm_name, "_", dataset_te_name, "_te")
+            print(paste("Creating:", eset_te_norm_name), quote=FALSE)
             if (norm_type == "gcrma") {
                 xnorm_te <- gcrmaaddon(norm_obj, affybatch_te, affinities)
             }
@@ -98,7 +133,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 xnorm_te <- rmaaddon(norm_obj, affybatch_te)
             }
             rownames(xnorm_te) <- sub("\\.CEL$", "", rownames(xnorm_te))
-            if (cdfname == "hgu133plus2hsentrezg") {
+            if (id_type == "gene") {
                 eset_te_norm <- ExpressionSet(
                     assayData=t(xnorm_te),
                     phenoData=phenoData(get(eset_te_name)),
