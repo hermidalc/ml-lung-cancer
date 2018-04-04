@@ -13,7 +13,7 @@ for (dataset_name in dataset_names) {
     eset_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
     eset_file <- paste0("data/", eset_name, ".Rda")
     if (file.exists(eset_file)) {
-        print(paste("Loading:", eset_name), quote=FALSE)
+        cat("Loading:", eset_name, "\n")
         load(eset_file)
         # subset common pheno data
         eset <- get(eset_name)
@@ -27,7 +27,7 @@ for (col in 1:ncol(dataset_name_combos)) {
     eset_1_name <- paste0(c("eset", dataset_name_combos[1,col], suffixes), collapse="_")
     eset_2_name <- paste0(c("eset", dataset_name_combos[2,col], suffixes), collapse="_")
     if (exists(eset_1_name) & exists(eset_2_name)) {
-        print(paste("Creating:", eset_merged_name), quote=FALSE)
+        cat("Creating:", eset_merged_name, "\n")
         eset_merged <- combine(get(eset_1_name), get(eset_2_name))
         if (nrow(dataset_name_combos) > 2) {
             for (row in 3:nrow(dataset_name_combos)) {

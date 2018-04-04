@@ -10,14 +10,14 @@ affinities <- compute.affinities(cdfname, verbose=TRUE)
 for (dataset_te_name in c("gse30219", "gse37745", "gse50081")) {
     cel_path_te <- paste0("data/raw/", dataset_te_name)
     cel_files_te <- list.files(path=cel_path_te, full.names=TRUE, pattern="\\.CEL$")
-    print(paste("Creating AffyBatch:", dataset_te_name))
+    cat("Creating AffyBatch:", dataset_te_name, "\n")
     affybatch_te <- ReadAffy(filenames=cel_files_te, cdfname=cdfname, verbose=TRUE)
     eset_te_name <- paste0("eset_", dataset_te_name)
-    print(paste("Loading:", eset_te_name))
+    cat("Loading:", eset_te_name, "\n")
     load(paste0("data/", eset_te_name, ".Rda"))
     for (norm_type in c("gcrma")) {
         eset_te_norm_name <- paste0(eset_te_name, "_gene")
-        print(paste("Creating:", eset_te_norm_name))
+        cat("Creating:", eset_te_norm_name, "\n")
         if (norm_type == "gcrma") {
             eset_te_norm <- gcrma(affybatch_te, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE)
         }

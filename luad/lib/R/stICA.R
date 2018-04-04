@@ -59,14 +59,14 @@ normFact <- function(fact,X,ref,refType,k=20,t=0.5,ref2=NULL,refType2=NULL,t2=0.
              idx2 = c(idx2,which(factR2_2$allR2[,i]>t2[i]))
         }
         idx2keep2 = intersect(idx2remove,idx2)
-        print(paste("Keeping",length(idx2keep2), "components with R2(ref2) higher than",t2), quote=FALSE)
+        cat("Keeping", length(idx2keep2), "components with R2(ref2) higher than", t2, "\n")
         idx2remove = setdiff(idx2remove,idx2keep2)
         idx2keep = union(idx2keep,idx2keep2)
         R2 = cbind(R2,factR2_2$allR2)
     }
     U = A[,idx2keep]
     V = B[,idx2keep]
-    print(paste("Removing",length(idx2remove),"components with R2(ref) higher than",t), quote=FALSE)
+    cat("Removing", length(idx2remove), "components with R2(ref) higher than", t, "\n")
     Xn = U %*% t(V)
     return(list(Xn=Xn,R2=R2,U=U,V=V))
 }

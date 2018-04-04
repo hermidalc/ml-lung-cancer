@@ -22,7 +22,7 @@ for (file in cmd_args) {
         eset_name <- paste0(c("eset", file_name_parts[1:3]), collapse="_")
         id_type <- file_name_parts[3]
     }
-    print(paste("Creating:", eset_name), quote=FALSE, row.names=FALSE)
+    cat("Creating:", eset_name, "\n")
     eset <- ExpressionSet(
         assayData=as.matrix(column_to_rownames(as.data.frame(read_excel(
             file,

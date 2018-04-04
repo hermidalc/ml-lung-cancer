@@ -11,8 +11,8 @@ svaba <- function(x, batch, mod, mod0, algorithm="fast", controls=NULL) {
         else {
           svobj <- sva::sva(t(x), mod, mod0, n.sv=numsv)
         }
-        # sva doesn't print carriage return after progress output
-        cat('\n')
+        # sva doesn't print newline after progress output
+        cat("\n")
         xadj <- svabaxadj(t(x), mod, svobj)
         # nmod <- dim(mod)[2]
         # mod <- cbind(mod, svobj$sv)
