@@ -1,8 +1,8 @@
 rmatrain <- function(affybatchtrain) {
     # perform RMA
-    cat("Background correction")
+    cat("Performing background correction")
     abg <- affy::bg.correct.rma(affybatchtrain)
-    cat("Normalization/summarization\n")
+    cat("Performing normalization/summarization\n")
     a.nrm.rma <- bapred::normalizeAffyBatchqntval(abg, 'pmonly')
     # store parameters for add-on quantile normalization
     rmadoc <- Biobase::experimentData(a.nrm.rma)@preprocessing[['val']]
@@ -15,23 +15,33 @@ rmatrain <- function(affybatchtrain) {
     return(rma_obj)
 }
 
-rmaaddon <- function(rma_obj, affybatchtest) {
+rmaaddon <- function(rma_obj, affybatchtest, parallel=TRUE) {
     if(class(rma_obj) != "rmatrain")
         stop("Input parameter 'rma_obj' has to be of class 'rmatrain'.")
     # perform RMA with add-on quantile normalization
+    cat("Performing background correction\n")
     abg <- affy::bg.correct.rma(affybatchtest)
     cat("Performing add-on normalization/summarization")
-    suppressPackageStartupMessages(require("doParallel"))
-    registerDoParallel(cores=detectCores())
-    # exprs.test.rma <- matrix(0, nrow=rma_obj$nfeature, ncol=length(abg))
-    # for (cel in 1:length(abg)) {
-    exprs.test.rma <- foreach (cel=1:length(abg), .combine="cbind") %dopar% {
-        ab.add <- bapred::extractAffybatch(cel, abg)
-        abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, rma_obj$rmadoc$mqnts)
-        eset <- bapred::summarizeadd2(abo.nrm.rma, rma_obj$sumdoc.rma)
-        # exprs.test.rma[,cel] <- exprs(eset)
-        cat(".")
-        exprs(eset)
+    if (parallel) {
+        suppressPackageStartupMessages(require("doParallel"))
+        registerDoParallel(cores=detectCores())
+        exprs.test.rma <- foreach (cel=1:length(abg), .combine="cbind") %dopar% {
+            ab.add <- bapred::extractAffybatch(cel, abg)
+            abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, rma_obj$rmadoc$mqnts)
+            eset <- bapred::summarizeadd2(abo.nrm.rma, rma_obj$sumdoc.rma)
+            cat(".")
+            exprs(eset)
+        }
+    }
+    else {
+        exprs.test.rma <- matrix(0, nrow=rma_obj$nfeature, ncol=length(abg))
+        for (cel in 1:length(abg)) {
+            ab.add <- bapred::extractAffybatch(cel, abg)
+            abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, rma_obj$rmadoc$mqnts)
+            eset <- bapred::summarizeadd2(abo.nrm.rma, rma_obj$sumdoc.rma)
+            exprs.test.rma[,cel] <- exprs(eset)
+            cat(".")
+        }
     }
     cat("Done.\n")
     return(t(exprs.test.rma))

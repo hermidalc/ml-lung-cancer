@@ -13,23 +13,32 @@ gcrmatrain <- function(affybatchtrain, affinities) {
     return(gcrma_obj)
 }
 
-gcrmaaddon <- function(gcrma_obj, affybatchtest, affinities) {
+gcrmaaddon <- function(gcrma_obj, affybatchtest, affinities, parallel=TRUE) {
     if (class(gcrma_obj) != "gcrmatrain")
         stop("Input parameter 'gcrma_obj' has to be of class 'gcrmatrain'.")
     # perform GCRMA with add-on quantile normalization
     abg <- gcrma::bg.adjust.gcrma(affybatchtest, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE)
     cat("Performing add-on normalization/summarization")
-    suppressPackageStartupMessages(require("doParallel"))
-    registerDoParallel(cores=detectCores())
-    # exprs.test.rma <- matrix(0, nrow=gcrma_obj$nfeature, ncol=length(abg))
-    # for (cel in 1:length(abg)) {
-    exprs.test.rma <- foreach (cel=1:length(abg), .combine="cbind") %dopar% {
-        ab.add <- bapred::extractAffybatch(cel, abg)
-        abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, gcrma_obj$rmadoc$mqnts)
-        eset <- bapred::summarizeadd2(abo.nrm.rma, gcrma_obj$sumdoc.rma)
-        # exprs.test.rma[,cel] <- exprs(eset)
-        cat(".")
-        exprs(eset)
+    if (parallel) {
+        suppressPackageStartupMessages(require("doParallel"))
+        registerDoParallel(cores=detectCores())
+        exprs.test.rma <- foreach (cel=1:length(abg), .combine="cbind") %dopar% {
+            ab.add <- bapred::extractAffybatch(cel, abg)
+            abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, gcrma_obj$rmadoc$mqnts)
+            eset <- bapred::summarizeadd2(abo.nrm.rma, gcrma_obj$sumdoc.rma)
+            cat(".")
+            exprs(eset)
+        }
+    }
+    else {
+        exprs.test.rma <- matrix(0, nrow=gcrma_obj$nfeature, ncol=length(abg))
+        for (cel in 1:length(abg)) {
+            ab.add <- bapred::extractAffybatch(cel, abg)
+            abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, gcrma_obj$rmadoc$mqnts)
+            eset <- bapred::summarizeadd2(abo.nrm.rma, gcrma_obj$sumdoc.rma)
+            exprs.test.rma[,cel] <- exprs(eset)
+            cat(".")
+        }
     }
     cat("Done.\n")
     return(t(exprs.test.rma))
