@@ -1,6 +1,6 @@
 rmatrain <- function(affybatchtrain) {
     # perform RMA
-    cat("Performing background correction")
+    cat("Performing background correction\n")
     abg <- affy::bg.correct.rma(affybatchtrain)
     cat("Performing normalization/summarization\n")
     a.nrm.rma <- bapred::normalizeAffyBatchqntval(abg, 'pmonly')
@@ -24,7 +24,7 @@ rmaaddon <- function(rma_obj, affybatchtest, parallel=TRUE) {
     cat("Performing add-on normalization/summarization")
     if (parallel) {
         suppressPackageStartupMessages(require("doParallel"))
-        registerDoParallel(cores=detectCores())
+        registerDoParallel(cores=max(detectCores()/2, 1))
         exprs.test.rma <- foreach (cel=1:length(abg), .combine="cbind") %dopar% {
             ab.add <- bapred::extractAffybatch(cel, abg)
             abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, rma_obj$rmadoc$mqnts)

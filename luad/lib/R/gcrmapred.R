@@ -21,7 +21,7 @@ gcrmaaddon <- function(gcrma_obj, affybatchtest, affinities, parallel=TRUE) {
     cat("Performing add-on normalization/summarization")
     if (parallel) {
         suppressPackageStartupMessages(require("doParallel"))
-        registerDoParallel(cores=detectCores())
+        registerDoParallel(cores=max(detectCores()/2, 1))
         exprs.test.rma <- foreach (cel=1:length(abg), .combine="cbind") %dopar% {
             ab.add <- bapred::extractAffybatch(cel, abg)
             abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, gcrma_obj$rmadoc$mqnts)
