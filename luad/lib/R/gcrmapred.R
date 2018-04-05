@@ -1,6 +1,7 @@
 gcrmatrain <- function(affybatchtrain, affinities) {
     # perform GCRMA
     abg <- gcrma::bg.adjust.gcrma(affybatchtrain, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE)
+    cat("Performing normalization/summarization\n")
     a.nrm.rma <- bapred::normalizeAffyBatchqntval(abg, 'pmonly')
     # store parameters for add-on quantile normalization
     rmadoc <- Biobase::experimentData(a.nrm.rma)@preprocessing[['val']]
