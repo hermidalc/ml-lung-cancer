@@ -57,7 +57,8 @@ if ("gcrma" %in% cmd_args[3:length(cmd_args)]) {
     cat("Affinities:", cdfname, "\n")
     affinities <- compute.affinities(cdfname, verbose=TRUE)
 }
-affybatch_bg_cache <- list()
+norm_obj_cache <- list()
+affybatch_cache <- list()
 for (col in 1:ncol(dataset_tr_name_combos)) {
     cel_tr_files <- c()
     for (dataset_tr_name in dataset_tr_name_combos[,col]) {
@@ -85,19 +86,35 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             break
         }
     }
-    cat(paste0(c("Creating AffyBatch:", dataset_tr_name_combos[,col]), collapse=" "), "\n")
-    affybatch_tr <- ReadAffy(filenames=cel_tr_files, cdfname=cdfname, verbose=TRUE)
+    dataset_tr_name_str <- paste0(dataset_tr_name_combos[,col], collapse="_")
+    if (length(dataset_tr_name_combos[,col]) > 1 || !exists(dataset_tr_name_str, where=norm_obj_cache)) {
+        cat(paste0(c("Creating AffyBatch:", dataset_tr_name_combos[,col]), collapse=" "), "\n")
+        affybatch_tr <- ReadAffy(filenames=cel_tr_files, cdfname=cdfname, verbose=TRUE)
+    }
     for (norm_type in cmd_args[3:length(cmd_args)]) {
         suffixes <- c(norm_type)
         if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
         eset_tr_norm_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "tr"), collapse="_")
         cat("Creating:", eset_tr_norm_name, "\n")
-        if (norm_type == "gcrma") {
+        if (
+            length(dataset_tr_name_combos[,col]) == 1 &&
+            exists(dataset_tr_name_str, where=norm_obj_cache) &&
+            exists(norm_type, where=norm_obj_cache[[dataset_tr_name_str]])
+        ) {
+            cat("Loading cached norm object:", paste0(dataset_tr_name_str, "_", norm_type), "\n")
+            norm_obj <- norm_obj_cache[[dataset_tr_name_str]][[norm_type]]
+        }
+        else if (norm_type == "gcrma") {
             norm_obj <- gcrmatrain(affybatch_tr, affinities)
         }
         else if (norm_type == "rma") {
             norm_obj <- rmatrain(affybatch_tr)
         }
+        if (
+            length(dataset_tr_name_combos[,col]) == 1 &&
+            !exists(dataset_tr_name_str, where=norm_obj_cache) &&
+            !exists(norm_type, where=norm_obj_cache[[dataset_tr_name_str]])
+        ) norm_obj_cache[[dataset_tr_name_str]][[norm_type]] <- norm_obj
         rownames(norm_obj$xnorm) <- sub("\\.CEL$", "", rownames(norm_obj$xnorm))
         if (id_type == "gene") {
             eset_tr_norm <- ExpressionSet(
@@ -119,30 +136,30 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         assign(eset_tr_norm_obj_name, norm_obj)
         save(list=eset_tr_norm_obj_name, file=paste0("data/", eset_tr_norm_obj_name, ".Rda"))
         for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
-            if (!exists(dataset_te_name, where=affybatch_bg_cache)) {
+            if (!exists(dataset_te_name, where=affybatch_cache)) {
                 cel_te_dir <- paste0("data/raw/", dataset_te_name)
                 if (!dir.exists(cel_te_dir)) next
                 cat("Creating AffyBatch:", dataset_te_name, "\n")
                 cel_te_files <- list.files(path=cel_te_dir, full.names=TRUE, pattern="\\.CEL$")
                 affybatch_te <- ReadAffy(filenames=cel_te_files, cdfname=cdfname, verbose=TRUE)
-                bg.correct=TRUE
+                bg_correct_te <- TRUE
             }
             else {
                 cat("Loading cached background corrected AffyBatch:", dataset_te_name, "\n")
-                affybatch_te <- affybatch_bg_cache[[dataset_te_name]]
-                bg.correct=FALSE
+                affybatch_te <- affybatch_cache[[dataset_te_name]]
+                bg_correct_te <- FALSE
             }
             eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
             eset_te_norm_name <- paste0(eset_tr_norm_name, "_", dataset_te_name, "_te")
             cat("Creating:", eset_te_norm_name, "\n")
             if (norm_type == "gcrma") {
-                normaddon_obj <- gcrmaaddon(norm_obj, affybatch_te, affinities, bg.correct=bg.correct)
+                normaddon_obj <- gcrmaaddon(norm_obj, affybatch_te, affinities, bg.correct=bg_correct_te)
             }
             else if (norm_type == "rma") {
-                normaddon_obj <- rmaaddon(norm_obj, affybatch_te, bg.correct=bg.correct)
+                normaddon_obj <- rmaaddon(norm_obj, affybatch_te, bg.correct=bg_correct_te)
             }
-            if (!exists(dataset_te_name, where=affybatch_bg_cache))
-                affybatch_bg_cache[[dataset_te_name]] <- normaddon_obj$abg
+            if (!exists(dataset_te_name, where=affybatch_cache))
+                affybatch_cache[[dataset_te_name]] <- normaddon_obj$abg
             rownames(normaddon_obj$xnorm) <- sub("\\.CEL$", "", rownames(normaddon_obj$xnorm))
             if (id_type == "gene") {
                 eset_te_norm <- ExpressionSet(

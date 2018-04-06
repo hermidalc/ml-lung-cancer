@@ -11,7 +11,9 @@ gcrmatrain <- function(affybatchtrain, affinities) {
     sumdoc.rma <- Biobase::experimentData(summ.rma)@preprocessing$val$probe.effects
     # extract gene expressions
     exprs.train.rma <- exprs(summ.rma)
-    gcrma_obj <- list(xnorm=t(exprs.train.rma), rmadoc=rmadoc, sumdoc.rma=sumdoc.rma, nfeature=nrow(exprs.train.rma))
+    gcrma_obj <- list(
+        xnorm=t(exprs.train.rma), rmadoc=rmadoc, sumdoc.rma=sumdoc.rma, nfeature=nrow(exprs.train.rma)
+    )
     class(gcrma_obj) <- "gcrmatrain"
     return(gcrma_obj)
 }
