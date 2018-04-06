@@ -117,9 +117,12 @@ symmUncertFeatureIdxs <- function(X, y) {
     return(as.integer(row.names(results)) - 1)
 }
 
-reliefFeatureIdxs <- function(X, y) {
+relieffFeatureIdxs <- function(X, y, num.neighbors=15, sample.size=10) {
     X <- as.data.frame(X)
     colnames(X) <- seq(1, ncol(X))
-    results <- FSelector::relief(as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)))
+    results <- FSelector::relief(
+        as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)),
+        neighbours.count=num.neighbors, sample.size=sample.size
+    )
     return(results[order(results$attr_importance, decreasing=TRUE), , drop=FALSE])
 }

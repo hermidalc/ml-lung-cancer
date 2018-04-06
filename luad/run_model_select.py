@@ -332,7 +332,7 @@ bc_methods = [
     'qnorm',
     'cbt',
     #'fab',
-    'sva',
+    #'sva',
     'stica0',
     'stica025',
     'stica05',
@@ -357,11 +357,11 @@ fs_methods = [
 if args.analysis == 1:
     args.datasets_tr = sorted(args.datasets_tr)
     if args.norm_meth and args.bc_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr) + '_' + args.norm_meth + '_' + args.bc_meth + '_tr'
+        dataset_tr_name = '_'.join(args.datasets_tr.extend(args.norm_meth, args.bc_meth, 'tr'))
+    elif args.norm_meth:
+        dataset_tr_name = '_'.join(args.datasets_tr.extend(args.norm_meth, 'tr'))
     elif args.bc_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr) + '_' + args.norm_meth + '_tr'
-    elif args.bc_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr) + '_' + args.bc_meth + '_tr'
+        dataset_tr_name = '_'.join(args.datasets_tr.extend(args.bc_meth, 'tr'))
     eset_tr_name = 'eset_' + dataset_tr_name
     print(eset_tr_name)
     base.load('data/' + eset_tr_name + '.Rda')

@@ -20,7 +20,7 @@ bc_types <- c(
     'qnorm',
     'cbt',
     #'fab',
-    'sva',
+    #'sva',
     'stica0',
     'stica025',
     'stica05',

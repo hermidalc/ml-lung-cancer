@@ -13,6 +13,7 @@ base = importr('base')
 base.source('lib/R/functions.R')
 r_cfs_feature_idxs = robjects.globalenv['cfsFeatureIdxs']
 r_fcbf_feature_idxs = robjects.globalenv['fcbfFeatureIdxs']
+r_relieff_feature_idxs = robjects.globalenv['relieffFeatureIdxs']
 numpy2ri.activate()
 
 class CFS(BaseEstimator, SelectorMixin):
@@ -54,7 +55,7 @@ class CFS(BaseEstimator, SelectorMixin):
 
     def _get_support_mask(self):
         check_is_fitted(self, 'selected_idxs_')
-        mask = np.zeros(self.n_features_, dtype='bool')
+        mask = np.zeros(self.n_features_, dtype=bool)
         mask[self.selected_idxs_] = True
         return mask
 
@@ -67,7 +68,7 @@ class FCBF(BaseEstimator, SelectorMixin):
         Number of features in input data X
 
     selected_idxs_ : array-like, 1d
-        CFS selected feature indexes
+        FCBF selected feature indexes
     """
     def __init__(self):
         pass
@@ -97,6 +98,48 @@ class FCBF(BaseEstimator, SelectorMixin):
 
     def _get_support_mask(self):
         check_is_fitted(self, 'selected_idxs_')
-        mask = np.zeros(self.n_features_, dtype='bool')
+        mask = np.zeros(self.n_features_, dtype=bool)
         mask[self.selected_idxs_] = True
+        return mask
+
+class ReliefF(BaseEstimator, SelectorMixin):
+    """Feature selector using ReliefF algorithm
+
+    Attributes
+    ----------
+    scores_ : array-like, shape=(n_features,)
+        Feature scores
+    """
+    def __init__(self, k=20, thres=0, n_neighbors=15, sample_size=10):
+        self.k = k
+        self.threshold = threshold
+        self.n_neighbors = n_neighbors
+        self.sample_size = sample_size
+
+    def fit(self, X, y):
+        """
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+            The training input samples.
+
+        y : array-like, shape = [n_samples]
+            The target values (class labels in classification, real numbers in
+            regression).
+
+        Returns
+        -------
+        self : object
+            Returns self.
+        """
+        X, y = check_X_y(X, y)
+        warnings.filterwarnings('ignore', category=RRuntimeWarning)
+        self.scores_ = np.array(r_relieff_feature_idxs(X, y), dtype=int)
+        warnings.filterwarnings('always', category=RRuntimeWarning)
+        return self
+
+    def _get_support_mask(self):
+        check_is_fitted(self, 'scores_')
+        mask = np.zeros(self.scores_.shape, dtype=bool)
+        mask[np.argsort(self.scores_, kind="mergesort")[-self.k:]] = True
         return mask
