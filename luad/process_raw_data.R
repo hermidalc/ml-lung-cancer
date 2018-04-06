@@ -60,7 +60,7 @@ norm_obj_cache <- list()
 for (col in 1:ncol(dataset_tr_name_combos)) {
     skip_processing <- FALSE
     for (dataset_tr_name in dataset_tr_name_combos[,col]) {
-        if (!dir.exists(paste0("data/raw/", dataset_tr_name)) {
+        if (!dir.exists(paste0("data/raw/", dataset_tr_name))) {
             skip_processing <- TRUE
             break
         }
@@ -96,7 +96,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 )
                 affybatch_cache[[dataset_tr_name]] <- affybatch
             }
-            dataset_tr_bg_name <- paste0(dataset_tr_name, suffixes, collapse="_")
+            dataset_tr_bg_name <- paste0(c(dataset_tr_name, suffixes), collapse="_")
             if (exists(dataset_tr_bg_name, where=affybatch_cache)) {
                 cat("Loading cached AffyBatch:", dataset_tr_bg_name, "\n")
                 affybatch <- affybatch_cache[[dataset_tr_bg_name]]
@@ -122,7 +122,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             }
         }
         dataset_tr_norm_name <- paste0(c(dataset_tr_name_combos[,col], suffixes), collapse="_")
-        eset_tr_norm_name <- paste0("eset", dataset_tr_norm_name, "tr", collapse="_")
+        eset_tr_norm_name <- paste("eset", dataset_tr_norm_name, "tr", sep="_")
         cat("Creating:", eset_tr_norm_name, "\n")
         if (length(dataset_tr_name_combos[,col]) == 1) {
             if (exists(dataset_tr_norm_name, where=norm_obj_cache)) {
@@ -169,7 +169,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 affybatch_te <- ReadAffy(celfile.path=cel_te_dir, cdfname=cdfname, verbose=TRUE)
                 affybatch_cache[[dataset_te_name]] <- affybatch_te
             }
-            dataset_te_bg_name <- paste0(dataset_te_name, suffixes, collapse="_")
+            dataset_te_bg_name <- paste0(c(dataset_te_name, suffixes), collapse="_")
             if (exists(dataset_te_bg_name, where=affybatch_cache)) {
                 cat("Loading cached AffyBatch:", dataset_te_bg_name, "\n")
                 affybatch_te <- affybatch_cache[[dataset_te_bg_name]]
@@ -187,7 +187,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 affybatch_cache[[dataset_te_bg_name]] <- affybatch_te
             }
             eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
-            eset_te_norm_name <- paste0(eset_tr_norm_name, "_", dataset_te_name, "_te")
+            eset_te_norm_name <- paste(eset_tr_norm_name, dataset_te_name, "te", sep="_")
             cat("Creating:", eset_te_norm_name, "\n")
             xnorm_te <- rmaaddon(norm_obj, affybatch_te)
             rownames(xnorm_te) <- sub("\\.CEL$", "", rownames(xnorm_te))
