@@ -1,11 +1,13 @@
 gcrmatrain <- function(affybatchtrain, affinities) {
     # perform GCRMA
-    abg <- gcrma::bg.adjust.gcrma(affybatchtrain, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE)
+    affybatchtrain <- gcrma::bg.adjust.gcrma(
+        affybatchtrain, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
+    )
     cat("Performing normalization/summarization\n")
-    a.nrm.rma <- bapred::normalizeAffyBatchqntval(abg, 'pmonly')
+    affybatchtrain <- bapred::normalizeAffyBatchqntval(affybatchtrain, 'pmonly')
     # store parameters for add-on quantile normalization
-    rmadoc <- Biobase::experimentData(a.nrm.rma)@preprocessing[['val']]
-    summ.rma <- bapred::summarizeval2(a.nrm.rma)
+    rmadoc <- Biobase::experimentData(affybatchtrain)@preprocessing[['val']]
+    summ.rma <- bapred::summarizeval2(affybatchtrain)
     sumdoc.rma <- Biobase::experimentData(summ.rma)@preprocessing$val$probe.effects
     # extract gene expressions
     exprs.train.rma <- exprs(summ.rma)
@@ -14,17 +16,21 @@ gcrmatrain <- function(affybatchtrain, affinities) {
     return(gcrma_obj)
 }
 
-gcrmaaddon <- function(gcrma_obj, affybatchtest, affinities, parallel=TRUE) {
+gcrmaaddon <- function(gcrma_obj, affybatchtest, affinities, bg.correct=TRUE, parallel=TRUE) {
     if (class(gcrma_obj) != "gcrmatrain")
         stop("Input parameter 'gcrma_obj' has to be of class 'gcrmatrain'.")
     # perform GCRMA with add-on quantile normalization
-    abg <- gcrma::bg.adjust.gcrma(affybatchtest, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE)
+    if (bg.correct) {
+        affybatchtest <- gcrma::bg.adjust.gcrma(
+            affybatchtest, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
+        )
+    }
     cat("Performing add-on normalization/summarization")
     if (parallel) {
         suppressPackageStartupMessages(require("doParallel"))
         registerDoParallel(cores=max(detectCores()/2, 1))
-        exprs.test.rma <- foreach (cel=1:length(abg), .combine="cbind") %dopar% {
-            ab.add <- bapred::extractAffybatch(cel, abg)
+        exprs.test.rma <- foreach (cel=1:length(affybatchtest), .combine="cbind") %dopar% {
+            ab.add <- bapred::extractAffybatch(cel, affybatchtest)
             abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, gcrma_obj$rmadoc$mqnts)
             eset <- bapred::summarizeadd2(abo.nrm.rma, gcrma_obj$sumdoc.rma)
             cat(".")
@@ -32,9 +38,9 @@ gcrmaaddon <- function(gcrma_obj, affybatchtest, affinities, parallel=TRUE) {
         }
     }
     else {
-        exprs.test.rma <- matrix(0, nrow=gcrma_obj$nfeature, ncol=length(abg))
-        for (cel in 1:length(abg)) {
-            ab.add <- bapred::extractAffybatch(cel, abg)
+        exprs.test.rma <- matrix(0, nrow=gcrma_obj$nfeature, ncol=length(affybatchtest))
+        for (cel in 1:length(affybatchtest)) {
+            ab.add <- bapred::extractAffybatch(cel, affybatchtest)
             abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, gcrma_obj$rmadoc$mqnts)
             eset <- bapred::summarizeadd2(abo.nrm.rma, gcrma_obj$sumdoc.rma)
             exprs.test.rma[,cel] <- exprs(eset)
@@ -42,5 +48,5 @@ gcrmaaddon <- function(gcrma_obj, affybatchtest, affinities, parallel=TRUE) {
         }
     }
     cat("Done.\n")
-    return(t(exprs.test.rma))
+    return(list(xnorm=t(exprs.test.rma), abg=affybatchtest))
 }
