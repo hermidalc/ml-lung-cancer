@@ -1,5 +1,5 @@
 rmatrain <- function(affybatch) {
-    cat("Performing normalization/summarization\n")
+    cat("Performing normalization/summarization")
     affybatch <- bapred::normalizeAffyBatchqntval(affybatch, 'pmonly')
     # store parameters for add-on quantile normalization
     rmadoc <- Biobase::experimentData(affybatch)@preprocessing[['val']]

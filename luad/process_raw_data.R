@@ -26,6 +26,18 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         }
     }
     if (skip_processing) next
+    # load base affybatches
+    for (norm_type in cmd_args[3:length(cmd_args)]) {
+        suffixes <- c(norm_type)
+        if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+        for (dataset_name in dataset_tr_name_combos[,col]) {
+            affybatch_name <- paste0(c("affybatch", dataset_name, suffixes), collapse="_")
+            if (!exists(affybatch_name)) {
+                cat("Loading:", affybatch_name, "\n")
+                load(paste0("data/", affybatch_name, ".Rda"))
+            }
+        }
+    }
     # load a reference eset set
     for (norm_type in norm_types) {
         suffixes <- c(norm_type)
@@ -49,18 +61,6 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 }
             }
             break
-        }
-    }
-    # load base affybatches
-    for (norm_type in cmd_args[3:length(cmd_args)]) {
-        suffixes <- c(norm_type)
-        if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
-        for (dataset_name in dataset_tr_name_combos[,col]) {
-            affybatch_name <- paste0(c("affybatch", dataset_name, suffixes), collapse="_")
-            if (!exists(affybatch_name)) {
-                cat("Loading:", affybatch_name, "\n")
-                load(paste0("data/", affybatch_name, ".Rda"))
-            }
         }
     }
 }
@@ -92,10 +92,10 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         suffixes <- c(norm_type)
         if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
         affybatch_tr <- NULL
-        cat("Merging:")
+        cat("Merging: ")
         for (dataset_tr_name in dataset_tr_name_combos[,col]) {
             affybatch_name <- paste0(c("affybatch", dataset_tr_name, suffixes), collapse="_")
-            cat(" ", affybatch_name)
+            cat(affybatch_name, "")
             if (is.null(affybatch_tr)) {
                 affybatch_tr <- get(affybatch_name)
             }
