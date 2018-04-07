@@ -2,7 +2,7 @@ suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(library("bapred"))
 
 rmatrain <- function(affybatch) {
-    cat("Performing normalization/summarization")
+    cat("Performing normalization/summarization\n")
     affybatch <- normalizeAffyBatchqntval(affybatch, 'pmonly')
     # store parameters for add-on quantile normalization
     rmadoc <- experimentData(affybatch)@preprocessing[['val']]
