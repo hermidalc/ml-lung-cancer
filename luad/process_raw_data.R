@@ -57,8 +57,10 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
         for (dataset_name in dataset_tr_name_combos[,col]) {
             affybatch_name <- paste0(c("affybatch", dataset_name, suffixes), collapse="_")
-            cat("Loading AffyBatch:", affybatch_name, "\n")
-            load(paste0("data/", affybatch_name, ".Rda"))
+            if (!exists(affybatch_name)) {
+                cat("Loading:", affybatch_name, "\n")
+                load(paste0("data/", affybatch_name, ".Rda"))
+            }
         }
     }
 }
@@ -90,7 +92,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         suffixes <- c(norm_type)
         if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
         affybatch_tr <- NULL
-        cat("Merging AffyBatches:")
+        cat("Merging:")
         for (dataset_tr_name in dataset_tr_name_combos[,col]) {
             affybatch_name <- paste0(c("affybatch", dataset_tr_name, suffixes), collapse="_")
             cat(" ", affybatch_name)
