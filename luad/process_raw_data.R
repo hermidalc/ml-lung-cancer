@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-suppressPackageStartupMessages(library("gcrma"))
+suppressPackageStartupMessages(library("Biobase"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db")))
 suppressPackageStartupMessages(library("annotate"))
@@ -15,12 +15,7 @@ if (id_type == "gene") {
 } else {
     cdfname <- "hgu133plus2"
 }
-if ("gcrma" %in% cmd_args[3:length(cmd_args)]) {
-    cat("CDF:", cdfname, "\n")
-    affinities <- compute.affinities(cdfname, verbose=TRUE)
-}
-# preload all esets and create base affybatches
-affybatch_cache <- list()
+# preload all relevant esets and base affybatches
 dataset_tr_name_combos <- combn(dataset_names, num_tr_subset)
 for (col in 1:ncol(dataset_tr_name_combos)) {
     skip_processing <- FALSE
@@ -56,36 +51,14 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             break
         }
     }
-    # create and cache all base affybatches
+    # load base affybatches
     for (norm_type in cmd_args[3:length(cmd_args)]) {
         suffixes <- c(norm_type)
         if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
-        for (dataset_tr_name in dataset_tr_name_combos[,col]) {
-            if (exists(dataset_tr_name, where=affybatch_cache)) {
-                cat("Loading cached AffyBatch:", dataset_tr_name, "\n")
-                affybatch <- affybatch_cache[[dataset_tr_name]]
-            }
-            else {
-                cat("Creating AffyBatch:", dataset_tr_name, "\n")
-                affybatch <- ReadAffy(
-                    celfile.path=paste0("data/raw/", dataset_tr_name), cdfname=cdfname, verbose=TRUE
-                )
-                affybatch_cache[[dataset_tr_name]] <- affybatch
-            }
-            dataset_tr_bg_name <- paste0(c(dataset_tr_name, suffixes), collapse="_")
-            if (!exists(dataset_tr_bg_name, where=affybatch_cache)) {
-                cat("Creating AffyBatch:", dataset_tr_bg_name, "\n")
-                if (norm_type == "gcrma") {
-                    affybatch <- bg.adjust.gcrma(
-                        affybatch, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
-                    )
-                }
-                else if (norm_type == "rma") {
-                    cat("Performing background correction\n")
-                    affybatch <- bg.correct.rma(affybatch)
-                }
-                affybatch_cache[[dataset_tr_bg_name]] <- affybatch
-            }
+        for (dataset_name in dataset_tr_name_combos[,col]) {
+            affybatch_name <- paste0(c("affybatch", dataset_name, suffixes), collapse="_")
+            cat("Loading AffyBatch:", affybatch_name, "\n")
+            load(paste0("data/", affybatch_name, ".Rda"))
         }
     }
 }
@@ -117,17 +90,18 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         suffixes <- c(norm_type)
         if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
         affybatch_tr <- NULL
+        cat("Merging AffyBatches:")
         for (dataset_tr_name in dataset_tr_name_combos[,col]) {
-            dataset_tr_bg_name <- paste0(c(dataset_tr_name, suffixes), collapse="_")
-            cat("Loading cached AffyBatch:", dataset_tr_bg_name, "\n")
-            affybatch <- affybatch_cache[[dataset_tr_bg_name]]
+            affybatch_name <- paste0(c("affybatch", dataset_tr_name, suffixes), collapse="_")
+            cat(" ", affybatch_name)
             if (is.null(affybatch_tr)) {
-                affybatch_tr <- affybatch
+                affybatch_tr <- get(affybatch_name)
             }
             else {
-                affybatch_tr <- merge.AffyBatch(affybatch_tr, affybatch, notes="")
+                affybatch_tr <- merge.AffyBatch(affybatch_tr, get(affybatch_name), notes="")
             }
         }
+        cat("\n")
         dataset_tr_norm_name <- paste0(c(dataset_tr_name_combos[,col], suffixes), collapse="_")
         eset_tr_norm_name <- paste("eset", dataset_tr_norm_name, "tr", sep="_")
         cat("Creating:", eset_tr_norm_name, "\n")
@@ -167,13 +141,11 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
             cel_te_dir <- paste0("data/raw/", dataset_te_name)
             if (!dir.exists(cel_te_dir)) next
-            dataset_te_bg_name <- paste0(c(dataset_te_name, suffixes), collapse="_")
-            cat("Loading cached AffyBatch:", dataset_te_bg_name, "\n")
-            affybatch_te <- affybatch_cache[[dataset_te_bg_name]]
+            affybatch_name <- paste0(c("affybatch", dataset_te_name, suffixes), collapse="_")
             eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
             eset_te_norm_name <- paste(eset_tr_norm_name, dataset_te_name, "te", sep="_")
             cat("Creating:", eset_te_norm_name, "\n")
-            xnorm_te <- rmaaddon(norm_obj, affybatch_te)
+            xnorm_te <- rmaaddon(norm_obj, get(affybatch_name))
             rownames(xnorm_te) <- sub("\\.CEL$", "", rownames(xnorm_te))
             if (id_type == "gene") {
                 eset_te_norm <- ExpressionSet(
