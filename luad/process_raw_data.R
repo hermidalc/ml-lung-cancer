@@ -15,16 +15,22 @@ if (id_type == "gene") {
 } else {
     cdfname <- "hgu133plus2"
 }
+if ("gcrma" %in% cmd_args[3:length(cmd_args)]) {
+    cat("CDF:", cdfname, "\n")
+    affinities <- compute.affinities(cdfname, verbose=TRUE)
+}
+# preload all esets and create base affybatches
+affybatch_cache <- list()
 dataset_tr_name_combos <- combn(dataset_names, num_tr_subset)
 for (col in 1:ncol(dataset_tr_name_combos)) {
-    no_raw_data <- FALSE
+    skip_processing <- FALSE
     for (dataset_tr_name in dataset_tr_name_combos[,col]) {
         if (!dir.exists(paste0("data/raw/", dataset_tr_name))) {
-            no_raw_data <- TRUE
+            skip_processing <- TRUE
             break
         }
     }
-    if (no_raw_data) next
+    if (skip_processing) next
     # load a reference eset set
     for (norm_type in norm_types) {
         suffixes <- c(norm_type)
@@ -50,12 +56,39 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             break
         }
     }
+    # create and cache all base affybatches
+    for (norm_type in cmd_args[3:length(cmd_args)]) {
+        suffixes <- c(norm_type)
+        if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+        for (dataset_tr_name in dataset_tr_name_combos[,col]) {
+            if (exists(dataset_tr_name, where=affybatch_cache)) {
+                cat("Loading cached AffyBatch:", dataset_tr_name, "\n")
+                affybatch <- affybatch_cache[[dataset_tr_name]]
+            }
+            else {
+                cat("Creating AffyBatch:", dataset_tr_name, "\n")
+                affybatch <- ReadAffy(
+                    celfile.path=paste0("data/raw/", dataset_tr_name), cdfname=cdfname, verbose=TRUE
+                )
+                affybatch_cache[[dataset_tr_name]] <- affybatch
+            }
+            dataset_tr_bg_name <- paste0(c(dataset_tr_name, suffixes), collapse="_")
+            if (!exists(dataset_tr_bg_name, where=affybatch_cache)) {
+                cat("Creating AffyBatch:", dataset_tr_bg_name, "\n")
+                if (norm_type == "gcrma") {
+                    affybatch <- bg.adjust.gcrma(
+                        affybatch, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
+                    )
+                }
+                else if (norm_type == "rma") {
+                    cat("Performing background correction\n")
+                    affybatch <- bg.correct.rma(affybatch)
+                }
+                affybatch_cache[[dataset_tr_bg_name]] <- affybatch
+            }
+        }
+    }
 }
-if ("gcrma" %in% cmd_args[3:length(cmd_args)]) {
-    cat("Affinities:", cdfname, "\n")
-    affinities <- compute.affinities(cdfname, verbose=TRUE)
-}
-affybatch_cache <- list()
 norm_obj_cache <- list()
 for (col in 1:ncol(dataset_tr_name_combos)) {
     skip_processing <- FALSE
@@ -85,35 +118,9 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
         affybatch_tr <- NULL
         for (dataset_tr_name in dataset_tr_name_combos[,col]) {
-            if (exists(dataset_tr_name, where=affybatch_cache)) {
-                cat("Loading cached AffyBatch:", dataset_tr_name, "\n")
-                affybatch <- affybatch_cache[[dataset_tr_name]]
-            }
-            else {
-                cat("Creating AffyBatch:", dataset_tr_name, "\n")
-                affybatch <- ReadAffy(
-                    celfile.path=paste0("data/raw/", dataset_tr_name), cdfname=cdfname, verbose=TRUE
-                )
-                affybatch_cache[[dataset_tr_name]] <- affybatch
-            }
             dataset_tr_bg_name <- paste0(c(dataset_tr_name, suffixes), collapse="_")
-            if (exists(dataset_tr_bg_name, where=affybatch_cache)) {
-                cat("Loading cached AffyBatch:", dataset_tr_bg_name, "\n")
-                affybatch <- affybatch_cache[[dataset_tr_bg_name]]
-            }
-            else {
-                cat("Creating AffyBatch:", dataset_tr_bg_name, "\n")
-                if (norm_type == "gcrma") {
-                    affybatch <- bg.adjust.gcrma(
-                        affybatch, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
-                    )
-                }
-                else if (norm_type == "rma") {
-                    cat("Performing background correction\n")
-                    affybatch <- bg.correct.rma(affybatch)
-                }
-                affybatch_cache[[dataset_tr_bg_name]] <- affybatch
-            }
+            cat("Loading cached AffyBatch:", dataset_tr_bg_name, "\n")
+            affybatch <- affybatch_cache[[dataset_tr_bg_name]]
             if (is.null(affybatch_tr)) {
                 affybatch_tr <- affybatch
             }
@@ -160,32 +167,9 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
             cel_te_dir <- paste0("data/raw/", dataset_te_name)
             if (!dir.exists(cel_te_dir)) next
-            if (exists(dataset_te_name, where=affybatch_cache)) {
-                cat("Loading cached AffyBatch:", dataset_te_name, "\n")
-                affybatch_te <- affybatch_cache[[dataset_te_name]]
-            }
-            else {
-                cat("Creating AffyBatch:", dataset_te_name, "\n")
-                affybatch_te <- ReadAffy(celfile.path=cel_te_dir, cdfname=cdfname, verbose=TRUE)
-                affybatch_cache[[dataset_te_name]] <- affybatch_te
-            }
             dataset_te_bg_name <- paste0(c(dataset_te_name, suffixes), collapse="_")
-            if (exists(dataset_te_bg_name, where=affybatch_cache)) {
-                cat("Loading cached AffyBatch:", dataset_te_bg_name, "\n")
-                affybatch_te <- affybatch_cache[[dataset_te_bg_name]]
-            }
-            else {
-                cat("Creating AffyBatch:", dataset_te_bg_name, "\n")
-                if (norm_type == "gcrma") {
-                    affybatch_te <- bg.adjust.gcrma(
-                        affybatch_te, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
-                    )
-                }
-                else if (norm_type == "rma") {
-                    affybatch_te <- bg.correct.rma(affybatch_te)
-                }
-                affybatch_cache[[dataset_te_bg_name]] <- affybatch_te
-            }
+            cat("Loading cached AffyBatch:", dataset_te_bg_name, "\n")
+            affybatch_te <- affybatch_cache[[dataset_te_bg_name]]
             eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
             eset_te_norm_name <- paste(eset_tr_norm_name, dataset_te_name, "te", sep="_")
             cat("Creating:", eset_te_norm_name, "\n")
