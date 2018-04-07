@@ -1,10 +1,13 @@
+suppressPackageStartupMessages(library("Biobase"))
+suppressPackageStartupMessages(library("bapred"))
+
 rmatrain <- function(affybatch) {
     cat("Performing normalization/summarization")
-    affybatch <- bapred::normalizeAffyBatchqntval(affybatch, 'pmonly')
+    affybatch <- normalizeAffyBatchqntval(affybatch, 'pmonly')
     # store parameters for add-on quantile normalization
-    rmadoc <- Biobase::experimentData(affybatch)@preprocessing[['val']]
-    summ.rma <- bapred::summarizeval2(affybatch)
-    sumdoc.rma <- Biobase::experimentData(summ.rma)@preprocessing$val$probe.effects
+    rmadoc <- experimentData(affybatch)@preprocessing[['val']]
+    summ.rma <- summarizeval2(affybatch)
+    sumdoc.rma <- experimentData(summ.rma)@preprocessing$val$probe.effects
     exprs.train.rma <- exprs(summ.rma)
     rma_obj <- list(
         xnorm=t(exprs.train.rma), rmadoc=rmadoc, sumdoc.rma=sumdoc.rma, nfeature=nrow(exprs.train.rma)
@@ -21,9 +24,9 @@ rmaaddon <- function(rma_obj, affybatch, parallel=TRUE) {
         suppressPackageStartupMessages(require("doParallel"))
         registerDoParallel(cores=max(detectCores()/2, 1))
         exprs.test.rma <- foreach (cel=1:length(affybatch), .combine="cbind") %dopar% {
-            ab.add <- bapred::extractAffybatch(cel, affybatch)
-            abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, rma_obj$rmadoc$mqnts)
-            eset <- bapred::summarizeadd2(abo.nrm.rma, rma_obj$sumdoc.rma)
+            ab.add <- extractAffybatch(cel, affybatch)
+            abo.nrm.rma  <- normalizeqntadd(ab.add, rma_obj$rmadoc$mqnts)
+            eset <- summarizeadd2(abo.nrm.rma, rma_obj$sumdoc.rma)
             cat(".")
             exprs(eset)
         }
@@ -31,9 +34,9 @@ rmaaddon <- function(rma_obj, affybatch, parallel=TRUE) {
     else {
         exprs.test.rma <- matrix(0, nrow=rma_obj$nfeature, ncol=length(affybatch))
         for (cel in 1:length(affybatch)) {
-            ab.add <- bapred::extractAffybatch(cel, affybatch)
-            abo.nrm.rma  <- bapred::normalizeqntadd(ab.add, rma_obj$rmadoc$mqnts)
-            eset <- bapred::summarizeadd2(abo.nrm.rma, rma_obj$sumdoc.rma)
+            ab.add <- extractAffybatch(cel, affybatch)
+            abo.nrm.rma  <- normalizeqntadd(ab.add, rma_obj$rmadoc$mqnts)
+            eset <- summarizeadd2(abo.nrm.rma, rma_obj$sumdoc.rma)
             exprs.test.rma[,cel] <- exprs(eset)
             cat(".")
         }
