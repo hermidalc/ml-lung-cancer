@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-suppressPackageStartupMessages(library("Biobase"))
+suppressPackageStartupMessages(library("affy"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db")))
 suppressPackageStartupMessages(library("annotate"))
