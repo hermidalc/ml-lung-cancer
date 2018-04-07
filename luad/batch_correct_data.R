@@ -34,7 +34,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             eset_te_name <- paste0(c("eset", dataset_te_name, suffixes), collapse="_")
         }
         eset_te_file <- paste0("data/", eset_te_name, ".Rda")
-        if (!exists(eset_te_name) & file.exists(eset_te_file)) {
+        if (!exists(eset_te_name) && file.exists(eset_te_file)) {
             cat("Loading:", eset_te_name, "\n")
             load(eset_te_file)
         }

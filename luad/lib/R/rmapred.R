@@ -16,13 +16,13 @@ rmatrain <- function(affybatch) {
     return(rma_obj)
 }
 
-rmaaddon <- function(rma_obj, affybatch, parallel=TRUE) {
+rmaaddon <- function(rma_obj, affybatch, num.cores=max(detectCores()/2, 1)) {
     if (class(rma_obj) != "rmatrain")
         stop("Input parameter 'rma_obj' has to be of class 'rmatrain'.")
     cat("Performing add-on normalization/summarization")
-    if (parallel) {
+    if (num.cores > 1) {
         suppressPackageStartupMessages(require("doParallel"))
-        registerDoParallel(cores=max(detectCores()/2, 1))
+        registerDoParallel(cores=num.cores)
         exprs.test.rma <- foreach (cel=1:length(affybatch), .combine="cbind") %dopar% {
             ab.add <- extractAffybatch(cel, affybatch)
             abo.nrm.rma  <- normalizeqntadd(ab.add, rma_obj$rmadoc$mqnts)
