@@ -69,6 +69,7 @@ R CMD javareconf
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
 install.packages("rJava", type="source")
 install.packages("Biocomb")
+install.packages("FSelectorRcpp")
 install.packages("bapred")
 ```
 
