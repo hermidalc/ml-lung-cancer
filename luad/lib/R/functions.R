@@ -83,8 +83,9 @@ limmaFeatures <- function(eset, numbers=TRUE, min.p.value=0.05, min.lfc=0, max.n
     }
 }
 
-fcbfFeatureIdxs <- function(X, y) {
-    results <- Biocomb::select.fast.filter(cbind(X, as.factor(y)), disc.method="MDL", threshold=0)
+fcbfFeatureIdxs <- function(X, y, threshold=0) {
+    results <- Biocomb::select.fast.filter(cbind(X, as.factor(y)), disc.method="MDL", threshold=threshold)
+    results <- results[order(results$Information.Gain, decreasing=TRUE), , drop=FALSE]
     return(results$NumberFeature - 1)
 }
 
@@ -106,7 +107,7 @@ gainRatioFeatureIdxs <- function(X, y) {
     return(as.integer(row.names(results)) - 1)
 }
 
-symmUncertFeatureIdxs <- function(X, y) {
+symUncertFeatureIdxs <- function(X, y) {
     X <- as.data.frame(X)
     colnames(X) <- seq(1, ncol(X))
     results <- FSelector::symmetrical.uncertainty(
@@ -117,12 +118,13 @@ symmUncertFeatureIdxs <- function(X, y) {
     return(as.integer(row.names(results)) - 1)
 }
 
-relieffFeatureIdxs <- function(X, y, num.neighbors=15, sample.size=10) {
+relieffFeatureScore <- function(X, y, num.neighbors=20, sample.size=10) {
     X <- as.data.frame(X)
     colnames(X) <- seq(1, ncol(X))
     results <- FSelector::relief(
         as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)),
         neighbours.count=num.neighbors, sample.size=sample.size
     )
-    return(results[order(results$attr_importance, decreasing=TRUE), , drop=FALSE])
+    results <- results[order(as.integer(row.names(results))), , drop=FALSE]
+    return(results$attr_importance)
 }

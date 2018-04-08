@@ -13,7 +13,7 @@ base = importr('base')
 base.source('lib/R/functions.R')
 r_cfs_feature_idxs = robjects.globalenv['cfsFeatureIdxs']
 r_fcbf_feature_idxs = robjects.globalenv['fcbfFeatureIdxs']
-r_relieff_feature_idxs = robjects.globalenv['relieffFeatureIdxs']
+r_relieff_feature_score = robjects.globalenv['relieffFeatureScore']
 numpy2ri.activate()
 
 class CFS(BaseEstimator, SelectorMixin):
@@ -48,7 +48,7 @@ class CFS(BaseEstimator, SelectorMixin):
         """
         X, y = check_X_y(X, y)
         self.n_features_ = X.shape[1]
-        warnings.filterwarnings('ignore', category=RRuntimeWarning)
+        warnings.filterwarnings('ignore', category=RRuntimeWarning, message="^Rjava\.init\.warning")
         self.selected_idxs_ = np.array(r_cfs_feature_idxs(X, y), dtype=int)
         warnings.filterwarnings('always', category=RRuntimeWarning)
         return self
@@ -70,8 +70,9 @@ class FCBF(BaseEstimator, SelectorMixin):
     selected_idxs_ : array-like, 1d
         FCBF selected feature indexes
     """
-    def __init__(self):
-        pass
+    def __init__(self, k='all', threshold=0):
+        self.k = k
+        self.threshold = threshold
 
     def fit(self, X, y):
         """
@@ -91,15 +92,18 @@ class FCBF(BaseEstimator, SelectorMixin):
         """
         X, y = check_X_y(X, y)
         self.n_features_ = X.shape[1]
-        warnings.filterwarnings('ignore', category=RRuntimeWarning)
-        self.selected_idxs_ = np.array(r_fcbf_feature_idxs(X, y), dtype=int)
+        warnings.filterwarnings('ignore', category=RRuntimeWarning, message="^Rjava\.init\.warning")
+        self.selected_idxs_ = np.array(r_fcbf_feature_idxs(X, y, threshold=self.threshold), dtype=int)
         warnings.filterwarnings('always', category=RRuntimeWarning)
         return self
 
     def _get_support_mask(self):
         check_is_fitted(self, 'selected_idxs_')
         mask = np.zeros(self.n_features_, dtype=bool)
-        mask[self.selected_idxs_] = True
+        if self.k == 'all':
+            mask[self.selected_idxs_] = True
+        else:
+            mask[self.selected_idxs_[:self.k]] = True
         return mask
 
 class ReliefF(BaseEstimator, SelectorMixin):
@@ -110,7 +114,7 @@ class ReliefF(BaseEstimator, SelectorMixin):
     scores_ : array-like, shape=(n_features,)
         Feature scores
     """
-    def __init__(self, k=20, thres=0, n_neighbors=15, sample_size=10):
+    def __init__(self, k=20, threshold=0, n_neighbors=15, sample_size=10):
         self.k = k
         self.threshold = threshold
         self.n_neighbors = n_neighbors
@@ -133,8 +137,8 @@ class ReliefF(BaseEstimator, SelectorMixin):
             Returns self.
         """
         X, y = check_X_y(X, y)
-        warnings.filterwarnings('ignore', category=RRuntimeWarning)
-        self.scores_ = np.array(r_relieff_feature_idxs(X, y), dtype=int)
+        warnings.filterwarnings('ignore', category=RRuntimeWarning, message="^Rjava\.init\.warning")
+        self.scores_ = np.array(r_relieff_feature_score(X, y), dtype=int)
         warnings.filterwarnings('always', category=RRuntimeWarning)
         return self
 
