@@ -57,9 +57,7 @@ args = parser.parse_args()
 
 base = importr('base')
 biobase = importr('Biobase')
-warnings.filterwarnings('ignore', category=RRuntimeWarning)
 base.source('lib/R/functions.R')
-warnings.filterwarnings('always', category=RRuntimeWarning)
 r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']
 r_get_eset_class_labels = robjects.globalenv['getEsetClassLabels']
 r_get_eset_gene_symbols = robjects.globalenv['getEsetGeneSymbols']
