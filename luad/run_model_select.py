@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
-import argparse, pprint, warnings
+import argparse, pprint
 from os import path
 from tempfile import mkdtemp
 from shutil import rmtree
 from natsort import natsorted
 import numpy as np
+import rpy2.rinterface as rinterface
+rinterface.set_initoptions((b'rpy2', b'--quiet', b'--no-save', b'--max-ppsize=500000'))
 import rpy2.robjects as robjects
-from rpy2.rinterface import RRuntimeWarning
 from rpy2.robjects.packages import importr
 from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
@@ -85,7 +86,7 @@ class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
 
 # limma feature selection scoring function
 def limma(X, y):
-    f, pv = r_limma_feature_score(np.transpose(X), y)
+    f, pv = r_limma_feature_score(X, y)
     return np.array(f), np.array(pv)
 
 # bcr performance metrics scoring function

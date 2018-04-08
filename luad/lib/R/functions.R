@@ -51,11 +51,11 @@ getEsetGeneSymbols <- function(eset, features=NULL) {
     return(symbols)
 }
 
-limmaFeatureScore <- function(exprs, class) {
+limmaFeatureScore <- function(X, y) {
     suppressPackageStartupMessages(require("limma"))
-    design <- model.matrix(~0 + factor(class))
+    design <- model.matrix(~0 + factor(y))
     colnames(design) <- c("Class0", "Class1")
-    fit <- lmFit(exprs, design)
+    fit <- lmFit(t(X), design)
     contrast.matrix <- makeContrasts(Class1VsClass0=Class1-Class0, levels=design)
     fit.contrasts <- contrasts.fit(fit, contrast.matrix)
     fit.b <- eBayes(fit.contrasts)
