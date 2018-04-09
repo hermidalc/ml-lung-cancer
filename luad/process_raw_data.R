@@ -41,7 +41,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
     # load a reference eset set
     for (norm_type in norm_types) {
         suffixes <- c(norm_type)
-        if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+        if (!is.na(id_type) & id_type != "gene") suffixes <- c(suffixes, id_type)
         if (num_tr_subset > 1) {
             eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
         }
@@ -75,7 +75,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
     if (skip_processing) next
     for (norm_type in norm_types) {
         suffixes <- c(norm_type)
-        if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+        if (!is.na(id_type) & id_type != "gene") suffixes <- c(suffixes, id_type)
         if (num_tr_subset > 1) {
             eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
         }
@@ -91,7 +91,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         suffixes <- c(norm_type)
         if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
         affybatch_tr <- NULL
-        cat("Merging: ")
+        if (length(dataset_tr_name_combos[,col]) != 1) cat("Merging: ")
         for (dataset_tr_name in dataset_tr_name_combos[,col]) {
             affybatch_name <- paste0(c("affybatch", dataset_tr_name, suffixes), collapse="_")
             cat(affybatch_name, "")
@@ -113,7 +113,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 assayData=t(norm_obj$xnorm),
                 phenoData=phenoData(get(eset_tr_name)),
                 featureData=AnnotatedDataFrame(data.frame(
-                    Symbol=getSYMBOL(featureNames(eset_tr_norm), paste0(cdfname, ".db"))
+                    Symbol=getSYMBOL(colnames(norm_obj$xnorm)), paste0(cdfname, ".db"))
                 )),
                 annotation=cdfname
             )
@@ -141,7 +141,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                     assayData=t(xnorm_te),
                     phenoData=phenoData(get(eset_te_name)),
                     featureData=AnnotatedDataFrame(data.frame(
-                        Symbol=getSYMBOL(featureNames(eset_te_norm), paste0(cdfname, ".db"))
+                        Symbol=getSYMBOL(colnames(norm_obj$xnorm)), paste0(cdfname, ".db"))
                     )),
                     annotation=cdfname
                 )
