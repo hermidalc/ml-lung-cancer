@@ -41,15 +41,15 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
     }
 }
 if (length(cmd_args) > 4) bc_types <- cmd_args[5:length(cmd_args)]
-for (bc_type in bc_types) {
-    for (col in 1:ncol(dataset_tr_name_combos)) {
-        if (is.na(merged_type) | merged_type == "none") {
-            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "tr"), collapse="_")
-        }
-        else {
-            eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
-        }
-        if (!exists(eset_tr_name)) next
+for (col in 1:ncol(dataset_tr_name_combos)) {
+    if (is.na(merged_type) | merged_type == "none") {
+        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "tr"), collapse="_")
+    }
+    else {
+        eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
+    }
+    if (!exists(eset_tr_name)) next
+    for (bc_type in bc_types) {
         if (grepl("^(stica\\d+|svd)$", bc_type)) {
             Xtr <- exprs(get(eset_tr_name))
             ptr <- pData(get(eset_tr_name))
