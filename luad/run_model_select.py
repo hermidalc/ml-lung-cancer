@@ -272,20 +272,6 @@ pipelines = {
             },
         ],
     },
-    'Limma-KBest-CFS': {
-        'pipe_steps': [
-            ('skb', SelectKBest(limma_score_func)),
-            ('std', StandardScaler()),
-            ('cfs', CFS()),
-            ('clf', LinearSVC(class_weight='balanced')),
-        ],
-        'param_grid': [
-            {
-                'skb__k': [ 200 ],
-                'clf__C': CLF_SVC_C,
-            },
-        ],
-    },
     'Limma-KBest-FCBF': {
         'pipe_steps': [
             ('skb', SelectKBest(limma_score_func)),
@@ -305,6 +291,20 @@ pipelines = {
             ('skb', SelectKBest(limma_score_func)),
             ('std', StandardScaler()),
             ('rlf', ReliefF()),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'skb__k': [ 100 ],
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'Limma-KBest-CFS': {
+        'pipe_steps': [
+            ('skb', SelectKBest(limma_score_func)),
+            ('std', StandardScaler()),
+            ('cfs', CFS()),
             ('clf', LinearSVC(class_weight='balanced')),
         ],
         'param_grid': [
@@ -344,7 +344,6 @@ fs_methods = [
     'Limma-Fpr-SVM-RFE',
     'SVM-SFM-RFE',
     'ExtraTrees-SFM-RFE',
-    'Limma-KBest-CFS',
     'Limma-KBest-FCBF',
     'Limma-KBest-ReliefF',
     #'SVM-RFE',
@@ -357,13 +356,13 @@ fs_methods = [
 if args.analysis == 1:
     args.datasets_tr = sorted(args.datasets_tr)
     if args.norm_meth and args.bc_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr.extend(args.norm_meth, args.bc_meth, 'tr'))
+        dataset_tr_name = '_'.join(args.datasets_tr + [args.norm_meth, args.bc_meth, 'tr'])
     elif args.norm_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr.extend(args.norm_meth, 'tr'))
+        dataset_tr_name = '_'.join(args.datasets_tr + [args.norm_meth, 'tr'])
     elif args.bc_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr.extend(args.bc_meth, 'tr'))
+        dataset_tr_name = '_'.join(args.datasets_tr + [args.bc_meth, 'tr'])
     eset_tr_name = 'eset_' + dataset_tr_name
-    print(eset_tr_name)
+    print('Train Dataset:', eset_tr_name)
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
@@ -498,9 +497,9 @@ if args.analysis == 1:
     ])
     for dataset_te_name in sorted(list(set(dataset_names) - set(args.datasets_tr))):
         if args.norm_meth or args.bc_meth:
-            eset_te_name = eset_tr_name + '_' + dataset_te_name + '_te'
+            eset_te_name = '_'.join([eset_tr_name, dataset_te_name, 'te'])
         else:
-            eset_te_name = 'eset_' + dataset_te_name
+            eset_te_name = '_'.join(['eset', dataset_te_name, args.norm_meth])
         eset_te_file = 'data/' + eset_te_name + '.Rda'
         if not path.isfile(eset_te_file): continue
         base.load(eset_te_file)
@@ -526,13 +525,13 @@ if args.analysis == 1:
                 np.mean(bcrs_te), np.std(bcrs_te),
             ),
         )
-        plt.plot(
-            x_axis, bcrs_te,
-            lw=4, alpha=0.8,
-        )
+        # plt.plot(
+        #     x_axis, bcrs_te,
+        #     lw=4, alpha=0.8,
+        # )
         # print summary info
         print(
-            'Dataset: %3s' % dataset_te_name,
+            'Test Dataset: %3s' % eset_te_name,
             ' ROC AUC: %.4f' % np.max(roc_aucs_te),
             ' BCR: %.4f' % np.max(bcrs_te),
         )
