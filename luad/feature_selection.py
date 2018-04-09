@@ -114,7 +114,7 @@ class ReliefF(BaseEstimator, SelectorMixin):
     scores_ : array-like, shape=(n_features,)
         Feature scores
     """
-    def __init__(self, k=20, threshold=0, n_neighbors=15, sample_size=10):
+    def __init__(self, k=20, threshold=0, n_neighbors=20, sample_size=10):
         self.k = k
         self.threshold = threshold
         self.n_neighbors = n_neighbors

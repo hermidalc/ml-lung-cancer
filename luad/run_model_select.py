@@ -21,7 +21,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 from sklearn.metrics import roc_auc_score, roc_curve, make_scorer
 from sklearn.externals.joblib import dump, Memory
-from feature_selection import CFS, FCBF
+from feature_selection import CFS, FCBF, ReliefF
 import matplotlib.pyplot as plt
 from matplotlib import style
 
@@ -272,20 +272,6 @@ pipelines = {
             },
         ],
     },
-    'Limma-Fpr-CFS': {
-        'pipe_steps': [
-            ('sfp', SelectFpr(limma_score_func)),
-            ('std', StandardScaler()),
-            ('cfs', CFS()),
-            ('clf', LinearSVC(class_weight='balanced')),
-        ],
-        'param_grid': [
-            {
-                'sfp__alpha': SFP_ALPHA,
-                'clf__C': CLF_SVC_C,
-            },
-        ],
-    },
     'Limma-KBest-CFS': {
         'pipe_steps': [
             ('skb', SelectKBest(limma_score_func)),
@@ -309,7 +295,21 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'skb__k': [ 10000 ],
+                'skb__k': [ 15000 ],
+                'clf__C': CLF_SVC_C,
+            },
+        ],
+    },
+    'Limma-KBest-ReliefF': {
+        'pipe_steps': [
+            ('skb', SelectKBest(limma_score_func)),
+            ('std', StandardScaler()),
+            ('rlf', ReliefF()),
+            ('clf', LinearSVC(class_weight='balanced')),
+        ],
+        'param_grid': [
+            {
+                'skb__k': [ 100 ],
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -344,11 +344,12 @@ fs_methods = [
     'Limma-Fpr-SVM-RFE',
     'SVM-SFM-RFE',
     'ExtraTrees-SFM-RFE',
+    'Limma-KBest-CFS',
     'Limma-KBest-FCBF',
+    'Limma-KBest-ReliefF',
     #'SVM-RFE',
     #'SVM-SFM',
     #'ExtraTrees-SFM',
-    #'Limma-Fpr-CFS',
     #'Limma-KBest-CFS',
 ]
 

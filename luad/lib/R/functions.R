@@ -51,19 +51,6 @@ getEsetGeneSymbols <- function(eset, features=NULL) {
     return(symbols)
 }
 
-limmaFeatureScore <- function(X, y) {
-    suppressPackageStartupMessages(require("limma"))
-    design <- model.matrix(~0 + factor(y))
-    colnames(design) <- c("Class0", "Class1")
-    fit <- lmFit(t(X), design)
-    contrast.matrix <- makeContrasts(Class1VsClass0=Class1-Class0, levels=design)
-    fit.contrasts <- contrasts.fit(fit, contrast.matrix)
-    fit.b <- eBayes(fit.contrasts)
-    results <- topTableF(fit.b, number=Inf, adjust.method="BH")
-    results <- results[order(as.integer(row.names(results))),]
-    return(list(results$F, results$adj.P.Val))
-}
-
 limmaFeatures <- function(eset, numbers=TRUE, min.p.value=0.05, min.lfc=0, max.num.features=Inf) {
     suppressPackageStartupMessages(require("limma"))
     design <- model.matrix(~0 + factor(pData(eset)$Class))
@@ -81,6 +68,19 @@ limmaFeatures <- function(eset, numbers=TRUE, min.p.value=0.05, min.lfc=0, max.n
     else {
         return(feature.names)
     }
+}
+
+limmaFeatureScore <- function(X, y) {
+    suppressPackageStartupMessages(require("limma"))
+    design <- model.matrix(~0 + factor(y))
+    colnames(design) <- c("Class0", "Class1")
+    fit <- lmFit(t(X), design)
+    contrast.matrix <- makeContrasts(Class1VsClass0=Class1-Class0, levels=design)
+    fit.contrasts <- contrasts.fit(fit, contrast.matrix)
+    fit.b <- eBayes(fit.contrasts)
+    results <- topTableF(fit.b, number=Inf, adjust.method="BH")
+    results <- results[order(as.integer(row.names(results))),]
+    return(list(results$F, results$adj.P.Val))
 }
 
 fcbfFeatureIdxs <- function(X, y, threshold=0) {
