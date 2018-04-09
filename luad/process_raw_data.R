@@ -64,7 +64,6 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         }
     }
 }
-norm_obj_cache <- list()
 for (col in 1:ncol(dataset_tr_name_combos)) {
     skip_processing <- FALSE
     for (dataset_tr_name in dataset_tr_name_combos[,col]) {
@@ -107,19 +106,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
         dataset_tr_norm_name <- paste0(c(dataset_tr_name_combos[,col], suffixes), collapse="_")
         eset_tr_norm_name <- paste("eset", dataset_tr_norm_name, "tr", sep="_")
         cat("Creating:", eset_tr_norm_name, "\n")
-        if (length(dataset_tr_name_combos[,col]) == 1) {
-            if (exists(dataset_tr_norm_name, where=norm_obj_cache)) {
-                cat("Loading cached norm object:", dataset_tr_norm_name, "\n")
-                norm_obj <- norm_obj_cache[[dataset_tr_norm_name]]
-            }
-            else {
-                norm_obj <- rmatrain(affybatch_tr)
-                norm_obj_cache[[dataset_tr_norm_name]] <- norm_obj
-            }
-        }
-        else {
-            norm_obj <- rmatrain(affybatch_tr)
-        }
+        norm_obj <- rmatrain(affybatch_tr)
         rownames(norm_obj$xnorm) <- sub("\\.CEL$", "", rownames(norm_obj$xnorm))
         if (id_type == "gene") {
             eset_tr_norm <- ExpressionSet(
