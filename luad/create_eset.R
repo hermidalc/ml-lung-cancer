@@ -64,6 +64,8 @@ for (file in cmd_args) {
         eset <- eset[,eset$"Exclude_incomplete_resection_adjuvant_therapy" == 0]
         impute_results <- impute.knn(exprs(eset), k=15)
         exprs(eset) <- impute_results$data
+        exprs(eset) <- exprs(eset)[order(rownames(exprs(eset))),, drop=FALSE]
+        exprs(eset) <- exprs(eset)[rownames(exprs(eset)) != "0000_at",]
     }
     # annotate eset
     probeset_ids <- featureNames(eset)
