@@ -28,7 +28,7 @@ from matplotlib import style
 # config
 parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
-parser.add_argument('--norm-meth', type=str, help='preprocess/normalization method')
+parser.add_argument('--pr-meth', type=str, nargs='+', help='preprocess/normalization methods')
 parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, help='feature selection method')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
@@ -281,7 +281,8 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'skb__k': [ 15000 ],
+                'skb__k': SKB_N_FEATURES,
+                'fcbf__k': [ 30 ],
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -295,7 +296,7 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'skb__k': [ 100 ],
+                'skb__k': SKB_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -309,7 +310,7 @@ pipelines = {
         ],
         'param_grid': [
             {
-                'skb__k': [ 100 ],
+                'skb__k': SKB_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
