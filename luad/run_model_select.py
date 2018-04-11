@@ -28,11 +28,17 @@ from matplotlib import style
 # config
 parser = argparse.ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
-parser.add_argument('--pr-meth', type=str, nargs='+', help='preprocess/normalization methods')
+parser.add_argument('--dataset-tr-num', type=int, help='dataset tr num combos')
+parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
+parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
+parser.add_argument('--norm-meth', type=str, help='preprocess/normalization method')
 parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, help='feature selection method')
+parser.add_argument('--no-addon-te', default=False, action='store_true', help='dataset te no addon')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=30, help='fs skb k max')
+parser.add_argument('--fs-fcbf-k', type=int, nargs='+', help='fs fcbf k select')
+parser.add_argument('--fs-fcbf-k-max', type=int, default=30, help='fs fcbf k max')
 parser.add_argument('--fs-fpr-p', type=float, nargs='+', help='fs fpr p-value')
 parser.add_argument('--fs-sfm-thres', type=float, nargs='+', help='fs sfm threshold')
 parser.add_argument('--fs-sfm-c', type=float, nargs='+', help='fs sfm svm c')
@@ -51,17 +57,14 @@ parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel job
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc or bcr)')
 parser.add_argument('--gscv-no-memory', default=False, action='store_true', help='gscv no pipeline memory')
-parser.add_argument('--dataset-tr-num', type=int, help='dataset tr num combos')
-parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
-parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
 args = parser.parse_args()
 
 base = importr('base')
 biobase = importr('Biobase')
 base.source('lib/R/functions.R')
 r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']
-r_get_eset_class_labels = robjects.globalenv['getEsetClassLabels']
-r_get_eset_gene_symbols = robjects.globalenv['getEsetGeneSymbols']
+r_eset_class_labels = robjects.globalenv['esetClassLabels']
+r_eset_gene_symbols = robjects.globalenv['esetGeneSymbols']
 r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
 numpy2ri.activate()
 if args.gscv_no_memory:
@@ -148,6 +151,10 @@ if args.fs_rfe_n:
     RFE_N_FEATURES = sorted(args.fs_rfe_n)
 else:
     RFE_N_FEATURES = list(range(1, args.fs_rfe_n_max + 1))
+if args.fs_fcbf_k:
+    FCBF_N_FEATURES = sorted(args.fs_fcbf_k)
+else:
+    FCBF_N_FEATURES = list(range(1, args.fs_fcbf_k_max + 1))
 if args.fs_fpr_p:
     SFP_ALPHA = sorted(args.fs_fpr_p)
 else:
@@ -207,8 +214,8 @@ pipelines = {
             {
                 'sfm__estimator__C': SFM_SVC_C,
                 'sfm__threshold': SFM_THRESHOLDS,
-                'rfe__n_features_to_select': RFE_N_FEATURES,
                 'rfe__estimator__C': RFE_SVC_C,
+                'rfe__n_features_to_select': RFE_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -282,7 +289,7 @@ pipelines = {
         'param_grid': [
             {
                 'skb__k': SKB_N_FEATURES,
-                'fcbf__k': [ 30 ],
+                'fcbf__k': FCBF_N_FEATURES,
                 'clf__C': CLF_SVC_C,
             },
         ],
@@ -354,6 +361,197 @@ fs_methods = [
 ]
 
 # analyses
+if args.analysis == 0:
+    args.datasets_tr = sorted(args.datasets_tr)
+    if args.norm_meth and args.bc_meth:
+        dataset_name = '_'.join(args.datasets_tr + [args.norm_meth, args.bc_meth, 'tr'])
+    elif args.norm_meth:
+        dataset_name = '_'.join(args.datasets_tr + [args.norm_meth, 'tr'])
+    elif args.bc_meth:
+        dataset_name = '_'.join(args.datasets_tr + [args.bc_meth, 'tr'])
+    print('Dataset:', dataset_name)
+    eset_name = 'eset_' + dataset_name
+    base.load('data/' + eset_name + '.Rda')
+    eset = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_name])
+    X = np.array(base.t(biobase.exprs(eset)))
+    y = np.array(r_eset_class_labels(eset), dtype=int)
+    split_results = []
+    sss = StratifiedShuffleSplit(n_splits=3, test_size=0.3)
+    for tr_idxs, te_idxs in sss.split(X, y):
+        grid = GridSearchCV(
+            Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
+            param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+        )
+        grid.fit(X[tr_idxs], y[tr_idxs])
+        feature_idxs = np.arange(X[tr_idxs].shape[1])
+        for step in grid.best_estimator_.named_steps:
+            if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
+                feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
+        feature_names = np.array(biobase.featureNames(eset), dtype=str)[feature_idxs]
+        coefs = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
+        feature_ranks = sorted(
+            zip(coefs, feature_idxs, feature_names, r_eset_gene_symbols(eset, feature_idxs + 1)),
+            reverse=True,
+        )
+        roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
+        bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
+        print(
+            'Features: %3s' % feature_idxs.size,
+            ' ROC AUC (CV): %.4f' % roc_auc_cv,
+            ' BCR (CV): %.4f' % bcr_cv,
+            ' Params:',  grid.best_params_,
+        )
+        # print('Rankings:')
+        # for coef, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', coef)
+        mean_roc_aucs_cv, mean_bcrs_cv = {}, {}
+        std_roc_aucs_cv, std_bcrs_cv = {}, {}
+        grid_params = pipelines[args.fs_meth]['param_grid'][0]
+        for idx, param in enumerate(grid_params):
+            new_shape = ()
+            if param in (
+                'skb__k', 'rfe__n_features_to_select', 'sfm__estimator__C', 'sfm__estimator__n_estimators',
+                'fcbf__k', 'sfm__threshold', 'sfp__alpha', 'rfe__estimator__C', 'clf__C',
+            ) and len(grid_params[param]) > 1:
+                new_shape = (
+                    len(grid_params[param]),
+                    np.prod([len(v) for k,v in grid_params.items() if k != param])
+                )
+                if param in ('sfm__threshold'):
+                    xaxis_group_sorted_idxs = np.argsort(
+                        np.ma.getdata(grid.cv_results_['param_' + param]).astype(str)
+                    )
+                else:
+                    xaxis_group_sorted_idxs = np.argsort(
+                        np.ma.getdata(grid.cv_results_['param_' + param])
+                    )
+            if new_shape:
+                mean_roc_aucs_cv[param] = np.reshape(grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+                std_roc_aucs_cv[param] = np.reshape(grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape)
+                mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv[param], axis=1)
+                mean_roc_aucs_cv[param] = mean_roc_aucs_cv[param][np.arange(len(mean_roc_aucs_cv[param])), mean_roc_aucs_cv_max_idxs]
+                std_roc_aucs_cv[param] = std_roc_aucs_cv[param][np.arange(len(std_roc_aucs_cv[param])), mean_roc_aucs_cv_max_idxs]
+                mean_bcrs_cv[param] = np.reshape(grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+                std_bcrs_cv[param] = np.reshape(grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape)
+                mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv[param], axis=1)
+                mean_bcrs_cv[param] = mean_bcrs_cv[param][np.arange(len(mean_bcrs_cv[param])), mean_bcrs_cv_max_idxs]
+                std_bcrs_cv[param] = std_bcrs_cv[param][np.arange(len(std_bcrs_cv[param])), mean_bcrs_cv_max_idxs]
+        y_score = grid.decision_function(X[te_idxs])
+        fpr, tpr, thres = roc_curve(y[te_idxs], y_score, pos_label=1)
+        roc_auc_te = roc_auc_score(y[te_idxs], y_score)
+        y_pred = grid.predict(X[te_idxs])
+        bcr_te = bcr_score(y[te_idxs], y_pred)
+        split_results.append({
+            'grid': grid,
+            'feature_idxs': feature_idxs,
+            'feature_names': feature_names,
+            'fprs': fpr,
+            'tprs': tpr,
+            'thres': thres,
+            'coefs': coefs,
+            'y_score': y_score,
+            'mean_roc_aucs_cv': mean_roc_aucs_cv,
+            'std_roc_aucs_cv': std_roc_aucs_cv,
+            'mean_bcrs_cv': mean_bcrs_cv,
+            'std_bcrs_cv': std_bcrs_cv,
+            'roc_auc_te': roc_auc_te,
+            'bcr_te': bcr_te,
+        })
+    # plot grid search parameters vs cv perf metrics
+    for param_idx, param in enumerate(grid_params):
+        for split_idx, result in enumerate(split_results):
+            if split_idx == 0:
+                roc_aucs_cv = result[param]['mean_roc_aucs_cv']
+                bcrs_cv = result[param]['mean_bcrs_cv']
+            else:
+                roc_aucs_cv = np.stack((roc_aucs_cv, result[param]['mean_roc_aucs_cv']))
+                bcrs_cv = np.stack((bcrs_cv, result[param]['mean_bcrs_cv']))
+        mean_roc_aucs_cv = np.mean(roc_aucs_cv, axis=0)
+        mean_bcrs_cv = np.mean(bcrs_cv, axis=0)
+        std_roc_aucs_cv = np.std(roc_aucs_cv, axis=0)
+        std_bcrs_cv = np.std(bcrs_cv, axis=0)
+        plt.figure('Figure 1-' + str(param_idx + 1))
+        plt.rcParams['font.size'] = 16
+        if param in (
+            'skb__k', 'rfe__n_features_to_select', 'sfm__estimator__n_estimators', 'fcbf__k',
+        ):
+            x_axis = grid_params[param]
+            plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+            plt.xticks(x_axis)
+        elif param in (
+            'sfm__estimator__C', 'sfm__threshold', 'sfp__alpha', 'rfe__estimator__C', 'clf__C',
+        ):
+            x_axis = range(len(grid_params[param]))
+            plt.xticks(x_axis, grid_params[param])
+        plt.title(
+            dataset_tr_name + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+            'Effect of ' + param + ' on CV Performance Metrics'
+        )
+        plt.xlabel(param)
+        plt.ylabel('CV Score')
+        plt.plot(
+            x_axis,
+            mean_roc_aucs_cv,
+            lw=4, alpha=0.8, label='Mean ROC AUC'
+        )
+        plt.fill_between(
+            x_axis,
+            [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+            [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+            color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+        )
+        plt.plot(
+            x_axis,
+            mean_bcrs_cv,
+            lw=4, alpha=0.8, label='Mean BCR'
+        )
+        plt.fill_between(
+            x_axis,
+            [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+            [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+            color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
+        )
+        plt.legend(loc='lower right', fontsize='small')
+        plt.grid('on')
+    # print final selected feature information
+    feature_idxs = []
+    for split in split_results: feature_idxs.extend(split['feature_idxs'])
+    feature_idxs = sorted(list(set(feature_idxs)))
+    feature_names = np.array(biobase.featureNames(eset), dtype=str)[feature_idxs]
+    # print(*natsorted(feature_names), sep='\n')
+    feature_mx_idx = {}
+    for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
+    coef_mx = np.zeros((len(feature_idxs), len(split_results)), dtype=float)
+    roc_auc_mx = coef_mx
+    bcr_mx = coef_mx
+    for split_idx in range(len(split_results)):
+        split_data = split_results[split_idx]
+        for idx in range(len(split_data['feature_idxs'])):
+            coef_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                split_data['coefs'][idx]
+            roc_auc_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                split_data['roc_auc_te']
+            bcr_mx[feature_mx_idx[split_data['feature_idxs'][idx]]][split_idx] = \
+                split_data['bcr_te']
+    feature_mean_coefs, feature_mean_roc_aucs, feature_mean_bcrs = [], [], []
+    for idx in range(len(feature_idxs)):
+        feature_mean_coefs.append(np.mean(coef_mx[idx]))
+        feature_mean_roc_aucs.append(np.mean(roc_auc_mx[idx]))
+        feature_mean_bcrs.append(np.mean(bcr_mx[idx]))
+        # print(feature_names[idx], '\t', feature_mean_coefs[idx], '\t', coef_mx[idx])
+        # print(feature_names[idx], '\t', feature_mean_roc_aucs[idx], '\t', roc_auc_mx[idx])
+    if args.fs_rank_meth == 'mean_coefs':
+        feature_ranks = feature_mean_coefs
+    elif args.fs_rank_meth == 'mean_roc_aucs':
+        feature_ranks = feature_mean_roc_aucs
+    else:
+        feature_ranks = feature_mean_bcrs
+    print('Rankings:')
+    for rank, feature, symbol in sorted(
+        zip(feature_ranks, feature_names, r_eset_gene_symbols(eset, np.array(feature_idxs) + 1)),
+        reverse=True
+    ): print(feature, '\t', symbol, '\t', rank)
 if args.analysis == 1:
     args.datasets_tr = sorted(args.datasets_tr)
     if args.norm_meth and args.bc_meth:
@@ -362,12 +560,12 @@ if args.analysis == 1:
         dataset_tr_name = '_'.join(args.datasets_tr + [args.norm_meth, 'tr'])
     elif args.bc_meth:
         dataset_tr_name = '_'.join(args.datasets_tr + [args.bc_meth, 'tr'])
+    print('Train Dataset:', dataset_tr_name)
     eset_tr_name = 'eset_' + dataset_tr_name
-    print('Train Dataset:', eset_tr_name)
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-    y_tr = np.array(r_get_eset_class_labels(eset_tr), dtype=int)
+    y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
     grid = GridSearchCV(
         Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
         param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
@@ -384,13 +582,8 @@ if args.analysis == 1:
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
     coefs = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
     feature_ranks = sorted(
-        zip(
-            coefs, feature_idxs, feature_names,
-            r_get_eset_gene_symbols(
-                eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
-            ),
-        ),
-        reverse=True
+        zip(coefs, feature_idxs, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
+        reverse=True,
     )
     roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
     bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
@@ -403,13 +596,12 @@ if args.analysis == 1:
     print('Rankings:')
     for coef, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', coef)
     # plot grid search parameters vs cv perf metrics
-    dataset_tr_title = dataset_tr_name.replace('gse', 'GSE')
     grid_params = pipelines[args.fs_meth]['param_grid'][0]
     for idx, param in enumerate(grid_params):
         new_shape = ()
         if param in (
             'skb__k', 'rfe__n_features_to_select', 'sfm__estimator__C', 'sfm__estimator__n_estimators',
-            'sfm__threshold', 'sfp__alpha', 'rfe__estimator__C', 'clf__C',
+            'fcbf__k', 'sfm__threshold', 'sfp__alpha', 'rfe__estimator__C', 'clf__C',
         ) and len(grid_params[param]) > 1:
             new_shape = (
                 len(grid_params[param]),
@@ -435,9 +627,9 @@ if args.analysis == 1:
             mean_bcrs_cv = mean_bcrs_cv[np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs]
             std_bcrs_cv = std_bcrs_cv[np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs]
             plt.figure('Figure 1-' + str(idx + 1))
-            plt.rcParams['font.size'] = 20
+            plt.rcParams['font.size'] = 16
             if param in (
-                'skb__k', 'rfe__n_features_to_select', 'sfm__estimator__n_estimators',
+                'skb__k', 'rfe__n_features_to_select', 'sfm__estimator__n_estimators', 'fcbf__k',
             ):
                 x_axis = grid_params[param]
                 plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
@@ -448,7 +640,7 @@ if args.analysis == 1:
                 x_axis = range(len(grid_params[param]))
                 plt.xticks(x_axis, grid_params[param])
             plt.title(
-                dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+                dataset_tr_name + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
                 'Effect of ' + param + ' on CV Performance Metrics'
             )
             plt.xlabel(param)
@@ -479,9 +671,9 @@ if args.analysis == 1:
             plt.grid('on')
     # plot num top-ranked features selected vs test dataset perf metrics
     plt.figure('Figure 2')
-    plt.rcParams['font.size'] = 20
+    plt.rcParams['font.size'] = 16
     plt.title(
-        dataset_tr_title + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+        dataset_tr_name + ' SVM Classifier (' + args.fs_meth + ' Feature Selection)\n' +
         'Effect of Number of Top-Ranked Features Selected Performance Metrics'
     )
     plt.xlabel('Number of top-ranked features selected')
@@ -496,17 +688,18 @@ if args.analysis == 1:
             class_weight='balanced', C=grid.best_params_['clf__C'],
         )),
     ])
-    for dataset_te_name in sorted(list(set(dataset_names) - set(args.datasets_tr))):
-        if args.norm_meth or args.bc_meth:
-            eset_te_name = '_'.join([eset_tr_name, dataset_te_name, 'te'])
+    for dataset_te in sorted(list(set(dataset_names) - set(args.datasets_tr))):
+        if args.no_addon_te:
+            dataset_te_name = '_'.join([dataset_te, args.norm_meth])
         else:
-            eset_te_name = '_'.join(['eset', dataset_te_name, args.norm_meth])
+            dataset_te_name = '_'.join([dataset_tr_name, dataset_te, 'te'])
+        eset_te_name = 'eset_' + dataset_te_name
         eset_te_file = 'data/' + eset_te_name + '.Rda'
         if not path.isfile(eset_te_file): continue
         base.load(eset_te_file)
         eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
         X_te = np.array(base.t(biobase.exprs(eset_te)))
-        y_te = np.array(r_get_eset_class_labels(eset_te), dtype=int)
+        y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
         roc_aucs_te, bcrs_te = [], []
         for num_features in range(1, len(ranked_feature_idxs) + 1):
             top_feature_idxs = ranked_feature_idxs[:num_features]
@@ -521,7 +714,7 @@ if args.analysis == 1:
         plt.plot(
             x_axis, roc_aucs_te,
             lw=4, alpha=0.8, label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, BCR = %0.4f $\pm$ %0.2f)' % (
-                dataset_te_name.replace('gse', 'GSE'),
+                dataset_te_name,
                 np.mean(roc_aucs_te), np.std(roc_aucs_te),
                 np.mean(bcrs_te), np.std(bcrs_te),
             ),
@@ -532,7 +725,7 @@ if args.analysis == 1:
         # )
         # print summary info
         print(
-            'Test Dataset: %3s' % eset_te_name,
+            'Test Dataset: %3s' % dataset_te_name,
             ' ROC AUC: %.4f' % np.max(roc_aucs_te),
             ' BCR: %.4f' % np.max(bcrs_te),
         )
@@ -554,7 +747,7 @@ elif args.analysis == 2:
             base.load('data/' + eset_tr_name + '.Rda')
             eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
             X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-            y_tr = np.array(r_get_eset_class_labels(eset_tr), dtype=int)
+            y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
                 Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
                 param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
@@ -577,7 +770,7 @@ elif args.analysis == 2:
             base.load('data/' + eset_te_name + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
             X_te = np.array(base.t(biobase.exprs(eset_te)))
-            y_te = np.array(r_get_eset_class_labels(eset_te), dtype=int)
+            y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
             y_score = grid.decision_function(X_te)
             fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
             roc_auc_te = roc_auc_score(y_te, y_score)
@@ -617,19 +810,13 @@ elif args.analysis == 2:
             )
             print('Rankings:')
             for rank, feature, symbol in sorted(
-                zip(
-                    coefs,
-                    feature_names,
-                    r_get_eset_gene_symbols(
-                        eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
-                    ),
-                ),
-                reverse=True
+                zip(coefs, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
+                reverse=True,
             ): print(feature, '\t', symbol, '\t', rank)
     # plot bc method vs train/test scores
     plt_fig_x_axis = range(1, len(bc_methods) + 1)
     plt.figure('Figure 3-1')
-    plt.rcParams['font.size'] = 20
+    plt.rcParams['font.size'] = 16
     plt.title(
         'Effect of Batch Effect Correction Method on ROC AUC\n' +
         '(' + args.fs_meth + ' Feature Selection)'
@@ -638,7 +825,7 @@ elif args.analysis == 2:
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, bc_methods)
     plt.figure('Figure 3-2')
-    plt.rcParams['font.size'] = 20
+    plt.rcParams['font.size'] = 16
     plt.title(
         'Effect of Batch Effect Correction Method on BCR\n' +
         '(' + args.fs_meth + ' Feature Selection)'
@@ -656,8 +843,6 @@ elif args.analysis == 2:
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         dataset_tr_name, dataset_te_name = dataset_pair_names[te_idx]
-        dataset_tr_name = dataset_tr_name.upper()
-        dataset_te_name = dataset_te_name.upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.figure('Figure 3-1')
         plt.plot(
@@ -696,10 +881,9 @@ elif args.analysis == 2:
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
     # plot train/test dataset vs bc method
-    dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
     plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
     plt.figure('Figure 4-1')
-    plt.rcParams['font.size'] = 20
+    plt.rcParams['font.size'] = 16
     plt.title(
         'Effect of Train/Held-Out Test Dataset on ROC AUC\n' +
         '(' + args.fs_meth + ' Feature Selection)'
@@ -708,7 +892,7 @@ elif args.analysis == 2:
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, dataset_te_names)
     plt.figure('Figure 4-2')
-    plt.rcParams['font.size'] = 20
+    plt.rcParams['font.size'] = 16
     plt.title(
         'Effect of Train/Held-Out Test Dataset on BCR\n' +
         '(' + args.fs_meth + ' Feature Selection)'
@@ -778,7 +962,7 @@ elif args.analysis == 3:
             base.load('data/' + eset_tr_name + '.Rda')
             eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
             X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-            y_tr = np.array(r_get_eset_class_labels(eset_tr), dtype=int)
+            y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
             grid = GridSearchCV(
                 Pipeline(pipelines[fs_method]['pipe_steps'], memory=memory),
                 param_grid=pipelines[fs_method]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
@@ -801,7 +985,7 @@ elif args.analysis == 3:
             base.load('data/' + eset_te_name + '.Rda')
             eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
             X_te = np.array(base.t(biobase.exprs(eset_te)))
-            y_te = np.array(r_get_eset_class_labels(eset_te), dtype=int)
+            y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
             y_score = grid.decision_function(X_te)
             fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
             roc_auc_te = roc_auc_score(y_te, y_score)
@@ -841,19 +1025,13 @@ elif args.analysis == 3:
             )
             print('Rankings:')
             for rank, feature, symbol in sorted(
-                zip(
-                    coefs,
-                    feature_names,
-                    r_get_eset_gene_symbols(
-                        eset_tr, robjects.IntVector(np.array(feature_idxs, dtype=int) + 1)
-                    ),
-                ),
-                reverse=True
+                zip(coefs, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
+                reverse=True,
             ): print(feature, '\t', symbol, '\t', rank)
     # plot fs method vs train/test dataset
     plt_fig_x_axis = range(1, len(fs_methods) + 1)
     plt.figure('Figure 5-1')
-    plt.rcParams['font.size'] = 20
+    plt.rcParams['font.size'] = 16
     plt.title(
         'Effect of Feature Selection Method on ROC AUC\n' +
         '(' + args.bc_meth + ' Batch Effect Correction)'
@@ -862,7 +1040,7 @@ elif args.analysis == 3:
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, fs_methods)
     plt.figure('Figure 5-2')
-    plt.rcParams['font.size'] = 20
+    plt.rcParams['font.size'] = 16
     plt.title(
         'Effect of Feature Selection Method on BCR\n' +
         '(' + args.bc_meth + ' Batch Effect Correction)'
@@ -880,8 +1058,6 @@ elif args.analysis == 3:
             bcrs_te.append(result['bcr_te'])
             num_features.append(len(result['feature_idxs']))
         dataset_tr_name, dataset_te_name = dataset_pair_names[te_idx]
-        dataset_tr_name = dataset_tr_name.upper()
-        dataset_te_name = dataset_te_name.upper()
         color = next(plt.gca()._get_lines.prop_cycler)['color']
         plt.figure('Figure 5-1')
         plt.plot(
@@ -920,10 +1096,9 @@ elif args.analysis == 3:
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
     # plot train/test dataset vs fs method
-    dataset_te_names = [te_name.upper() for _, te_name in dataset_pair_names]
     plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
     plt.figure('Figure 6-1')
-    plt.rcParams['font.size'] = 20
+    plt.rcParams['font.size'] = 16
     plt.title(
         'Effect of Training/Held-Out Test Dataset on ROC AUC\n' +
         '(' + args.bc_meth + ' Batch Effect Correction)'
@@ -932,7 +1107,7 @@ elif args.analysis == 3:
     plt.ylabel('ROC AUC')
     plt.xticks(plt_fig_x_axis, dataset_te_names)
     plt.figure('Figure 6-2')
-    plt.rcParams['font.size'] = 20
+    plt.rcParams['font.size'] = 16
     plt.title(
         'Effect of Training/Held-Out Test Dataset on BCR\n' +
         '(' + args.bc_meth + ' Batch Effect Correction)'

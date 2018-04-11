@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 
+suppressPackageStartupMessages(library("preprocessCore"))
 suppressPackageStartupMessages(library("affy"))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2.db")))
 suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db")))
@@ -13,10 +14,10 @@ if (id_type == "gene") {
 } else {
     cdfname <- "hgu133plus2"
 }
-if ("mas5" %in% cmd_args[2:length(cmd_args)]) {
-    eset_ref_name <- "eset_gse67639"
-    cat("Loading:", eset_ref_name, "\n")
-    load(paste0("data/", eset_ref_name, ".Rda"))
+if (id_type == "gene" && "mas5" %in% cmd_args[2:length(cmd_args)]) {
+    eset_gse67639_name <- "eset_gse67639_mas5_gene"
+    cat("Loading:", eset_gse67639_name, "\n")
+    load(paste0("data/", eset_gse67639_name, ".Rda"))
 }
 for (dataset_name in dataset_names) {
     if (!dir.exists(paste0("data/raw/", dataset_name))) next
@@ -44,10 +45,13 @@ for (dataset_name in dataset_names) {
             exprs <- exprs(rma(affybatch))
         }
         else if (norm_type == "mas5") {
-            exprs <- log2(exprs(mas5(affybatch)))
+            exprs <- normalize.quantiles(log2(exprs(mas5(affybatch))))
         }
         colnames(exprs) <- sub("\\.CEL$", "", colnames(exprs))
         if (id_type == "gene") {
+            if (exists(eset_gse67639_name)) {
+                
+            }
             eset_norm <- ExpressionSet(
                 assayData=exprs,
                 phenoData=phenoData(get(eset_ref_name)),

@@ -31,7 +31,7 @@ filterEsetControlProbesets <- function(eset) {
     ))
 }
 
-getEsetClassLabels <- function(eset, samples=NULL) {
+esetClassLabels <- function(eset, samples=NULL) {
     if (!is.null(samples)) {
         return(eset$Class[c(samples)])
     }
@@ -40,7 +40,7 @@ getEsetClassLabels <- function(eset, samples=NULL) {
     }
 }
 
-getEsetGeneSymbols <- function(eset, features=NULL) {
+esetGeneSymbols <- function(eset, features=NULL) {
     if (!is.null(features)) {
         symbols <- as.character(featureData(eset)[c(features)]$Symbol)
     }

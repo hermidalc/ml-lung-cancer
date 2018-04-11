@@ -63,7 +63,7 @@ for (file in cmd_args) {
         eset <- eset[,eset$Stage %in% c("1","1A","1B","2","2A","2B")]
         eset <- eset[,eset$"Exclude_incomplete_resection_adjuvant_therapy" == 0]
         exprs_new <- impute.knn(exprs(eset), k=15)$data
-        exprs_new <- exprs_new[order(rownames(exprs_new)),, drop=FALSE]
+        exprs_new <- exprs_new[order(rownames(exprs_new)), , drop=FALSE]
         exprs_new <- exprs_new[rownames(exprs_new) != "0000_at",]
         eset <- ExpressionSet(assayData=exprs_new, phenoData=phenoData(eset))
     }
