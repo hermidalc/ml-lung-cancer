@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import argparse, pprint
+from argparse import ArgumentParser
+from pprint import pprint
 from os import path
 from tempfile import mkdtemp
 from shutil import rmtree
@@ -26,7 +27,7 @@ import matplotlib.pyplot as plt
 from matplotlib import style
 
 # config
-parser = argparse.ArgumentParser()
+parser = ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--dataset-tr-num', type=int, help='dataset tr num combos')
 parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
@@ -73,7 +74,7 @@ else:
     cachedir = mkdtemp()
     memory = Memory(cachedir=cachedir, verbose=0)
 
-# custom mixin and class for caching pipeline nested LinearSVC fits
+# custom mixin and class for caching pipeline nested estimator fits
 class CachedFitMixin:
     def fit(self, *args, **kwargs):
         fit = memory.cache(super(CachedFitMixin, self).fit)
