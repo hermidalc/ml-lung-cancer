@@ -6,6 +6,7 @@ from os import path
 from tempfile import mkdtemp
 from shutil import rmtree
 from natsort import natsorted
+from itertools import combinations
 import numpy as np
 import rpy2.rinterface as rinterface
 rinterface.set_initoptions((b'rpy2', b'--quiet', b'--no-save', b'--max-ppsize=500000'))
@@ -31,7 +32,7 @@ parser = ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--splits', type=int, default=80, help='num splits')
 parser.add_argument('--test-size', type=float, default=0.3, help='test size')
-parser.add_argument('--dataset-tr-cmb', type=int, help='dataset tr num combos')
+parser.add_argument('--datasets-tr-cmb', type=int, help='dataset tr num combos')
 parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
 parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
 parser.add_argument('--norm-meth', type=str, help='preprocess/normalization method')
@@ -334,6 +335,12 @@ dataset_names = [
     'gse37745',
     'gse50081'
 ]
+norm_methods = [
+    'rma_merged',
+    'gcrma_merged',
+    'rma',
+    'gcrma',
+]
 bc_methods = [
     'none',
     'ctr',
@@ -410,10 +417,6 @@ if args.analysis == 1:
             weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
         elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
             weights = grid.best_estimator_.named_steps['clf'].feature_importances_
-        feature_ranks = sorted(
-            zip(weights, feature_idxs, feature_names, r_eset_gene_symbols(eset, feature_idxs + 1)),
-            reverse=True,
-        )
         roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
         bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
         y_score = grid.decision_function(X[te_idxs])
@@ -421,6 +424,10 @@ if args.analysis == 1:
         roc_auc_te = roc_auc_score(y[te_idxs], y_score)
         y_pred = grid.predict(X[te_idxs])
         bcr_te = bcr_score(y[te_idxs], y_pred)
+        feature_ranks = sorted(
+            zip(weights, feature_idxs, feature_names, r_eset_gene_symbols(eset, feature_idxs + 1)),
+            reverse=True,
+        )
         print(
             'Split: %3s' % (split_idx + 1),
             ' ROC AUC (CV/Test): %.4f/%.4f' % (roc_auc_cv, roc_auc_te),
@@ -609,7 +616,6 @@ if args.analysis == 2:
     )
     grid.fit(X_tr, y_tr)
     dump(grid, 'results/grid_' + dataset_tr_name  + '_' + args.fs_meth.lower() + '.pkl')
-    # print summary info
     feature_idxs = np.arange(X_tr.shape[1])
     for step in grid.best_estimator_.named_steps:
         if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
@@ -619,12 +625,12 @@ if args.analysis == 2:
         weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
     elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
         weights = grid.best_estimator_.named_steps['clf'].feature_importances_
+    roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
+    bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
     feature_ranks = sorted(
         zip(weights, feature_idxs, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
         reverse=True,
     )
-    roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
-    bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
     print(
         'ROC AUC (CV): %.4f' % roc_auc_cv,
         ' BCR (CV): %.4f' % bcr_cv,
@@ -781,91 +787,132 @@ if args.analysis == 2:
         )
     plt.legend(loc='lower right', fontsize='small')
     plt.grid('on')
-elif args.analysis == 2:
-    if args.dataset_tr:
-        dataset_pair_names = [t for t in dataset_pair_names if t[0] == args.dataset_tr]
-    te_results, bc_results = [], []
-    for te_idx, (dataset_tr_name, dataset_te_name) in enumerate(dataset_pair_names):
-        for bc_idx, bc_method in enumerate(bc_methods):
-            if bc_method != 'none':
-                eset_tr_name = 'eset_' + dataset_tr_name + '_tr_' + bc_method
-                eset_te_name = eset_tr_name + '_' + dataset_te_name + '_te'
-            else:
+elif args.analysis == 3:
+    if not args.norm_meth:
+        var_methods = norm_methods
+    elif not args.bc_meth:
+        var_methods = bc_methods
+    elif not args.fs_meth:
+        var_methods = fs_methods
+    tr_results, te_results, var_results = [], [], []
+    for tr_idx, dataset_tr_combo in enumerate(combinations(dataset_names, args.datasets_tr_cmb)):
+        for te_idx, dataset_te in enumerate(natsorted(list(set(dataset_names) - set(dataset_tr_combo)))):
+            for var_idx, var_meth in enumerate(var_methods):
+                if not args.norm_meth:
+                    if args.bc_meth != 'none':
+                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [var_meth, args.bc_meth, 'tr'])
+                    else:
+                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [var_meth, 'tr'])
+                elif not args.bc_meth:
+                    if var_meth != 'none':
+                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [args.norm_meth, var_meth, 'tr'])
+                    else:
+                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [args.norm_meth, 'tr'])
+                elif not args.fs_meth:
+                    if args.bc_meth != 'none':
+                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [args.norm_meth, args.bc_meth, 'tr'])
+                    else:
+                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [args.norm_meth, 'tr'])
+                if args.no_addon_te:
+                    if not args.norm_meth:
+                        dataset_te_name = '_'.join([dataset_te, var_meth])
+                    else:
+                        dataset_te_name = '_'.join([dataset_te, args.norm_meth])
+                else:
+                    dataset_te_name = '_'.join([dataset_tr_name, dataset_te, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
                 eset_te_name = 'eset_' + dataset_te_name
-            print(eset_tr_name, '->', eset_te_name)
-            base.load('data/' + eset_tr_name + '.Rda')
-            eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-            X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-            y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
-            grid = GridSearchCV(
-                Pipeline(pipelines[args.fs_meth]['pipe_steps'], memory=memory),
-                param_grid=pipelines[args.fs_meth]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-                error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
-            )
-            grid.fit(X_tr, y_tr)
-            if bc_method != 'none':
-                dump(grid, 'results/grid_' + dataset_tr_name + '_' + bc_method + '_' + args.fs_meth.lower() + '.pkl')
-            else:
-                dump(grid, 'results/grid_' + dataset_tr_name + '_' + args.fs_meth.lower() + '.pkl')
-            feature_idxs = np.arange(X_tr.shape[1])
-            for step in grid.best_estimator_.named_steps:
-                if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
-                    feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
-            feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
-            if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
-                weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
-            elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
-                weights = grid.best_estimator_.named_steps['clf'].feature_importances_
-            roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
-            bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
-            base.load('data/' + eset_te_name + '.Rda')
-            eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
-            X_te = np.array(base.t(biobase.exprs(eset_te)))
-            y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-            y_score = grid.decision_function(X_te)
-            fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-            roc_auc_te = roc_auc_score(y_te, y_score)
-            y_pred = grid.predict(X_te)
-            bcr_te = bcr_score(y_te, y_pred)
-            result = {
-                'grid': grid,
-                'feature_idxs': feature_idxs,
-                'feature_names': feature_names,
-                'fprs': fpr,
-                'tprs': tpr,
-                'thres': thres,
-                'weights': weights,
-                'y_score': y_score,
-                'y_test': y_te,
-                'roc_auc_cv': roc_auc_cv,
-                'roc_auc_te': roc_auc_te,
-                'bcr_cv': bcr_cv,
-                'bcr_te': bcr_te,
-            }
-            if te_idx < len(te_results):
-                te_results[te_idx].append(result)
-            else:
-                te_results.append([result])
-            if bc_idx < len(bc_results):
-                bc_results[bc_idx].append(result)
-            else:
-                bc_results.append([result])
-            base.remove(eset_tr_name)
-            base.remove(eset_te_name)
-            # print summary info
-            print(
-                'Features: %3s' % feature_idxs.size,
-                ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
-                ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
-                ' Params:',  grid.best_params_,
-            )
-            print('Rankings:')
-            for rank, feature, symbol in sorted(
-                zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
-                reverse=True,
-            ): print(feature, '\t', symbol, '\t', rank)
+                eset_tr_file = 'data/' + eset_tr_name + '.Rda'
+                eset_te_file = 'data/' + eset_te_name + '.Rda'
+                if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
+                print(eset_tr_name, '->', eset_te_name)
+
+                continue
+
+                base.load('data/' + eset_tr_name + '.Rda')
+                eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
+                X_tr = np.array(base.t(biobase.exprs(eset_tr)))
+                y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
+                base.load('data/' + eset_te_name + '.Rda')
+                eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
+                X_te = np.array(base.t(biobase.exprs(eset_te)))
+                y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
+                param_grid = []
+                for fs_meth in fs_methods:
+                    for fs_params in pipelines['fs'][fs_meth]['param_grid']:
+                        for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
+                            for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
+                                params = { **fs_params, **slr_params, **clf_params }
+                                for (step, object) in \
+                                    pipelines['fs'][fs_meth]['steps'] + \
+                                    pipelines['slr'][args.slr_meth]['steps'] + \
+                                    pipelines['clf'][args.clf_meth]['steps'] \
+                                : params[step] = [ object ]
+                                param_grid.append(params)
+                grid = GridSearchCV(
+                    pipe, param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
+                    cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
+                    error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+                )
+                grid.fit(X_tr, y_tr)
+                dump(grid, 'results/grid_' + dataset_tr_name  + '_' + args.fs_meth.lower() + '.pkl')
+                feature_idxs = np.arange(X_tr.shape[1])
+                for step in grid.best_estimator_.named_steps:
+                    if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
+                        feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
+                feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
+                if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
+                    weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
+                elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
+                    weights = grid.best_estimator_.named_steps['clf'].feature_importances_
+                roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
+                bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
+                y_score = grid.decision_function(X_te)
+                fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
+                roc_auc_te = roc_auc_score(y_te, y_score)
+                y_pred = grid.predict(X_te)
+                bcr_te = bcr_score(y_te, y_pred)
+                print(
+                    'Features: %3s' % feature_idxs.size,
+                    ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
+                    ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
+                    ' Params:',  grid.best_params_,
+                )
+                print('Rankings:')
+                for rank, feature, symbol in sorted(
+                    zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
+                    reverse=True,
+                ): print(feature, '\t', symbol, '\t', rank)
+                result = {
+                    'grid': grid,
+                    'feature_idxs': feature_idxs,
+                    'feature_names': feature_names,
+                    'fprs': fpr,
+                    'tprs': tpr,
+                    'thres': thres,
+                    'weights': weights,
+                    'y_score': y_score,
+                    'y_test': y_te,
+                    'roc_auc_cv': roc_auc_cv,
+                    'roc_auc_te': roc_auc_te,
+                    'bcr_cv': bcr_cv,
+                    'bcr_te': bcr_te,
+                }
+                if tr_idx < len(tr_results):
+                    tr_results[tr_idx].append(result)
+                else:
+                    tr_results.append([result])
+                if te_idx < len(te_results):
+                    te_results[te_idx].append(result)
+                else:
+                    te_results.append([result])
+                if var_idx < len(var_results):
+                    var_results[var_idx].append(result)
+                else:
+                    var_results.append([result])
+                base.remove(eset_tr_name)
+                base.remove(eset_te_name)
+    quit()
     # plot bc method vs train/test scores
     plt_fig_x_axis = range(1, len(bc_methods) + 1)
     plt.figure('Figure 3-1')
@@ -999,7 +1046,7 @@ elif args.analysis == 2:
     plt.figure('Figure 4-2')
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
-elif args.analysis == 3:
+elif args.analysis == 4:
     if args.dataset_tr:
         dataset_pair_names = [t for t in dataset_pair_names if t[0] == args.dataset_tr]
     te_results, fs_results = [], []
