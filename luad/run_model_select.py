@@ -366,7 +366,7 @@ fs_methods = [
 
 # analyses
 if args.analysis == 1:
-    args.datasets_tr = sorted(args.datasets_tr)
+    args.datasets_tr = natsorted(args.datasets_tr)
     if args.norm_meth and args.bc_meth:
         dataset_name = '_'.join(args.datasets_tr + [args.norm_meth, args.bc_meth, 'tr'])
     elif args.norm_meth:
@@ -578,7 +578,7 @@ if args.analysis == 1:
         reverse=True
     ): print(feature, '\t', symbol, '\t', rank)
 if args.analysis == 2:
-    args.datasets_tr = sorted(args.datasets_tr)
+    args.datasets_tr = natsorted(args.datasets_tr)
     if args.norm_meth and args.bc_meth:
         dataset_tr_name = '_'.join(args.datasets_tr + [args.norm_meth, args.bc_meth, 'tr'])
     elif args.norm_meth:
@@ -738,7 +738,7 @@ if args.analysis == 2:
         ('slr', grid.best_params_['slr']),
         ('clf', grid.best_params_['clf']),
     ])
-    for dataset_te in sorted(list(set(dataset_names) - set(args.datasets_tr))):
+    for dataset_te in natsorted(list(set(dataset_names) - set(args.datasets_tr))):
         if args.no_addon_te:
             dataset_te_name = '_'.join([dataset_te, args.norm_meth])
         else:
