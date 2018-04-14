@@ -30,6 +30,7 @@ r-rcppeigen \
 r-lme4 \
 r-corpcor \
 r-rgl \
+autopep8 \
 rpy2 \
 libiconv \
 bioconductor-biocinstaller \
