@@ -42,7 +42,7 @@ parser.add_argument('--norm-meth', type=str, nargs='+', help='preprocess/normali
 parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
 parser.add_argument('--slr-meth', type=str, nargs='+', default=['Standard'], help='scaling method')
-parser.add_argument('--clf-meth', type=str, nargs='+', default=['LinearSVC'], help='classifier method')
+parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=30, help='fs skb k max')
 parser.add_argument('--fs-fcbf-k', type=int, nargs='+', help='fs fcbf k select')
@@ -382,17 +382,17 @@ fs_methods = [
 
 # analyses
 if args.analysis == 1:
-    if args.norm_meth:
-        norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
-    if args.id_type:
+    norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
+    suffixes = [norm_meth]
+    if args.id_type and args.id_type != 'none':
         id_type = [x for x in id_types if x in args.id_type][0]
-    if args.merge_type:
+        suffixes.append(id_type)
+    if args.merge_type and args.merge_type != 'none':
         merge_type = [x for x in merge_types if x in args.merge_type][0]
-    if args.bc_meth:
-        bc_meth = [x for x in bc_methods if x in args.be_meth][0]
-    suffixes = [
-        x for x in [norm_meth, id_type, merge_type, bc_meth] if x != 'none'
-    ]
+        suffixes.append(merge_type)
+    if args.bc_meth and args.bc_meth != 'none':
+        bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
+        suffixes.append(bc_meth)
     args.datasets_tr = natsorted(args.datasets_tr)
     dataset_name = '_'.join(args.datasets_tr + suffixes + ['tr'])
     print('Dataset:', dataset_name)
@@ -602,17 +602,17 @@ if args.analysis == 1:
         reverse=True
     ): print(feature, '\t', symbol, '\t', rank)
 if args.analysis == 2:
-    if args.norm_meth:
-        norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
-    if args.id_type:
+    norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
+    suffixes = [norm_meth]
+    if args.id_type and args.id_type != 'none':
         id_type = [x for x in id_types if x in args.id_type][0]
-    if args.merge_type:
+        suffixes.append(id_type)
+    if args.merge_type and args.merge_type != 'none':
         merge_type = [x for x in merge_types if x in args.merge_type][0]
-    if args.bc_meth:
-        bc_meth = [x for x in bc_methods if x in args.be_meth][0]
-    suffixes = [
-        x for x in [norm_meth, id_type, merge_type, bc_meth] if x != 'none'
-    ]
+        suffixes.append(merge_type)
+    if args.bc_meth and args.bc_meth != 'none':
+        bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
+        suffixes.append(bc_meth)
     args.datasets_tr = natsorted(args.datasets_tr)
     dataset_tr_name = '_'.join(args.datasets_tr + suffixes + ['tr'])
     print('Train Dataset:', dataset_tr_name)
@@ -765,10 +765,13 @@ if args.analysis == 2:
     plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
     plt.xticks(x_axis)
     ranked_feature_idxs = [x for _, x, _, _ in feature_ranks]
-    pipe = Pipeline([
-        ('slr', grid.best_params_['slr']),
-        ('clf', grid.best_params_['clf']),
-    ])
+    pipe = Pipeline(
+        pipelines['slr'][args.slr_meth]['steps'] +
+        pipelines['clf'][args.clf_meth]['steps']
+    )
+    pipe.set_params(
+        **{ k: v for k, v in grid.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
+    )
     for dataset_te in natsorted(list(set(dataset_names) - set(args.datasets_tr))):
         if args.no_addon_te:
             dataset_te_name = '_'.join([dataset_te, suffixes[0]])
@@ -821,7 +824,7 @@ elif args.analysis == 3:
     if args.merge_type:
         merge_types = [x for x in merge_types if x in args.merge_type]
     if args.bc_meth:
-        bc_methods = [x for x in bc_methods if x in args.be_meth]
+        bc_methods = [x for x in bc_methods if x in args.bc_meth]
     for norm_meth in norm_methods:
         for id_type in id_types:
             for merge_type in merge_types:
