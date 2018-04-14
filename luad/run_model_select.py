@@ -32,15 +32,17 @@ parser = ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--splits', type=int, default=80, help='num splits')
 parser.add_argument('--test-size', type=float, default=0.3, help='test size')
-parser.add_argument('--datasets-tr-cmb', type=int, help='dataset tr num combos')
 parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
 parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
-parser.add_argument('--norm-meth', type=str, help='preprocess/normalization method')
-parser.add_argument('--bc-meth', type=str, help='batch effect correction method')
-parser.add_argument('--fs-meth', type=str, help='feature selection method')
-parser.add_argument('--slr-meth', type=str, default='Standard', help='scaling method')
-parser.add_argument('--clf-meth', type=str, default='LinearSVC', help='classifier method')
+parser.add_argument('--num-combo-tr', type=int, help='dataset tr num combos')
 parser.add_argument('--no-addon-te', default=False, action='store_true', help='dataset te no addon')
+parser.add_argument('--merge-type', type=str, nargs='+', help='dataset merge type')
+parser.add_argument('--id-type', type=str, nargs='+', help='dataset ID type')
+parser.add_argument('--norm-meth', type=str, nargs='+', help='preprocess/normalization method')
+parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correction method')
+parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
+parser.add_argument('--slr-meth', type=str, nargs='+', default=['Standard'], help='scaling method')
+parser.add_argument('--clf-meth', type=str, nargs='+', default=['LinearSVC'], help='classifier method')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=30, help='fs skb k max')
 parser.add_argument('--fs-fcbf-k', type=int, nargs='+', help='fs fcbf k select')
@@ -55,7 +57,7 @@ parser.add_argument('--fs-rfe-n-max', type=int, default=30, help='fs rfe n max')
 parser.add_argument('--fs-rfe-c', type=float, nargs='+', help='fs rfe c')
 parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
-parser.add_argument('--fs-rank-meth', type=str, default='mean_weights', help='fs rank method (mean_weights, mean_roc_aucs, mean_bcrs)')
+parser.add_argument('--fs-rank-meth', type=str, default='mean_weights', help='fs rank method')
 parser.add_argument('--clf-svm-c', type=float, nargs='+', help='clf svm c')
 parser.add_argument('--clf-svm-cache', type=int, default=2000, help='libsvm cache size')
 parser.add_argument('--gscv-splits', type=int, default=80, help='gscv splits')
@@ -167,13 +169,13 @@ if args.fs_fpr_p:
 else:
     SFP_ALPHA = np.logspace(-3, -2, 2)
 
-pipe = Pipeline([
-    ('fs1', None),
-    ('slr', None),
-    ('fs2', None),
-    ('fs3', None),
-    ('clf', None),
-], memory=memory)
+pipeline_order = [
+    'fs1',
+    'slr',
+    'fs2',
+    'fs3',
+    'clf',
+]
 pipelines = {
     'slr': {
         'Standard': {
@@ -336,10 +338,17 @@ dataset_names = [
     'gse50081'
 ]
 norm_methods = [
-    'rma_merged',
-    'gcrma_merged',
-    'rma',
     'gcrma',
+    'rma',
+    'mas5',
+]
+id_types = [
+    'none',
+    'gene',
+]
+merge_types = [
+    'none',
+    'merged',
 ]
 bc_methods = [
     'none',
@@ -373,32 +382,40 @@ fs_methods = [
 
 # analyses
 if args.analysis == 1:
+    if args.norm_meth:
+        norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
+    if args.id_type:
+        id_type = [x for x in id_types if x in args.id_type][0]
+    if args.merge_type:
+        merge_type = [x for x in merge_types if x in args.merge_type][0]
+    if args.bc_meth:
+        bc_meth = [x for x in bc_methods if x in args.be_meth][0]
+    suffixes = [
+        x for x in [norm_meth, id_type, merge_type, bc_meth] if x != 'none'
+    ]
     args.datasets_tr = natsorted(args.datasets_tr)
-    if args.norm_meth and args.bc_meth:
-        dataset_name = '_'.join(args.datasets_tr + [args.norm_meth, args.bc_meth, 'tr'])
-    elif args.norm_meth:
-        dataset_name = '_'.join(args.datasets_tr + [args.norm_meth, 'tr'])
-    elif args.bc_meth:
-        dataset_name = '_'.join(args.datasets_tr + [args.bc_meth, 'tr'])
+    dataset_name = '_'.join(args.datasets_tr + suffixes + ['tr'])
     print('Dataset:', dataset_name)
     eset_name = 'eset_' + dataset_name
     base.load('data/' + eset_name + '.Rda')
     eset = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_name])
     X = np.array(base.t(biobase.exprs(eset)))
     y = np.array(r_eset_class_labels(eset), dtype=int)
+    args.fs_meth = args.fs_meth[0]
+    args.slr_meth = args.slr_meth[0]
+    args.clf_meth = args.clf_meth[0]
     param_grid = []
     for fs_params in pipelines['fs'][args.fs_meth]['param_grid']:
         for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
             for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
-                params = { **fs_params, **slr_params, **clf_params }
-                for (step, object) in \
-                    pipelines['fs'][args.fs_meth]['steps'] + \
-                    pipelines['slr'][args.slr_meth]['steps'] + \
-                    pipelines['clf'][args.clf_meth]['steps'] \
-                : params[step] = [ object ]
-                param_grid.append(params)
+                param_grid.append({ **fs_params, **slr_params, **clf_params })
     grid = GridSearchCV(
-        pipe, param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
+        Pipeline(sorted(
+            pipelines['fs'][args.fs_meth]['steps'] +
+            pipelines['slr'][args.slr_meth]['steps'] +
+            pipelines['clf'][args.clf_meth]['steps'],
+            key=lambda t: pipeline_order.index(t[0])
+        ), memory=memory), param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
         cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
         error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
     )
@@ -585,32 +602,40 @@ if args.analysis == 1:
         reverse=True
     ): print(feature, '\t', symbol, '\t', rank)
 if args.analysis == 2:
+    if args.norm_meth:
+        norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
+    if args.id_type:
+        id_type = [x for x in id_types if x in args.id_type][0]
+    if args.merge_type:
+        merge_type = [x for x in merge_types if x in args.merge_type][0]
+    if args.bc_meth:
+        bc_meth = [x for x in bc_methods if x in args.be_meth][0]
+    suffixes = [
+        x for x in [norm_meth, id_type, merge_type, bc_meth] if x != 'none'
+    ]
     args.datasets_tr = natsorted(args.datasets_tr)
-    if args.norm_meth and args.bc_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr + [args.norm_meth, args.bc_meth, 'tr'])
-    elif args.norm_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr + [args.norm_meth, 'tr'])
-    elif args.bc_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr + [args.bc_meth, 'tr'])
+    dataset_tr_name = '_'.join(args.datasets_tr + suffixes + ['tr'])
     print('Train Dataset:', dataset_tr_name)
     eset_tr_name = 'eset_' + dataset_tr_name
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
     y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
+    args.fs_meth = args.fs_meth[0]
+    args.slr_meth = args.slr_meth[0]
+    args.clf_meth = args.clf_meth[0]
     param_grid = []
     for fs_params in pipelines['fs'][args.fs_meth]['param_grid']:
         for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
             for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
-                params = { **fs_params, **slr_params, **clf_params }
-                for (step, object) in \
-                    pipelines['fs'][args.fs_meth]['steps'] + \
-                    pipelines['slr'][args.slr_meth]['steps'] + \
-                    pipelines['clf'][args.clf_meth]['steps'] \
-                : params[step] = [ object ]
-                param_grid.append(params)
+                param_grid.append({ **fs_params, **slr_params, **clf_params })
     grid = GridSearchCV(
-        pipe, param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
+        Pipeline(sorted(
+            pipelines['fs'][args.fs_meth]['steps'] +
+            pipelines['slr'][args.slr_meth]['steps'] +
+            pipelines['clf'][args.clf_meth]['steps'],
+            key=lambda t: pipeline_order.index(t[0])
+        ), memory=memory), param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
         cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
         error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
     )
@@ -746,7 +771,7 @@ if args.analysis == 2:
     ])
     for dataset_te in natsorted(list(set(dataset_names) - set(args.datasets_tr))):
         if args.no_addon_te:
-            dataset_te_name = '_'.join([dataset_te, args.norm_meth])
+            dataset_te_name = '_'.join([dataset_te, suffixes[0]])
         else:
             dataset_te_name = '_'.join([dataset_tr_name, dataset_te, 'te'])
         eset_te_name = 'eset_' + dataset_te_name
@@ -788,36 +813,47 @@ if args.analysis == 2:
     plt.legend(loc='lower right', fontsize='small')
     plt.grid('on')
 elif args.analysis == 3:
-    if not args.norm_meth:
-        var_methods = norm_methods
-    elif not args.bc_meth:
-        var_methods = bc_methods
-    elif not args.fs_meth:
-        var_methods = fs_methods
+    suffix_groups = []
+    if args.norm_meth:
+        norm_methods = [x for x in norm_methods if x in args.norm_meth]
+    if args.id_type:
+        id_types = [x for x in id_types if x in args.id_type]
+    if args.merge_type:
+        merge_types = [x for x in merge_types if x in args.merge_type]
+    if args.bc_meth:
+        bc_methods = [x for x in bc_methods if x in args.be_meth]
+    for norm_meth in norm_methods:
+        for id_type in id_types:
+            for merge_type in merge_types:
+                for bc_meth in bc_methods:
+                    suffix_groups.append([
+                        x for x in [norm_meth, id_type, merge_type, bc_meth] if x != 'none'
+                    ])
+    args.fs_meth = args.fs_meth[0]
+    args.slr_meth = args.slr_meth[0]
+    args.clf_meth = args.clf_meth[0]
+    param_grid = []
+    for fs_params in pipelines['fs'][args.fs_meth]['param_grid']:
+        for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
+            for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
+                param_grid.append({ **fs_params, **slr_params, **clf_params })
+    grid = GridSearchCV(
+        Pipeline(sorted(
+            pipelines['fs'][args.fs_meth]['steps'] +
+            pipelines['slr'][args.slr_meth]['steps'] +
+            pipelines['clf'][args.clf_meth]['steps'],
+            key=lambda t: pipeline_order.index(t[0])
+        ), memory=memory), param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
+        cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
+        error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+    )
     tr_results, te_results, var_results = [], [], []
-    for tr_idx, dataset_tr_combo in enumerate(combinations(dataset_names, args.datasets_tr_cmb)):
+    for tr_idx, dataset_tr_combo in enumerate(combinations(dataset_names, args.num_combo_tr)):
         for te_idx, dataset_te in enumerate(natsorted(list(set(dataset_names) - set(dataset_tr_combo)))):
-            for var_idx, var_meth in enumerate(var_methods):
-                if not args.norm_meth:
-                    if args.bc_meth != 'none':
-                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [var_meth, args.bc_meth, 'tr'])
-                    else:
-                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [var_meth, 'tr'])
-                elif not args.bc_meth:
-                    if var_meth != 'none':
-                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [args.norm_meth, var_meth, 'tr'])
-                    else:
-                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [args.norm_meth, 'tr'])
-                elif not args.fs_meth:
-                    if args.bc_meth != 'none':
-                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [args.norm_meth, args.bc_meth, 'tr'])
-                    else:
-                        dataset_tr_name = '_'.join(list(dataset_tr_combo) + [args.norm_meth, 'tr'])
+            for var_idx, suffixes in enumerate(suffix_groups):
+                dataset_tr_name = '_'.join(list(dataset_tr_combo) + suffixes + ['tr'])
                 if args.no_addon_te:
-                    if not args.norm_meth:
-                        dataset_te_name = '_'.join([dataset_te, var_meth])
-                    else:
-                        dataset_te_name = '_'.join([dataset_te, args.norm_meth])
+                    dataset_te_name = '_'.join([dataset_te, suffixes[0]])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
@@ -826,9 +862,6 @@ elif args.analysis == 3:
                 eset_te_file = 'data/' + eset_te_name + '.Rda'
                 if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
                 print(eset_tr_name, '->', eset_te_name)
-
-                continue
-
                 base.load('data/' + eset_tr_name + '.Rda')
                 eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
                 X_tr = np.array(base.t(biobase.exprs(eset_tr)))
@@ -837,23 +870,6 @@ elif args.analysis == 3:
                 eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
                 X_te = np.array(base.t(biobase.exprs(eset_te)))
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-                param_grid = []
-                for fs_meth in fs_methods:
-                    for fs_params in pipelines['fs'][fs_meth]['param_grid']:
-                        for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
-                            for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
-                                params = { **fs_params, **slr_params, **clf_params }
-                                for (step, object) in \
-                                    pipelines['fs'][fs_meth]['steps'] + \
-                                    pipelines['slr'][args.slr_meth]['steps'] + \
-                                    pipelines['clf'][args.clf_meth]['steps'] \
-                                : params[step] = [ object ]
-                                param_grid.append(params)
-                grid = GridSearchCV(
-                    pipe, param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
-                    cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-                    error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
-                )
                 grid.fit(X_tr, y_tr)
                 dump(grid, 'results/grid_' + dataset_tr_name  + '_' + args.fs_meth.lower() + '.pkl')
                 feature_idxs = np.arange(X_tr.shape[1])
@@ -912,7 +928,6 @@ elif args.analysis == 3:
                     var_results.append([result])
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
-    quit()
     # plot bc method vs train/test scores
     plt_fig_x_axis = range(1, len(bc_methods) + 1)
     plt.figure('Figure 3-1')
@@ -1047,6 +1062,47 @@ elif args.analysis == 3:
     plt.legend(loc='best', fontsize='x-small')
     plt.grid('on')
 elif args.analysis == 4:
+    pipe = Pipeline([
+        ('fs1', None),
+        ('slr', None),
+        ('fs2', None),
+        ('fs3', None),
+        ('clf', None),
+    ], memory=memory)
+    param_grid = []
+    for fs_params in pipelines['fs'][args.fs_meth]['param_grid']:
+        for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
+            for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
+                params = { **fs_params, **slr_params, **clf_params }
+                for (step, object) in \
+                    pipelines['fs'][args.fs_meth]['steps'] + \
+                    pipelines['slr'][args.slr_meth]['steps'] + \
+                    pipelines['clf'][args.clf_meth]['steps'] \
+                : params[step] = [ object ]
+                param_grid.append(params)
+
+    tr_results, te_results, var_results = [], [], []
+    for tr_idx, dataset_tr_combo in enumerate(combinations(dataset_names, args.num_combo_tr)):
+        for te_idx, dataset_te in enumerate(natsorted(list(set(dataset_names) - set(dataset_tr_combo)))):
+            if args.bc_meth:
+                suffixes = [args.norm_meth, args.bc_meth]
+            else:
+                suffixes = [args.norm_meth]
+            dataset_tr_name = '_'.join(list(dataset_tr_combo) + suffixes + ['tr'])
+            if args.no_addon_te:
+                dataset_te_name = '_'.join([dataset_te, args.norm_meth])
+            else:
+                dataset_te_name = '_'.join([dataset_tr_name, dataset_te, 'te'])
+            eset_tr_name = 'eset_' + dataset_tr_name
+            eset_te_name = 'eset_' + dataset_te_name
+            eset_tr_file = 'data/' + eset_tr_name + '.Rda'
+            eset_te_file = 'data/' + eset_te_name + '.Rda'
+            print(eset_tr_name, '->', eset_te_name)
+            if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
+
+            continue
+
+elif args.analysis == 5:
     if args.dataset_tr:
         dataset_pair_names = [t for t in dataset_pair_names if t[0] == args.dataset_tr]
     te_results, fs_results = [], []
