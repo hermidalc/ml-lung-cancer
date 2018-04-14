@@ -104,6 +104,6 @@ ENV/
 *.Rda
 
 # custom dirs and file types
-/luad/data
-/luad/results
+/nsclc/data
+/nsclc/results
 test*
