@@ -43,7 +43,7 @@ parser.add_argument('--id-type', type=str, nargs='+', help='dataset ID type')
 parser.add_argument('--norm-meth', type=str, nargs='+', help='preprocess/normalization method')
 parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
-parser.add_argument('--slr-meth', type=str, nargs='+', default=['Standard'], help='scaling method')
+parser.add_argument('--slr-meth', type=str, nargs='+', default=['StandardScaler'], help='scaling method')
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=30, help='fs skb k max')
@@ -186,7 +186,7 @@ pipeline_order = [
 ]
 pipelines = {
     'slr': {
-        'Standard': {
+        'StandardScaler': {
             'steps': [
                 ('slr', StandardScaler()),
             ],
@@ -685,7 +685,9 @@ if args.analysis == 2:
         error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
     )
     grid.fit(X_tr, y_tr)
-    dump(grid, 'results/grid_' + dataset_tr_name  + '_' + args.fs_meth.lower() + '.pkl')
+    dump(grid, '_'.join([
+        'results/grid', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
+    ]) + '.pkl')
     feature_idxs = np.arange(X_tr.shape[1])
     for step in grid.best_estimator_.named_steps:
         if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
@@ -954,7 +956,9 @@ elif args.analysis == 3:
                 X_te = np.array(base.t(biobase.exprs(eset_te)))
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
                 grid.fit(X_tr, y_tr)
-                dump(grid, 'results/grid_' + dataset_tr_name  + '_' + args.fs_meth.lower() + '.pkl')
+                dump(grid, '_'.join([
+                    'results/grid', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
+                ]) + '.pkl')
                 feature_idxs = np.arange(X_tr.shape[1])
                 for step in grid.best_estimator_.named_steps:
                     if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
