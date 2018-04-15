@@ -16,7 +16,7 @@ from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
 from sklearn.feature_selection import mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
-from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
+from sklearn.model_selection import GridSearchCV, ParameterGrid, StratifiedShuffleSplit
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import AdaBoostClassifier, ExtraTreesClassifier, RandomForestClassifier
@@ -53,12 +53,12 @@ parser.add_argument('--fs-fcbf-k', type=int, nargs='+', help='fs fcbf k select')
 parser.add_argument('--fs-fcbf-k-max', type=int, default=30, help='fs fcbf k max')
 parser.add_argument('--fs-fpr-p', type=float, nargs='+', help='fs fpr p-value')
 parser.add_argument('--fs-sfm-thres', type=float, nargs='+', help='fs sfm threshold')
-parser.add_argument('--fs-sfm-c', type=float, nargs='+', help='fs sfm svm c')
-parser.add_argument('--fs-sfm-e', type=int, nargs='+', help='fs sfm ext estimators')
-parser.add_argument('--fs-sfm-e-max', type=int, default=100, help='fs sfm ext estimators max')
+parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
+parser.add_argument('--fs-sfm-ext-n', type=int, nargs='+', help='fs sfm ext n estimators')
+parser.add_argument('--fs-sfm-ext-n-max', type=int, default=100, help='fs sfm ext n estimators max')
 parser.add_argument('--fs-rfe-n', type=int, nargs='+', help='fs rfe n select')
 parser.add_argument('--fs-rfe-n-max', type=int, default=30, help='fs rfe n max')
-parser.add_argument('--fs-rfe-c', type=float, nargs='+', help='fs rfe c')
+parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
 parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_weights', help='fs rank method')
@@ -140,18 +140,18 @@ if args.clf_svm_c:
     CLF_SVC_C = sorted(args.clf_svm_c)
 else:
     CLF_SVC_C = np.logspace(-7, 3, 11)
-if args.fs_rfe_c:
-    RFE_SVC_C = sorted(args.fs_rfe_c)
+if args.fs_rfe_svm_c:
+    RFE_SVC_C = sorted(args.fs_rfe_svm_c)
 else:
     RFE_SVC_C = np.logspace(-7, 2, 10)
-if args.fs_sfm_c:
-    SFM_SVC_C = sorted(args.fs_sfm_c)
+if args.fs_sfm_svm_c:
+    SFM_SVC_C = sorted(args.fs_sfm_svm_c)
 else:
     SFM_SVC_C = np.logspace(-2, 2, 5)
-if args.fs_sfm_e:
-    SFM_EXT_N_ESTIMATORS = sorted(args.fs_sfm_e)
+if args.fs_sfm_ext_n:
+    SFM_EXT_N_ESTIMATORS = sorted(args.fs_sfm_ext_n)
 else:
-    SFM_EXT_N_ESTIMATORS = list(range(10, args.fs_sfm_e_max + 1, 10))
+    SFM_EXT_N_ESTIMATORS = list(range(10, args.fs_sfm_ext_n_max + 1, 10))
 if args.fs_sfm_thres:
     SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
 else:
@@ -421,6 +421,9 @@ fs_methods = [
     # 'SVM-RFE',
     # 'Limma-KBest-ReliefF',
     # 'Limma-KBest-CFS',
+]
+slr_methods = [
+    'StandardScaler',
 ]
 clf_methods = [
     'LinearSVC',
@@ -728,32 +731,6 @@ if args.analysis == 2:
                 xaxis_group_sorted_idxs = np.argsort(
                     np.ma.getdata(grid.cv_results_['param_' + param])
                 )
-            mean_roc_aucs_cv = np.reshape(
-                grid.cv_results_['mean_test_roc_auc'][xaxis_group_sorted_idxs], new_shape
-            )
-            std_roc_aucs_cv = np.reshape(
-                grid.cv_results_['std_test_roc_auc'][xaxis_group_sorted_idxs], new_shape
-            )
-            mean_roc_aucs_cv_max_idxs = np.argmax(mean_roc_aucs_cv, axis=1)
-            mean_roc_aucs_cv = mean_roc_aucs_cv[
-                np.arange(len(mean_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs
-            ]
-            std_roc_aucs_cv = std_roc_aucs_cv[
-                np.arange(len(std_roc_aucs_cv)), mean_roc_aucs_cv_max_idxs
-            ]
-            mean_bcrs_cv = np.reshape(
-                grid.cv_results_['mean_test_bcr'][xaxis_group_sorted_idxs], new_shape
-            )
-            std_bcrs_cv = np.reshape(
-                grid.cv_results_['std_test_bcr'][xaxis_group_sorted_idxs], new_shape
-            )
-            mean_bcrs_cv_max_idxs = np.argmax(mean_bcrs_cv, axis=1)
-            mean_bcrs_cv = mean_bcrs_cv[
-                np.arange(len(mean_bcrs_cv)), mean_bcrs_cv_max_idxs
-            ]
-            std_bcrs_cv = std_bcrs_cv[
-                np.arange(len(std_bcrs_cv)), mean_bcrs_cv_max_idxs
-            ]
             plt.figure('Figure 2-' + str(param_idx + 1))
             plt.rcParams['font.size'] = 16
             if param in (
@@ -773,28 +750,31 @@ if args.analysis == 2:
             )
             plt.xlabel(param)
             plt.ylabel('CV Score')
-            plt.plot(
-                x_axis,
-                mean_roc_aucs_cv,
-                lw=4, alpha=0.8, label='Mean ROC AUC'
-            )
-            plt.fill_between(
-                x_axis,
-                [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-                [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-                color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
-            )
-            plt.plot(
-                x_axis,
-                mean_bcrs_cv,
-                lw=4, alpha=0.8, label='Mean BCR'
-            )
-            plt.fill_between(
-                x_axis,
-                [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-                [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-                color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
-            )
+            for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
+                mean_scores_cv = np.reshape(
+                    grid.cv_results_['mean_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                )
+                std_scores_cv = np.reshape(
+                    grid.cv_results_['std_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                )
+                mean_scores_cv_max_idxs = np.argmax(mean_scores_cv, axis=1)
+                mean_scores_cv = mean_scores_cv[
+                    np.arange(len(mean_scores_cv)), mean_scores_cv_max_idxs
+                ]
+                std_scores_cv = std_scores_cv[
+                    np.arange(len(std_scores_cv)), mean_scores_cv_max_idxs
+                ]
+                plt.plot(
+                    x_axis,
+                    mean_scores_cv,
+                    lw=4, alpha=0.8, label='Mean ' + metric.replace('_', ' ').upper()
+                )
+                plt.fill_between(
+                    x_axis,
+                    [m - s for m, s in zip(mean_scores_cv, std_scores_cv)],
+                    [m + s for m, s in zip(mean_scores_cv, std_scores_cv)],
+                    color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+                )
             plt.legend(loc='lower right', fontsize='small')
             plt.grid('on')
     # plot num top-ranked features selected vs test dataset perf metrics
@@ -877,8 +857,10 @@ elif args.analysis == 3:
                     prep_groups.append([
                         x for x in [norm_meth, id_type, merge_type, bc_meth] if x != 'none'
                     ])
-    args.slr_meth = args.slr_meth[0]
-    if args.fs_meth and len(args.fs_meth) == 1 and args.clf_meth and len(args.clf_meth) == 1:
+    if args.fs_meth and len(args.fs_meth) == 1 and
+       args.slr_meth and len(args.slr_meth) == 1 and
+       args.clf_meth and len(args.clf_meth) == 1:
+        args.slr_meth = args.slr_meth[0]
         args.fs_meth = args.fs_meth[0]
         args.clf_meth = args.clf_meth[0]
         param_grid = []
@@ -899,21 +881,30 @@ elif args.analysis == 3:
     else:
         if args.fs_meth:
             fs_methods = [x for x in fs_methods if x in args.fs_meth]
+        if args.slr_meth:
+            slr_methods = [x for x in slr_methods if x in args.slr_meth]
         if args.clf_meth:
             clf_methods = [x for x in clf_methods if x in args.clf_meth]
-        param_grid = []
+        param_grid, meth_grid = [], []
         for fs_meth in fs_methods:
             for fs_params in pipelines['fs'][fs_meth]['param_grid']:
-                for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
-                    for clf_meth in clf_methods:
-                        for clf_params in pipelines['clf'][clf_meth]['param_grid']:
-                            params = { **fs_params, **slr_params, **clf_params }
-                            for (step, object) in \
-                                pipelines['fs'][fs_meth]['steps'] + \
-                                pipelines['slr'][args.slr_meth]['steps'] + \
-                                pipelines['clf'][clf_meth]['steps'] \
-                            : params[step] = [ object ]
-                            param_grid.append(params)
+                for slr_meth in slr_methods:
+                    for slr_params in pipelines['slr'][slr_meth]['param_grid']:
+                        for clf_meth in clf_methods:
+                            for clf_params in pipelines['clf'][clf_meth]['param_grid']:
+                                params = { **fs_params, **slr_params, **clf_params }
+                                for param_combo in ParameterGrid(params):
+                                    meth_grid.append({
+                                        'fs': fs_meth,
+                                        'slr': slr_meth,
+                                        'clf': clf_meth,
+                                    })
+                                for (step, object) in \
+                                    pipelines['fs'][fs_meth]['steps'] + \
+                                    pipelines['slr'][slr_meth]['steps'] + \
+                                    pipelines['clf'][clf_meth]['steps'] \
+                                : params[step] = [ object ]
+                                param_grid.append(params)
         grid = GridSearchCV(
             Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
             param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
@@ -934,11 +925,11 @@ elif args.analysis == 3:
     for dataset_tr_combo in dataset_tr_combos:
         dataset_tr = '_'.join(dataset_tr_combo)
         for dataset_te in natsorted(list(set(datasets_te) - set(dataset_tr_combo))):
-            for prep_meth in prep_groups:
-                prep_meth_str = '_'.join(prep_meth)
-                dataset_tr_name = '_'.join([dataset_tr, prep_meth_str, 'tr'])
+            for prep_methods in prep_groups:
+                prep_method = '_'.join(prep_methods)
+                dataset_tr_name = '_'.join([dataset_tr, prep_method, 'tr'])
                 if args.no_addon_te:
-                    dataset_te_name = '_'.join([dataset_te, prep_meth[0]])
+                    dataset_te_name = '_'.join([dataset_te, prep_methods[0]])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
@@ -956,66 +947,86 @@ elif args.analysis == 3:
                 X_te = np.array(base.t(biobase.exprs(eset_te)))
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
                 grid.fit(X_tr, y_tr)
-                dump(grid, '_'.join([
-                    'results/grid', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
-                ]) + '.pkl')
-                feature_idxs = np.arange(X_tr.shape[1])
-                for step in grid.best_estimator_.named_steps:
-                    if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
-                        feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
-                feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
-                if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
-                    weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
-                elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
-                    weights = grid.best_estimator_.named_steps['clf'].feature_importances_
-                roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
-                bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
-                y_score = grid.decision_function(X_te)
-                fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-                roc_auc_te = roc_auc_score(y_te, y_score)
-                y_pred = grid.predict(X_te)
-                bcr_te = bcr_score(y_te, y_pred)
-                print(
-                    'ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
-                    ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
-                    ' Features: %3s' % feature_idxs.size,
-                    ' Params:',  grid.best_params_,
-                )
-                # print('Rankings:')
-                # for rank, feature, symbol in sorted(
-                #     zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
-                #     reverse=True,
-                # ): print(feature, '\t', symbol, '\t', rank)
-                results.append({
-                    'grid': grid,
-                    'feature_idxs': feature_idxs,
-                    'feature_names': feature_names,
-                    'fprs': fpr,
-                    'tprs': tpr,
-                    'thres': thres,
-                    'weights': weights,
-                    'y_score': y_score,
-                    'y_test': y_te,
-                    'roc_auc_cv': roc_auc_cv,
-                    'roc_auc_te': roc_auc_te,
-                    'bcr_cv': bcr_cv,
-                    'bcr_te': bcr_te,
-                    'dataset_tr': dataset_tr,
-                    'dataset_te': dataset_te,
-                    'prep_meth': prep_meth_str,
-                    # 'fs_meth':
-                    # 'clf_meth':
-                })
+                if args.fs_meth and len(args.fs_meth) == 1 and args.clf_meth and len(args.clf_meth) == 1:
+                    dump(grid, '_'.join([
+                        'results/grid', dataset_tr_name, args.slr_meth.lower(),
+                         args.fs_meth.lower(), args.clf_meth.lower()
+                    ]) + '.pkl')
+                    feature_idxs = np.arange(X_tr.shape[1])
+                    for step in grid.best_estimator_.named_steps:
+                        if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
+                            feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
+                    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
+                    if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
+                        weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
+                    elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
+                        weights = grid.best_estimator_.named_steps['clf'].feature_importances_
+                    roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
+                    bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
+                    y_score = grid.decision_function(X_te)
+                    fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
+                    roc_auc_te = roc_auc_score(y_te, y_score)
+                    y_pred = grid.predict(X_te)
+                    bcr_te = bcr_score(y_te, y_pred)
+                    print(
+                        'ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
+                        ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
+                        ' Features: %3s' % feature_idxs.size,
+                        ' Params:',  grid.best_params_,
+                    )
+                    # print('Rankings:')
+                    # for rank, feature, symbol in sorted(
+                    #     zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
+                    #     reverse=True,
+                    # ): print(feature, '\t', symbol, '\t', rank)
+                    results.append({
+                        'grid': grid,
+                        'feature_idxs': feature_idxs,
+                        'feature_names': feature_names,
+                        'fprs': fpr,
+                        'tprs': tpr,
+                        'thres': thres,
+                        'weights': weights,
+                        'y_score': y_score,
+                        'y_test': y_te,
+                        'roc_auc_cv': roc_auc_cv,
+                        'roc_auc_te': roc_auc_te,
+                        'bcr_cv': bcr_cv,
+                        'bcr_te': bcr_te,
+                        'dataset_tr': dataset_tr,
+                        'dataset_te': dataset_te,
+                        'prep_method': prep_method,
+                    })
+                else:
+                    meth_scores_cv = {}
+                    for group_idx, group in enumerate(meth_grid):
+                        for type, meth in group.items():
+                            if type not in meth_scores_cv:
+                                meth_scores_cv[type] = {}
+                            if meth not in meth_scores_cv[type]:
+                                meth_scores_cv[type][meth] = {}
+                            for metric in gscv_scoring.keys():
+                                if metric not in meth_scores_cv[type][meth]:
+                                    meth_scores_cv[type][meth][metric] = []
+                                meth_scores_cv[type][meth][metric].append(
+                                    grid.cv_results_['mean_test_' + metric][group_idx]
+                                )
+                    for type, type_methods in meth_scores_cv.items():
+                        for meth, meth_metrics in type_methods.items():
+                            result = { type + '_method': meth }
+                            for metric, metric_scores in meth_metrics.items():
+                                result[metric + '_cv'] = np.mean(metric_scores)
+                            results.append(result)
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
     # plot prep methods vs test datasets
-    nested_results = {}
-    for result in sorted(results, key=lambda r: (r['dataset_te'], r['prep_meth'])):
-        if result['dataset_te'] not in nested_results:
-            nested_results[result['dataset_te']] = {}
-        if result['prep_meth'] not in nested_results[result['dataset_te']]:
-            nested_results[result['dataset_te']][result['prep_meth']] = []
-        nested_results[result['dataset_te']][result['prep_meth']].append(result)
+    struct_results = {}
+    for result in sorted(results, key=lambda r: (r['dataset_te'], r['prep_method'])):
+        if result['dataset_te'] not in struct_results:
+            struct_results[result['dataset_te']] = {}
+        if result['prep_method'] not in struct_results[result['dataset_te']]:
+            struct_results[result['dataset_te']][result['prep_method']] = []
+        struct_results[result['dataset_te']][result['prep_method']].append(result)
     plt_fig_x_axis = range(1, len(prep_groups) + 1)
     for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
         metric_title = metric.replace('_', ' ').upper()
@@ -1028,11 +1039,11 @@ elif args.analysis == 3:
         plt.xlabel('Preprocessing Method')
         plt.ylabel(metric_title)
         plt.xticks(plt_fig_x_axis, ['_'.join(x) for x in prep_groups])
-        for dataset_te, te_pr_results in nested_results.items():
+        for dataset_te, te_pr_results in struct_results.items():
             mean_scores_cv, range_scores_cv = [], [[], []]
             mean_scores_te, range_scores_te = [], [[], []]
             num_features = []
-            for prep_meth, pr_results in te_pr_results.items():
+            for prep_method, pr_results in te_pr_results.items():
                 scores_cv, scores_te = [], []
                 for result in pr_results:
                     scores_cv.append(result[metric + '_cv'])
@@ -1062,13 +1073,13 @@ elif args.analysis == 3:
         plt.legend(loc='best', fontsize='x-small')
         plt.grid('on')
     # plot prep methods vs train datasets
-    nested_results = {}
-    for result in sorted(results, key=lambda r: (r['dataset_tr'], r['prep_meth'])):
-        if result['dataset_tr'] not in nested_results:
-            nested_results[result['dataset_tr']] = {}
-        if result['prep_meth'] not in nested_results[result['dataset_tr']]:
-            nested_results[result['dataset_tr']][result['prep_meth']] = []
-        nested_results[result['dataset_tr']][result['prep_meth']].append(result)
+    struct_results = {}
+    for result in sorted(results, key=lambda r: (r['dataset_tr'], r['prep_method'])):
+        if result['dataset_tr'] not in struct_results:
+            struct_results[result['dataset_tr']] = {}
+        if result['prep_method'] not in struct_results[result['dataset_tr']]:
+            struct_results[result['dataset_tr']][result['prep_method']] = []
+        struct_results[result['dataset_tr']][result['prep_method']].append(result)
     plt_fig_x_axis = range(1, len(prep_groups) + 1)
     for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
         metric_title = metric.replace('_', ' ').upper()
@@ -1081,11 +1092,11 @@ elif args.analysis == 3:
         plt.xlabel('Preprocessing Method')
         plt.ylabel(metric_title)
         plt.xticks(plt_fig_x_axis, ['_'.join(x) for x in prep_groups])
-        for dataset_tr, tr_pr_results in nested_results.items():
+        for dataset_tr, tr_pr_results in struct_results.items():
             mean_scores_cv, range_scores_cv = [], [[], []]
             mean_scores_te, range_scores_te = [], [[], []]
             num_features = []
-            for prep_meth, pr_results in te_pr_results.items():
+            for prep_method, pr_results in te_pr_results.items():
                 scores_cv, scores_te = [], []
                 for result in pr_results:
                     scores_cv.append(result[metric + '_cv'])
