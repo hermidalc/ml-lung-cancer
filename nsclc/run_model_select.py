@@ -860,6 +860,7 @@ elif args.analysis == 3:
     if (args.fs_meth and len(args.fs_meth) == 1 and
         args.slr_meth and len(args.slr_meth) == 1 and
         args.clf_meth and len(args.clf_meth) == 1):
+        analysis_type = "prep_methods"
         args.slr_meth = args.slr_meth[0]
         args.fs_meth = args.fs_meth[0]
         args.clf_meth = args.clf_meth[0]
@@ -947,9 +948,7 @@ elif args.analysis == 3:
                 X_te = np.array(base.t(biobase.exprs(eset_te)))
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
                 grid.fit(X_tr, y_tr)
-                if (args.fs_meth and len(args.fs_meth) == 1 and
-                    args.slr_meth and len(args.slr_meth) == 1 and
-                    args.clf_meth and len(args.clf_meth) == 1):
+                if analysis_type == 'prep_methods':
                     dump(grid, '_'.join([
                         'results/grid', dataset_tr_name, args.slr_meth.lower(),
                          args.fs_meth.lower(), args.clf_meth.lower()
@@ -982,15 +981,15 @@ elif args.analysis == 3:
                     #     reverse=True,
                     # ): print(feature, '\t', symbol, '\t', rank)
                     results.append({
-                        'grid': grid,
+                        # 'grid': grid,
                         'feature_idxs': feature_idxs,
-                        'feature_names': feature_names,
-                        'fprs': fpr,
-                        'tprs': tpr,
-                        'thres': thres,
-                        'weights': weights,
-                        'y_score': y_score,
-                        'y_test': y_te,
+                        # 'feature_names': feature_names,
+                        # 'fprs': fpr,
+                        # 'tprs': tpr,
+                        # 'thres': thres,
+                        # 'weights': weights,
+                        # 'y_score': y_score,
+                        # 'y_test': y_te,
                         'roc_auc_cv': roc_auc_cv,
                         'roc_auc_te': roc_auc_te,
                         'bcr_cv': bcr_cv,
@@ -1023,14 +1022,16 @@ elif args.analysis == 3:
                 base.remove(eset_te_name)
 
     # plot prep methods vs test datasets
-    struct_results = {}
+    struct_results, prep_methods = {}, []
     for result in sorted(results, key=lambda r: (r['dataset_te'], r['prep_method'])):
         if result['dataset_te'] not in struct_results:
             struct_results[result['dataset_te']] = {}
         if result['prep_method'] not in struct_results[result['dataset_te']]:
             struct_results[result['dataset_te']][result['prep_method']] = []
+        if result['prep_method'] not in prep_methods:
+            prep_methods.append(result['prep_method'])
         struct_results[result['dataset_te']][result['prep_method']].append(result)
-    plt_fig_x_axis = range(1, len(prep_groups) + 1)
+    plt_fig_x_axis = range(1, len(prep_methods) + 1)
     for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
         metric_title = metric.replace('_', ' ').upper()
         plt.figure('Figure 4-' + str(metric_idx + 1))
@@ -1041,7 +1042,7 @@ elif args.analysis == 3:
         )
         plt.xlabel('Preprocessing Method')
         plt.ylabel(metric_title)
-        plt.xticks(plt_fig_x_axis, ['_'.join(x) for x in prep_groups])
+        plt.xticks(plt_fig_x_axis, prep_methods)
         for dataset_te, te_pr_results in struct_results.items():
             mean_scores_cv, range_scores_cv = [], [[], []]
             mean_scores_te, range_scores_te = [], [[], []]
@@ -1075,6 +1076,68 @@ elif args.analysis == 3:
             )
         plt.legend(loc='best', fontsize='x-small')
         plt.grid('on')
+
+    # plot test datasets vs prep methods
+    struct_results, datasets_te = {}, []
+    for result in sorted(results, key=lambda r: (r['prep_method'], r['dataset_te'])):
+        if result['prep_method'] not in struct_results:
+            struct_results[result['prep_method']] = {}
+        if result['dataset_te'] not in struct_results[result['prep_method']]:
+            struct_results[result['prep_method']][result['dataset_te']] = []
+        if result['dataset_te'] not in datasets_te:
+            datasets_te.append(result['dataset_te'])
+        struct_results[result['prep_method']][result['dataset_te']].append(result)
+
+    pprint(struct_results, indent=4)
+
+    plt_fig_x_axis = range(1, len(datasets_te) + 1)
+    for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
+        metric_title = metric.replace('_', ' ').upper()
+        plt.figure('Figure 5-' + str(metric_idx + 1))
+        plt.rcParams['font.size'] = 16
+        plt.title(
+            'Effect of Test Dataset on ' + metric_title + '\n' +
+            '(' + args.clf_meth + ' Classifier ' + args.fs_meth + ' Feature Selection)'
+        )
+        plt.xlabel('Test Dataset')
+        plt.ylabel(metric_title)
+        plt.xticks(plt_fig_x_axis, datasets_te)
+        for prep_method, pr_te_results in struct_results.items():
+            mean_scores_cv, range_scores_cv = [], [[], []]
+            mean_scores_te, range_scores_te = [], [[], []]
+            num_features = []
+            for dataset_te, te_results in pr_te_results.items():
+                scores_cv, scores_te = [], []
+                for result in te_results:
+                    scores_cv.append(result[metric + '_cv'])
+                    scores_te.append(result[metric + '_te'])
+                    num_features.append(len(result['feature_idxs']))
+                mean_scores_cv.append(np.mean(scores_cv))
+                range_scores_cv[0].append(np.mean(scores_cv) - min(scores_cv))
+                range_scores_cv[1].append(max(scores_cv) - np.mean(scores_cv))
+                mean_scores_te.append(np.mean(scores_te))
+                range_scores_te[0].append(np.mean(scores_te) - min(scores_te))
+                range_scores_te[1].append(max(scores_te) - np.mean(scores_te))
+            color = next(plt.gca()._get_lines.prop_cycler)['color']
+            plt.errorbar(
+                plt_fig_x_axis, mean_scores_cv, yerr=range_scores_cv, lw=4, alpha=0.8,
+                linestyle='--', capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
+            )
+            plt.errorbar(
+                plt_fig_x_axis, mean_scores_te, yerr=range_scores_te, lw=4, alpha=0.8,
+                capsize=25, elinewidth=4, markeredgewidth=4, marker='s', color=color,
+                label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
+                    prep_method,
+                    np.mean(mean_scores_cv), np.std(mean_scores_cv),
+                    np.mean(mean_scores_te), np.std(mean_scores_te),
+                    np.mean(num_features), np.std(num_features),
+                )
+            )
+        plt.legend(loc='best', fontsize='x-small')
+        plt.grid('on')
+
+
+
     # plot prep methods vs train datasets
     struct_results = {}
     for result in sorted(results, key=lambda r: (r['dataset_tr'], r['prep_method'])):
@@ -1083,10 +1146,10 @@ elif args.analysis == 3:
         if result['prep_method'] not in struct_results[result['dataset_tr']]:
             struct_results[result['dataset_tr']][result['prep_method']] = []
         struct_results[result['dataset_tr']][result['prep_method']].append(result)
-    plt_fig_x_axis = range(1, len(prep_groups) + 1)
+    plt_fig_x_axis = range(1, len(prep_methods) + 1)
     for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
         metric_title = metric.replace('_', ' ').upper()
-        plt.figure('Figure 5-' + str(metric_idx + 1))
+        plt.figure('Figure 6-' + str(metric_idx + 1))
         plt.rcParams['font.size'] = 16
         plt.title(
             'Effect of Preprocessing Method on ' + metric_title + '\n' +
@@ -1094,12 +1157,12 @@ elif args.analysis == 3:
         )
         plt.xlabel('Preprocessing Method')
         plt.ylabel(metric_title)
-        plt.xticks(plt_fig_x_axis, ['_'.join(x) for x in prep_groups])
+        plt.xticks(plt_fig_x_axis, prep_methods)
         for dataset_tr, tr_pr_results in struct_results.items():
             mean_scores_cv, range_scores_cv = [], [[], []]
             mean_scores_te, range_scores_te = [], [[], []]
             num_features = []
-            for prep_method, pr_results in te_pr_results.items():
+            for prep_method, pr_results in tr_pr_results.items():
                 scores_cv, scores_te = [], []
                 for result in pr_results:
                     scores_cv.append(result[metric + '_cv'])
