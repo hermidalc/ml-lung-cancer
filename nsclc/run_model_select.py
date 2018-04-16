@@ -857,9 +857,9 @@ elif args.analysis == 3:
                     prep_groups.append([
                         x for x in [norm_meth, id_type, merge_type, bc_meth] if x != 'none'
                     ])
-    if args.fs_meth and len(args.fs_meth) == 1 and
-       args.slr_meth and len(args.slr_meth) == 1 and
-       args.clf_meth and len(args.clf_meth) == 1:
+    if (args.fs_meth and len(args.fs_meth) == 1 and
+        args.slr_meth and len(args.slr_meth) == 1 and
+        args.clf_meth and len(args.clf_meth) == 1):
         args.slr_meth = args.slr_meth[0]
         args.fs_meth = args.fs_meth[0]
         args.clf_meth = args.clf_meth[0]
@@ -947,7 +947,9 @@ elif args.analysis == 3:
                 X_te = np.array(base.t(biobase.exprs(eset_te)))
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
                 grid.fit(X_tr, y_tr)
-                if args.fs_meth and len(args.fs_meth) == 1 and args.clf_meth and len(args.clf_meth) == 1:
+                if (args.fs_meth and len(args.fs_meth) == 1 and
+                    args.slr_meth and len(args.slr_meth) == 1 and
+                    args.clf_meth and len(args.clf_meth) == 1):
                     dump(grid, '_'.join([
                         'results/grid', dataset_tr_name, args.slr_meth.lower(),
                          args.fs_meth.lower(), args.clf_meth.lower()
@@ -1019,6 +1021,7 @@ elif args.analysis == 3:
                             results.append(result)
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
+
     # plot prep methods vs test datasets
     struct_results = {}
     for result in sorted(results, key=lambda r: (r['dataset_te'], r['prep_method'])):
@@ -1125,294 +1128,6 @@ elif args.analysis == 3:
             )
         plt.legend(loc='best', fontsize='x-small')
         plt.grid('on')
-
-    plt.show()
-    quit()
-
-    # plot train/test dataset vs bc method
-    plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
-    plt.figure('Figure 4-1')
-    plt.rcParams['font.size'] = 16
-    plt.title(
-        'Effect of Train/Held-Out Test Dataset on ROC AUC\n' +
-        '(' + args.fs_meth + ' Feature Selection)'
-    )
-    plt.xlabel('Test Dataset')
-    plt.ylabel('ROC AUC')
-    plt.xticks(plt_fig_x_axis, dataset_te_names)
-    plt.figure('Figure 4-2')
-    plt.rcParams['font.size'] = 16
-    plt.title(
-        'Effect of Train/Held-Out Test Dataset on BCR\n' +
-        '(' + args.fs_meth + ' Feature Selection)'
-    )
-    plt.xlabel('Test Dataset')
-    plt.ylabel('BCR')
-    plt.xticks(plt_fig_x_axis, dataset_te_names)
-    for bc_idx, bc_te_results in enumerate(bc_results):
-        roc_aucs_cv, roc_aucs_te = [], []
-        bcrs_cv, bcrs_te, num_features = [], [], []
-        for result in bc_te_results:
-            roc_aucs_cv.append(result['roc_auc_cv'])
-            roc_aucs_te.append(result['roc_auc_te'])
-            bcrs_cv.append(result['bcr_cv'])
-            bcrs_te.append(result['bcr_te'])
-            num_features.append(len(result['feature_idxs']))
-        color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure('Figure 4-1')
-        plt.plot(
-            plt_fig_x_axis, roc_aucs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-        )
-        plt.plot(
-            plt_fig_x_axis, roc_aucs_te,
-            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
-                bc_methods[bc_idx],
-                np.mean(roc_aucs_cv), np.std(roc_aucs_cv),
-                np.mean(roc_aucs_te), np.std(roc_aucs_te),
-                np.mean(num_features), np.std(num_features),
-            )
-        )
-        plt.figure('Figure 4-2')
-        plt.plot(
-            plt_fig_x_axis, bcrs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-        )
-        plt.plot(
-            plt_fig_x_axis, bcrs_te,
-            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
-                bc_methods[bc_idx],
-                np.mean(bcrs_cv), np.std(bcrs_cv),
-                np.mean(bcrs_te), np.std(bcrs_te),
-                np.mean(num_features), np.std(num_features),
-            )
-        )
-    plt.figure('Figure 4-1')
-    plt.legend(loc='best', fontsize='x-small')
-    plt.grid('on')
-    plt.figure('Figure 4-2')
-    plt.legend(loc='best', fontsize='x-small')
-    plt.grid('on')
-elif args.analysis == 5:
-    if args.dataset_tr:
-        dataset_pair_names = [t for t in dataset_pair_names if t[0] == args.dataset_tr]
-    te_results, fs_results = [], []
-    for te_idx, (dataset_tr_name, dataset_te_name) in enumerate(dataset_pair_names):
-        for fs_idx, fs_method in enumerate(fs_methods):
-            if args.bc_meth:
-                eset_tr_name = 'eset_' + dataset_tr_name + '_tr_' + args.bc_meth
-                eset_te_name = eset_tr_name + '_' + dataset_te_name + '_te'
-            else:
-                eset_tr_name = 'eset_' + dataset_tr_name
-                eset_te_name = 'eset_' + dataset_te_name
-            print(eset_tr_name, '->', eset_te_name)
-            base.load('data/' + eset_tr_name + '.Rda')
-            eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-            X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-            y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
-            grid = GridSearchCV(
-                Pipeline(pipelines[fs_method]['pipe_steps'], memory=memory),
-                param_grid=pipelines[fs_method]['param_grid'], scoring=gscv_scoring, refit=args.gscv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-                error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
-            )
-            grid.fit(X_tr, y_tr)
-            if args.bc_meth:
-                dump(grid, 'results/grid_' + dataset_tr_name + '_' + args.bc_meth + '_' + fs_method.lower() + '.pkl')
-            else:
-                dump(grid, 'results/grid_' + dataset_tr_name + '_' + fs_method.lower() + '.pkl')
-            feature_idxs = np.arange(X_tr.shape[1])
-            for step in grid.best_estimator_.named_steps:
-                if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
-                    feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
-            feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
-            if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
-                weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
-            elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
-                weights = grid.best_estimator_.named_steps['clf'].feature_importances_
-            roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
-            bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
-            base.load('data/' + eset_te_name + '.Rda')
-            eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
-            X_te = np.array(base.t(biobase.exprs(eset_te)))
-            y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-            y_score = grid.decision_function(X_te)
-            fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-            roc_auc_te = roc_auc_score(y_te, y_score)
-            y_pred = grid.predict(X_te)
-            bcr_te = bcr_score(y_te, y_pred)
-            result = {
-                'grid': grid,
-                'feature_idxs': feature_idxs,
-                'feature_names': feature_names,
-                'fprs': fpr,
-                'tprs': tpr,
-                'thres': thres,
-                'weights': weights,
-                'y_score': y_score,
-                'y_test': y_te,
-                'roc_auc_cv': roc_auc_cv,
-                'roc_auc_te': roc_auc_te,
-                'bcr_cv': bcr_cv,
-                'bcr_te': bcr_te,
-            }
-            if te_idx < len(te_results):
-                te_results[te_idx].append(result)
-            else:
-                te_results.append([result])
-            if fs_idx < len(fs_results):
-                fs_results[fs_idx].append(result)
-            else:
-                fs_results.append([result])
-            base.remove(eset_tr_name)
-            base.remove(eset_te_name)
-            # print summary info
-            print(
-                'Features: %3s' % feature_idxs.size,
-                ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
-                ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
-                ' Params:',  grid.best_params_,
-            )
-            print('Rankings:')
-            for rank, feature, symbol in sorted(
-                zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
-                reverse=True,
-            ): print(feature, '\t', symbol, '\t', rank)
-    # plot fs method vs train/test dataset
-    plt_fig_x_axis = range(1, len(fs_methods) + 1)
-    plt.figure('Figure 5-1')
-    plt.rcParams['font.size'] = 16
-    plt.title(
-        'Effect of Feature Selection Method on ROC AUC\n' +
-        '(' + args.bc_meth + ' Batch Effect Correction)'
-    )
-    plt.xlabel('Feature Selection Method')
-    plt.ylabel('ROC AUC')
-    plt.xticks(plt_fig_x_axis, fs_methods)
-    plt.figure('Figure 5-2')
-    plt.rcParams['font.size'] = 16
-    plt.title(
-        'Effect of Feature Selection Method on BCR\n' +
-        '(' + args.bc_meth + ' Batch Effect Correction)'
-    )
-    plt.xlabel('Feature Selection Method')
-    plt.ylabel('BCR')
-    plt.xticks(plt_fig_x_axis, fs_methods)
-    for te_idx, te_fs_results in enumerate(te_results):
-        roc_aucs_cv, roc_aucs_te = [], []
-        bcrs_cv, bcrs_te, num_features = [], [], []
-        for result in te_fs_results:
-            roc_aucs_cv.append(result['roc_auc_cv'])
-            roc_aucs_te.append(result['roc_auc_te'])
-            bcrs_cv.append(result['bcr_cv'])
-            bcrs_te.append(result['bcr_te'])
-            num_features.append(len(result['feature_idxs']))
-        dataset_tr_name, dataset_te_name = dataset_pair_names[te_idx]
-        color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure('Figure 5-1')
-        plt.plot(
-            plt_fig_x_axis, roc_aucs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-        )
-        plt.plot(
-            plt_fig_x_axis, roc_aucs_te,
-            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
-                dataset_te_name,
-                np.mean(roc_aucs_cv), np.std(roc_aucs_cv),
-                np.mean(roc_aucs_te), np.std(roc_aucs_te),
-                np.mean(num_features), np.std(num_features),
-            )
-        )
-        plt.figure('Figure 5-2')
-        plt.plot(
-            plt_fig_x_axis, bcrs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-        )
-        plt.plot(
-            plt_fig_x_axis, bcrs_te,
-            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
-                dataset_te_name,
-                np.mean(bcrs_cv), np.std(bcrs_cv),
-                np.mean(bcrs_te), np.std(bcrs_te),
-                np.mean(num_features), np.std(num_features),
-            )
-        )
-    plt.figure('Figure 5-1')
-    plt.legend(loc='best', fontsize='x-small')
-    plt.grid('on')
-    plt.figure('Figure 5-2')
-    plt.legend(loc='best', fontsize='x-small')
-    plt.grid('on')
-    # plot train/test dataset vs fs method
-    plt_fig_x_axis = range(1, len(dataset_te_names) + 1)
-    plt.figure('Figure 6-1')
-    plt.rcParams['font.size'] = 16
-    plt.title(
-        'Effect of Training/Held-Out Test Dataset on ROC AUC\n' +
-        '(' + args.bc_meth + ' Batch Effect Correction)'
-    )
-    plt.xlabel('Test Dataset')
-    plt.ylabel('ROC AUC')
-    plt.xticks(plt_fig_x_axis, dataset_te_names)
-    plt.figure('Figure 6-2')
-    plt.rcParams['font.size'] = 16
-    plt.title(
-        'Effect of Training/Held-Out Test Dataset on BCR\n' +
-        '(' + args.bc_meth + ' Batch Effect Correction)'
-    )
-    plt.xlabel('Test Dataset')
-    plt.ylabel('BCR')
-    plt.xticks(plt_fig_x_axis, dataset_te_names)
-    for fs_idx, fs_te_results in enumerate(fs_results):
-        roc_aucs_cv, roc_aucs_te = [], []
-        bcrs_cv, bcrs_te, num_features = [], [], []
-        for result in fs_te_results:
-            roc_aucs_cv.append(result['roc_auc_cv'])
-            roc_aucs_te.append(result['roc_auc_te'])
-            bcrs_cv.append(result['bcr_cv'])
-            bcrs_te.append(result['bcr_te'])
-            num_features.append(len(result['feature_idxs']))
-        color = next(plt.gca()._get_lines.prop_cycler)['color']
-        plt.figure('Figure 6-1')
-        plt.plot(
-            plt_fig_x_axis, roc_aucs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-        )
-        plt.plot(
-            plt_fig_x_axis, roc_aucs_te,
-            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
-                fs_methods[fs_idx],
-                np.mean(roc_aucs_cv), np.std(roc_aucs_cv),
-                np.mean(roc_aucs_te), np.std(roc_aucs_te),
-                np.mean(num_features), np.std(num_features),
-            )
-        )
-        plt.figure('Figure 6-2')
-        plt.plot(
-            plt_fig_x_axis, bcrs_cv,
-            lw=4, alpha=0.8, linestyle='--', color=color, markeredgewidth=4, marker='s',
-        )
-        plt.plot(
-            plt_fig_x_axis, bcrs_te,
-            lw=4, alpha=0.8, color=color, markeredgewidth=4, marker='s',
-            label=r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' % (
-                fs_methods[fs_idx],
-                np.mean(bcrs_cv), np.std(bcrs_cv),
-                np.mean(bcrs_te), np.std(bcrs_te),
-                np.mean(num_features), np.std(num_features),
-            )
-        )
-    plt.figure('Figure 6-1')
-    plt.legend(loc='best', fontsize='x-small')
-    plt.grid('on')
-    plt.figure('Figure 6-2')
-    plt.legend(loc='best', fontsize='x-small')
-    plt.grid('on')
 
 plt.show()
 if not args.gscv_no_memory: rmtree(cachedir)
