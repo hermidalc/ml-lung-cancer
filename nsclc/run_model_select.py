@@ -1033,7 +1033,7 @@ elif args.analysis == 3:
     plt_fig_x_axis = range(1, len(prep_groups) + 1)
     for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
         metric_title = metric.replace('_', ' ').upper()
-        plt.figure('Figure 3-' + str(metric_idx + 1))
+        plt.figure('Figure 4-' + str(metric_idx + 1))
         plt.rcParams['font.size'] = 16
         plt.title(
             'Effect of Preprocessing Method on ' + metric_title + '\n' +
@@ -1086,7 +1086,7 @@ elif args.analysis == 3:
     plt_fig_x_axis = range(1, len(prep_groups) + 1)
     for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
         metric_title = metric.replace('_', ' ').upper()
-        plt.figure('Figure 4-' + str(metric_idx + 1))
+        plt.figure('Figure 5-' + str(metric_idx + 1))
         plt.rcParams['font.size'] = 16
         plt.title(
             'Effect of Preprocessing Method on ' + metric_title + '\n' +
