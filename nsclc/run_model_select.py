@@ -17,9 +17,15 @@ from rpy2.robjects import numpy2ri
 # import pandas as pd
 from sklearn.feature_selection import mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
 from sklearn.model_selection import GridSearchCV, ParameterGrid, StratifiedShuffleSplit
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
-from sklearn.ensemble import AdaBoostClassifier, ExtraTreesClassifier, RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.gaussian_process.kernels import RBF
+from sklearn.ensemble import AdaBoostClassifier, ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
@@ -54,8 +60,6 @@ parser.add_argument('--fs-fcbf-k-max', type=int, default=30, help='fs fcbf k max
 parser.add_argument('--fs-fpr-p', type=float, nargs='+', help='fs fpr p-value')
 parser.add_argument('--fs-sfm-thres', type=float, nargs='+', help='fs sfm threshold')
 parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
-parser.add_argument('--fs-sfm-ext-n', type=int, nargs='+', help='fs sfm ext n estimators')
-parser.add_argument('--fs-sfm-ext-n-max', type=int, default=100, help='fs sfm ext n estimators max')
 parser.add_argument('--fs-rfe-n', type=int, nargs='+', help='fs rfe n select')
 parser.add_argument('--fs-rfe-n-max', type=int, default=30, help='fs rfe n max')
 parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
@@ -64,12 +68,23 @@ parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbos
 parser.add_argument('--fs-rank-meth', type=str, default='mean_weights', help='fs rank method')
 parser.add_argument('--clf-svm-c', type=float, nargs='+', help='clf svm c')
 parser.add_argument('--clf-svm-cache', type=int, default=2000, help='libsvm cache size')
+parser.add_argument('--clf-knn-n', type=int, nargs='+', help='clf knn neighbors')
+parser.add_argument('--clf-knn-n-max', type=int, default=20, help='clf knn neighbors max')
+parser.add_argument('--clf-knn-w', type=str, nargs='+', help='clf knn weights')
+parser.add_argument('--clf-ext-n', type=int, nargs='+', help='clf ext n estimators')
+parser.add_argument('--clf-ext-n-max', type=int, default=100, help='clf ext n estimators max')
+parser.add_argument('--clf-ada-n', type=int, nargs='+', help='clf ada n estimators')
+parser.add_argument('--clf-ada-n-max', type=int, default=200, help='clf ada n estimators max')
+parser.add_argument('--clf-grb-n', type=int, nargs='+', help='clf grb n estimators')
+parser.add_argument('--clf-grb-n-max', type=int, default=100, help='clf grb n estimators max')
+parser.add_argument('--clf-grb-d', type=int, nargs='+', help='clf grb max depth')
+parser.add_argument('--clf-grb-d-max', type=int, default=20, help='clf grb max depth max')
 parser.add_argument('--gscv-splits', type=int, default=80, help='gscv splits')
 parser.add_argument('--gscv-size', type=float, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc, bcr)')
-parser.add_argument('--gscv-no-memory', default=False, action='store_true', help='gscv no pipeline memory')
+parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 args = parser.parse_args()
 
 base = importr('base')
@@ -80,11 +95,11 @@ r_eset_class_labels = robjects.globalenv['esetClassLabels']
 r_eset_gene_symbols = robjects.globalenv['esetGeneSymbols']
 r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
 numpy2ri.activate()
-if args.gscv_no_memory:
-    memory = None
-else:
+if args.pipe_memory:
     cachedir = mkdtemp()
     memory = Memory(cachedir=cachedir, verbose=0)
+else:
+    memory = None
 
 # custom mixin and class for caching pipeline nested estimator fits
 class CachedFitMixin:
@@ -98,6 +113,9 @@ class CachedLinearSVC(CachedFitMixin, LinearSVC):
     pass
 
 class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
+    pass
+
+class CachedLogisticRegression(CachedFitMixin, LogisticRegression):
     pass
 
 # limma feature selection scoring function
@@ -122,40 +140,24 @@ def bcr_score(y_true, y_pred):
         return (tp / mes1 + tn / mes2) / 2
 
 # config
-if args.gscv_no_memory:
-    limma_score_func = limma
-    mi_score_func = mutual_info_classif
-    rfe_svm_estimator = LinearSVC(class_weight='balanced')
-    sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, class_weight='balanced')
-    sfm_ext_estimator = ExtraTreesClassifier(class_weight='balanced')
-else:
+if args.pipe_memory:
     limma_score_func = memory.cache(limma)
     mi_score_func = memory.cache(mutual_info_classif)
     rfe_svm_estimator = CachedLinearSVC(class_weight='balanced')
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
     sfm_ext_estimator = CachedExtraTreesClassifier(class_weight='balanced')
+    ada_lgr_estimator = CachedLogisticRegression(class_weight='balanced')
+else:
+    limma_score_func = limma
+    mi_score_func = mutual_info_classif
+    rfe_svm_estimator = LinearSVC(class_weight='balanced')
+    sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, class_weight='balanced')
+    sfm_ext_estimator = ExtraTreesClassifier(class_weight='balanced')
+    ada_lgr_estimator = LogisticRegression(class_weight='balanced')
+
 gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
+
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
-if args.clf_svm_c:
-    CLF_SVC_C = sorted(args.clf_svm_c)
-else:
-    CLF_SVC_C = np.logspace(-7, 3, 11)
-if args.fs_rfe_svm_c:
-    RFE_SVC_C = sorted(args.fs_rfe_svm_c)
-else:
-    RFE_SVC_C = np.logspace(-7, 2, 10)
-if args.fs_sfm_svm_c:
-    SFM_SVC_C = sorted(args.fs_sfm_svm_c)
-else:
-    SFM_SVC_C = np.logspace(-2, 2, 5)
-if args.fs_sfm_ext_n:
-    SFM_EXT_N_ESTIMATORS = sorted(args.fs_sfm_ext_n)
-else:
-    SFM_EXT_N_ESTIMATORS = list(range(10, args.fs_sfm_ext_n_max + 1, 10))
-if args.fs_sfm_thres:
-    SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
-else:
-    SFM_THRESHOLDS = np.logspace(-9, -5, 5)
 if args.fs_skb_k:
     SKB_N_FEATURES = sorted(args.fs_skb_k)
 else:
@@ -176,6 +178,46 @@ if args.fs_fpr_p:
     SFP_ALPHA = sorted(args.fs_fpr_p)
 else:
     SFP_ALPHA = np.logspace(-3, -2, 2)
+if args.fs_sfm_thres:
+    SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
+else:
+    SFM_THRESHOLDS = np.logspace(-9, -5, 5)
+if args.fs_sfm_svm_c:
+    SFM_SVC_C = sorted(args.fs_sfm_svm_c)
+else:
+    SFM_SVC_C = np.logspace(-2, 2, 5)
+if args.fs_rfe_svm_c:
+    RFE_SVC_C = sorted(args.fs_rfe_svm_c)
+else:
+    RFE_SVC_C = np.logspace(-7, 2, 10)
+if args.clf_svm_c:
+    CLF_SVC_C = sorted(args.clf_svm_c)
+else:
+    CLF_SVC_C = np.logspace(-7, 3, 11)
+if args.clf_knn_n:
+    CLF_KNN_N = sorted(args.clf_knn_n)
+else:
+    CLF_KNN_N = list(range(1, args.clf_knn_n_max + 1, 1))
+if args.clf_knn_w:
+    CLF_KNN_WEIGHTS = sorted(args.clf_knn_w)
+else:
+    CLF_KNN_WEIGHTS = ['uniform', 'distance']
+if args.clf_ext_n:
+    CLF_EXT_N_ESTS = sorted(args.clf_ext_n)
+else:
+    CLF_EXT_N_ESTS = list(range(5, args.clf_ext_n_max + 1, 5))
+if args.clf_ada_n:
+    CLF_ADA_N_ESTS = sorted(args.clf_ada_n)
+else:
+    CLF_ADA_N_ESTS = list(range(10, args.clf_ada_n_max + 1, 10))
+if args.clf_grb_n:
+    CLF_GRB_N_ESTS = sorted(args.clf_grb_n)
+else:
+    CLF_GRB_N_ESTS = list(range(5, args.clf_grb_n_max + 1, 5))
+if args.clf_grb_d:
+    CLF_GRB_MAX_D = sorted(args.clf_grb_d)
+else:
+    CLF_GRB_MAX_D = list(range(1, args.clf_grb_d_max + 1, 1))
 
 pipeline_order = [
     'fs1',
@@ -235,7 +277,7 @@ pipelines = {
             'param_grid': [
                 {
                     'fs2__k': SFM_N_FEATURES,
-                    'fs2__estimator__n_estimators': SFM_EXT_N_ESTIMATORS,
+                    'fs2__estimator__n_estimators': CLF_EXT_N_ESTS,
                     'fs2__threshold': SFM_THRESHOLDS,
                 },
             ],
@@ -274,7 +316,7 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__estimator__n_estimators': SFM_EXT_N_ESTIMATORS,
+                    'fs2__estimator__n_estimators': CLF_EXT_N_ESTS,
                     'fs2__threshold': SFM_THRESHOLDS,
                     'fs3__estimator__C': RFE_SVC_C,
                     'fs3__n_features_to_select': RFE_N_FEATURES,
@@ -338,25 +380,64 @@ pipelines = {
                 },
             ],
         },
+        'kNN': {
+            'steps': [
+                ('clf', KNeighborsClassifier()),
+            ],
+            'param_grid': [
+                {
+                    'clf__n_neighbors': CLF_KNN_N,
+                    'clf__weights': CLF_KNN_WEIGHTS,
+                },
+            ],
+        },
+        'DT': {
+            'steps': [
+                ('clf', DecisionTreeClassifier(class_weight='balanced')),
+            ],
+            'param_grid': [
+                { },
+            ],
+        },
+        'ExtraTrees': {
+            'steps': [
+                ('clf', ExtraTreesClassifier(class_weight='balanced')),
+            ],
+            'param_grid': [
+                {
+                    'clf__n_estimators': CLF_EXT_N_ESTS,
+                },
+            ],
+        },
         'RandomForest': {
             'steps': [
                 ('clf', RandomForestClassifier(class_weight='balanced')),
             ],
             'param_grid': [
                 {
-                    'clf__n_estimators': CLF_SVC_C,
-                    'clf__max_depth': CLF_SVC_C,
+                    'clf__n_estimators': CLF_EXT_N_ESTS,
                 },
             ],
         },
         'AdaBoost': {
             'steps': [
-                ('clf', AdaBoostClassifier(LogisticRegression(class_weight='balanced'))),
+                ('clf', AdaBoostClassifier(ada_lgr_estimator)),
             ],
             'param_grid': [
                 {
-                    'clf__n_estimators': CLF_SVC_C,
-                    'clf__max_depth': CLF_SVC_C,
+                    'clf__base_estimator__C': CLF_SVC_C,
+                    'clf__n_estimators': CLF_ADA_N_ESTS,
+                },
+            ],
+        },
+        'GradientBoosting': {
+            'steps': [
+                ('clf', GradientBoostingClassifier()),
+            ],
+            'param_grid': [
+                {
+                    'clf__max_depth': CLF_GRB_MAX_D,
+                    'clf__n_estimators': CLF_GRB_N_ESTS,
                 },
             ],
         },
@@ -365,10 +446,34 @@ pipelines = {
                 ('clf', GaussianNB()),
             ],
             'param_grid': [
+                { },
+            ],
+        },
+        'GaussianProcess': {
+            'steps': [
+                ('clf', GaussianProcessClassifier(1.0 * RBF(1.0))),
+            ],
+            'param_grid': [
+                { },
+            ],
+        },
+        'MLPClassifier': {
+            'steps': [
+                ('clf', MLPClassifier()),
+            ],
+            'param_grid': [
                 {
-                    'clf__n_estimators': CLF_SVC_C,
-                    'clf__max_depth': CLF_SVC_C,
+                    'clf__alpha': CLF_SVC_C,
+                    'clf__learning_rate': ['constant', 'invscaling', 'adaptive'],
                 },
+            ],
+        },
+        'QDA': {
+            'steps': [
+                ('clf', QuadraticDiscriminantAnalysis()),
+            ],
+            'param_grid': [
+                { },
             ],
         },
     },
@@ -427,7 +532,14 @@ slr_methods = [
 ]
 clf_methods = [
     'LinearSVC',
+    'kNN',
     'RandomForest',
+    'ExtraTrees',
+    'AdaBoost',
+    'GradientBoosting',
+    'GaussianNB',
+    'GaussianProcess',
+    'QDA',
 ]
 
 # analyses
@@ -860,7 +972,7 @@ elif args.analysis == 3:
     if (args.fs_meth and len(args.fs_meth) == 1 and
         args.slr_meth and len(args.slr_meth) == 1 and
         args.clf_meth and len(args.clf_meth) == 1):
-        analysis_type = "prep_methods"
+        analysis_type = 'prep_methods'
         args.slr_meth = args.slr_meth[0]
         args.fs_meth = args.fs_meth[0]
         args.clf_meth = args.clf_meth[0]
@@ -880,6 +992,7 @@ elif args.analysis == 3:
             error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
         )
     else:
+        analysis_type = 'pipe_methods'
         if args.fs_meth:
             fs_methods = [x for x in fs_methods if x in args.fs_meth]
         if args.slr_meth:
@@ -906,6 +1019,9 @@ elif args.analysis == 3:
                                     pipelines['clf'][clf_meth]['steps'] \
                                 : params[step] = [ object ]
                                 param_grid.append(params)
+
+        pprint(param_grid, indent=4)
+        quit()
         grid = GridSearchCV(
             Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
             param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
@@ -922,15 +1038,28 @@ elif args.analysis == 3:
         datasets_te = natsorted(args.datasets_te)
     else:
         datasets_te = dataset_names
-    results = []
-    for dataset_tr_combo in dataset_tr_combos:
+    score_dtypes = [
+        ('num_features', int), ('roc_auc_cv', float),
+        ('roc_auc_te', float), ('bcr_cv', float), ('bcr_te', float)
+    ]
+    te_var_results = np.full((len(datasets_te), len(prep_groups)), np.nan, dtype=[
+        ('tr', score_dtypes, (len(dataset_tr_combos),))
+    ])
+    tr_var_results = np.full((len(dataset_tr_combos), len(prep_groups)), np.nan, dtype=[
+        ('te', score_dtypes, (len(datasets_te),))
+    ])
+    pr_var_results = np.full((len(prep_groups), len(fs_methods)), np.nan, dtype=[
+        ('te', score_dtypes, (len(datasets_te),)),
+        ('tr', score_dtypes, (len(dataset_tr_combos),))
+    ])
+    for tr_idx, dataset_tr_combo in enumerate(dataset_tr_combos):
         dataset_tr = '_'.join(dataset_tr_combo)
-        for dataset_te in natsorted(list(set(datasets_te) - set(dataset_tr_combo))):
-            for prep_methods in prep_groups:
-                prep_method = '_'.join(prep_methods)
+        for te_idx, dataset_te in enumerate(natsorted(list(set(datasets_te) - set(dataset_tr_combo)))):
+            for pr_idx, prep_steps in enumerate(prep_groups):
+                prep_method = '_'.join(prep_steps)
                 dataset_tr_name = '_'.join([dataset_tr, prep_method, 'tr'])
                 if args.no_addon_te:
-                    dataset_te_name = '_'.join([dataset_te, prep_methods[0]])
+                    dataset_te_name = '_'.join([dataset_te, prep_steps[0]])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
@@ -965,7 +1094,6 @@ elif args.analysis == 3:
                     roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
                     bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
                     y_score = grid.decision_function(X_te)
-                    fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
                     roc_auc_te = roc_auc_score(y_te, y_score)
                     y_pred = grid.predict(X_te)
                     bcr_te = bcr_score(y_te, y_pred)
@@ -980,24 +1108,28 @@ elif args.analysis == 3:
                     #     zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
                     #     reverse=True,
                     # ): print(feature, '\t', symbol, '\t', rank)
-                    results.append({
-                        # 'grid': grid,
-                        'feature_idxs': feature_idxs,
-                        # 'feature_names': feature_names,
-                        # 'fprs': fpr,
-                        # 'tprs': tpr,
-                        # 'thres': thres,
-                        # 'weights': weights,
-                        # 'y_score': y_score,
-                        # 'y_test': y_te,
-                        'roc_auc_cv': roc_auc_cv,
-                        'roc_auc_te': roc_auc_te,
-                        'bcr_cv': bcr_cv,
-                        'bcr_te': bcr_te,
-                        'dataset_tr': dataset_tr,
-                        'dataset_te': dataset_te,
-                        'prep_method': prep_method,
-                    })
+                    # results.append({
+                    #     # 'grid': grid,
+                    #     'feature_idxs': feature_idxs,
+                    #     # 'feature_names': feature_names,
+                    #     # 'fprs': fpr,
+                    #     # 'tprs': tpr,
+                    #     # 'thres': thres,
+                    #     # 'weights': weights,
+                    #     # 'y_score': y_score,
+                    #     # 'y_test': y_te,
+                    #     'roc_auc_cv': roc_auc_cv,
+                    #     'roc_auc_te': roc_auc_te,
+                    #     'bcr_cv': bcr_cv,
+                    #     'bcr_te': bcr_te,
+                    # })
+                    te_var_results[te_idx, pr_idx]['tr'][tr_idx]['num_features'] = feature_idxs.size
+                    te_var_results[te_idx, pr_idx]['tr'][tr_idx]['roc_auc_cv'] = roc_auc_cv
+                    te_var_results[te_idx, pr_idx]['tr'][tr_idx]['roc_auc_te'] = roc_auc_te
+                    te_var_results[te_idx, pr_idx]['tr'][tr_idx]['bcr_cv'] = bcr_cv
+                    te_var_results[te_idx, pr_idx]['tr'][tr_idx]['bcr_te'] = bcr_te
+                    tr_var_results[tr_idx, pr_idx]['te'][te_idx] = \
+                        te_var_results[te_idx, pr_idx]['tr'][tr_idx]
                 else:
                     meth_scores_cv = {}
                     for group_idx, group in enumerate(meth_grid):
@@ -1014,23 +1146,40 @@ elif args.analysis == 3:
                                 )
                     for type, type_methods in meth_scores_cv.items():
                         for meth, meth_metrics in type_methods.items():
-                            result = { type + '_method': meth }
                             for metric, metric_scores in meth_metrics.items():
-                                result[metric + '_cv'] = np.mean(metric_scores)
-                            results.append(result)
+                                # te_var_results[te_idx, pr_idx]['tr'][tr_idx]['num_features'] = feature_idxs.size
+                                te_var_results[te_idx, pr_idx]['tr'][tr_idx][metric + '_cv'] = \
+                                    np.mean(metric_scores)
+                    for var_idx, params in param_grid:
+                        pipe_steps = [(k, v[0]) for k: v in params.items() if k in pipeline_order]
+                        pipe = Pipeline(sorted(pipe_steps, key=lambda t: pipeline_order.index(t[0])))
+                        pipe.set_params(**{ k: v for k, v in params.items() if '__' in k})
+                        y_score = pipe.fit(X_tr, y_tr).decision_function(X_te)
+                        roc_auc_te = roc_auc_score(y_te, y_score)
+                        y_pred = pipe.predict(X_te)
+                        bcr_te = bcr_score(y_te, y_pred)
+                        te_var_results[te_idx, var_idx]['tr'][tr_idx]['roc_auc_te'] = roc_auc_te
+                        te_var_results[te_idx, var_idx]['tr'][tr_idx]['bcr_te'] = bcr_te
+
+                    tr_var_results[tr_idx, var_idx]['te'][te_idx] = \
+                        te_var_results[te_idx, var_idx]['tr'][tr_idx]
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
 
+    pprint(te_var_results, indent=4)
+    pprint(tr_var_results, indent=4)
+    quit()
+
     # plot prep methods vs test datasets
-    struct_results, prep_methods = {}, []
-    for result in sorted(results, key=lambda r: (r['dataset_te'], r['prep_method'])):
-        if result['dataset_te'] not in struct_results:
-            struct_results[result['dataset_te']] = {}
-        if result['prep_method'] not in struct_results[result['dataset_te']]:
-            struct_results[result['dataset_te']][result['prep_method']] = []
-        if result['prep_method'] not in prep_methods:
-            prep_methods.append(result['prep_method'])
-        struct_results[result['dataset_te']][result['prep_method']].append(result)
+    # struct_results, prep_methods = {}, []
+    # for result in sorted(results, key=lambda r: (r['dataset_te'], r['prep_method'])):
+    #     if result['dataset_te'] not in struct_results:
+    #         struct_results[result['dataset_te']] = {}
+    #     if result['prep_method'] not in struct_results[result['dataset_te']]:
+    #         struct_results[result['dataset_te']][result['prep_method']] = []
+    #     if result['prep_method'] not in prep_methods:
+    #         prep_methods.append(result['prep_method'])
+    #     struct_results[result['dataset_te']][result['prep_method']].append(result)
     plt_fig_x_axis = range(1, len(prep_methods) + 1)
     for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
         metric_title = metric.replace('_', ' ').upper()
@@ -1043,13 +1192,14 @@ elif args.analysis == 3:
         plt.xlabel('Preprocessing Method')
         plt.ylabel(metric_title)
         plt.xticks(plt_fig_x_axis, prep_methods)
-        for dataset_te, te_pr_results in struct_results.items():
+        for te_idx, te_results in enumerate(te_pr_results):
             mean_scores_cv, range_scores_cv = [], [[], []]
             mean_scores_te, range_scores_te = [], [[], []]
             num_features = []
-            for prep_method, pr_results in te_pr_results.items():
+            for pr_idx, pr_results in enumerate(te_results):
                 scores_cv, scores_te = [], []
-                for result in pr_results:
+                for pr_result in pr_results:
+
                     scores_cv.append(result[metric + '_cv'])
                     scores_te.append(result[metric + '_te'])
                     num_features.append(len(result['feature_idxs']))
@@ -1193,4 +1343,4 @@ elif args.analysis == 3:
         plt.grid('on')
 
 plt.show()
-if not args.gscv_no_memory: rmtree(cachedir)
+if args.pipe_memory: rmtree(cachedir)
