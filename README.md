@@ -22,6 +22,7 @@ conda config --add channels bioconda
 conda install -v -y \
 r-essentials \
 r-devtools \
+r-argparse \
 r-lintr \
 r-pamr \
 r-minqa \
