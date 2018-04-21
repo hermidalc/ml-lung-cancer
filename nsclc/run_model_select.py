@@ -1021,7 +1021,7 @@ elif args.analysis == 3:
     elif args.datasets_tr:
         dataset_tr_combos = [x for x in natsorted(dataset_names) if x in args.datasets_tr]
     else:
-        dataset_tr_combos = [list(x) for x in combinations(dataset_names, args.num_tr_combo)]
+        dataset_tr_combos = [list(x) for x in combinations(natsorted(dataset_names), args.num_tr_combo)]
     if args.datasets_te:
         dataset_te_basenames = [x for x in natsorted(dataset_names) if x in args.datasets_te]
     else:
@@ -1432,23 +1432,20 @@ elif args.analysis == 3:
                 for col_idx, col_results in enumerate(row_results):
                     scores_cv, scores_te = [], []
                     for result in col_results[figure['col_results_key']]:
-                        result_num_features = []
                         if 'sub_results_key' in figure and figure['sub_results_key'] in result.dtype.fields:
                             sub_scores_cv, sub_scores_te = [], []
                             for sub_result in result[figure['sub_results_key']]:
-                                sub_scores_cv.append(sub_result[metric + '_cv'])
-                                sub_scores_te.append(sub_result[metric + '_te'])
-                                result_num_features.append(sub_result['num_features'])
-                            score_cv = np.mean(sub_scores_cv)
-                            score_te = np.mean(sub_scores_te)
-                        else:
-                            score_cv = result[metric + '_cv']
-                            score_te = result[metric + '_te']
-                            result_num_features.append(result['num_features'])
-                        if score_cv == 0: continue
-                        scores_cv.append(score_cv)
-                        scores_te.append(score_te)
-                        num_features = np.append(num_features, result_num_features)
+                                if sub_result[metric + '_te'] > 0:
+                                    sub_scores_cv.append(sub_result[metric + '_cv'])
+                                    sub_scores_te.append(sub_result[metric + '_te'])
+                                    num_features = np.append(num_features, sub_result['num_features'])
+                            if sub_scores_cv:
+                                scores_cv.append(np.mean(sub_scores_cv))
+                                scores_te.append(np.mean(sub_scores_te))
+                        elif result[metric + '_te'] > 0:
+                            scores_cv.append(result[metric + '_cv'])
+                            scores_te.append(result[metric + '_te'])
+                            num_features = np.append(num_features, result['num_features'])
                     if scores_cv:
                         mean_scores_cv[col_idx] = np.mean(scores_cv)
                         range_scores_cv[0][col_idx] = np.mean(scores_cv) - min(scores_cv)
