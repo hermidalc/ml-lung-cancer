@@ -21,10 +21,6 @@ from sklearn.model_selection import GridSearchCV, ParameterGrid, StratifiedShuff
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neural_network import MLPClassifier
-from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import RBF
 from sklearn.ensemble import AdaBoostClassifier, ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.pipeline import Pipeline
@@ -33,10 +29,12 @@ from sklearn.svm import LinearSVC
 from sklearn.metrics import roc_auc_score, roc_curve, make_scorer
 from sklearn.externals.joblib import dump, Memory
 from feature_selection import CFS, FCBF, ReliefF
+# import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import style
 
-# ignore QDA clf collinearity warnings
+# sns.set_palette(sns.color_palette("hls", 20))
+# ignore QDA collinearity warnings
 warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
 
 # config
@@ -429,7 +427,7 @@ pipelines = {
                 },
             ],
         },
-        'GDBoosting': {
+        'GradBoost': {
             'steps': [
                 ('clf', GradientBoostingClassifier()),
             ],
@@ -440,7 +438,7 @@ pipelines = {
                 },
             ],
         },
-        'GaussianNB': {
+        'GaussNB': {
             'steps': [
                 ('clf', GaussianNB()),
             ],
@@ -1388,16 +1386,27 @@ elif args.analysis == 3:
         figure_num = figure_idx + 4
         for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
             metric_title = metric.replace('_', ' ').upper()
-            plt.figure('Figure ' + str(figure_num) + '-' + str(metric_idx + 1))
+            figure_name = 'Figure ' + str(figure_num) + '-' + str(metric_idx + 1)
+            plt.figure(figure_name + 'A')
             plt.rcParams['font.size'] = 14
             plt.title(
-                'Effect of ' + figure['x_axis_title'] + ' on ' +
+                'Effect of ' + figure['x_axis_title'] + ' on Train CV ' +
                 metric_title + ' for each ' + figure['lines_title'] + '\n' +
                 figure['title_sub']
             )
             plt.xlabel(figure['x_axis_title'])
             plt.ylabel(metric_title)
-            plt.xticks(figure['x_axis'], figure['x_axis_labels'])
+            plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='x-small')
+            plt.figure(figure_name + 'B')
+            plt.rcParams['font.size'] = 14
+            plt.title(
+                'Effect of ' + figure['x_axis_title'] + ' on Test ' +
+                metric_title + ' for each ' + figure['lines_title'] + '\n' +
+                figure['title_sub']
+            )
+            plt.xlabel(figure['x_axis_title'])
+            plt.ylabel(metric_title)
+            plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='x-small')
             for row_idx, row_results in enumerate(figure['results']):
                 mean_scores_cv = np.full((figure['results'].shape[1],), np.nan, dtype=float)
                 range_scores_cv = np.full((2, figure['results'].shape[1]), np.nan, dtype=float)
@@ -1429,31 +1438,43 @@ elif args.analysis == 3:
                         range_scores_te[0][col_idx] = np.mean(scores_te) - min(scores_te)
                         range_scores_te[1][col_idx] = max(scores_te) - np.mean(scores_te)
                 if not np.all(np.isnan(mean_scores_cv)):
-                    label_values = (
-                        figure['row_names'][row_idx],
+                    label_values_cv = (
+                        figure['row_names'][row_idx], 'CV',
                         np.mean(mean_scores_cv[~np.isnan(mean_scores_cv)]),
                         np.std(mean_scores_cv[~np.isnan(mean_scores_cv)]),
+                    )
+                    label_values_te = (
+                        figure['row_names'][row_idx], 'Test',
                         np.mean(mean_scores_te[~np.isnan(mean_scores_te)]),
                         np.std(mean_scores_te[~np.isnan(mean_scores_te)]),
                     )
                     if np.mean(num_features) == 0:
-                        label = r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f)'
+                        label = r'%s (%s = %0.4f $\pm$ %0.2f)'
                     elif np.std(num_features) == 0:
-                        label = r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d)'
-                        label_values = (label_values, np.mean(num_features))
+                        label = r'%s (%s = %0.4f $\pm$ %0.2f, Features = %d)'
+                        label_values_cv = (label_values_cv, np.mean(num_features))
+                        label_values_te = (label_values_te, np.mean(num_features))
                     else:
-                        label = r'%s (CV = %0.4f $\pm$ %0.2f, Test = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)'
-                        label_values = (label_values, np.mean(num_features), np.std(num_features))
-                    color = next(plt.gca()._get_lines.prop_cycler)['color']
+                        label = r'%s (%s = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)'
+                        label_values_cv = (label_values_cv, np.mean(num_features), np.std(num_features))
+                        label_values_te = (label_values_te, np.mean(num_features), np.std(num_features))
+                    plt.figure(figure_name + 'A')
+                    # color = next(plt.gca()._get_lines.prop_cycler)['color']
                     plt.errorbar(
                         figure['x_axis'], mean_scores_cv, yerr=range_scores_cv, lw=2, alpha=0.8,
-                        linestyle='--', capsize=15, elinewidth=2, markeredgewidth=2, marker='s', color=color,
+                        capsize=10, elinewidth=2, markeredgewidth=2, marker='s',
+                        label=label % label_values_cv,
                     )
+                    plt.figure(figure_name + 'B')
                     plt.errorbar(
                         figure['x_axis'], mean_scores_te, yerr=range_scores_te, lw=2, alpha=0.8,
-                        capsize=15, elinewidth=2, markeredgewidth=2, marker='s', color=color,
-                        label=label % label_values,
+                        capsize=10, elinewidth=2, markeredgewidth=2, marker='s',
+                        label=label % label_values_te,
                     )
+            plt.figure(figure_name + 'A')
+            plt.legend(loc='best', fontsize='x-small')
+            plt.grid('on')
+            plt.figure(figure_name + 'B')
             plt.legend(loc='best', fontsize='x-small')
             plt.grid('on')
 if args.save_plt: dump(plt, '_',join(['results/plt', 'analysis', args.analysis, '.pkl']))
