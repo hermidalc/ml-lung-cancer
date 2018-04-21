@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import warnings
 from argparse import ArgumentParser
 from pprint import pprint
 from os import path
@@ -34,6 +35,9 @@ from sklearn.externals.joblib import dump, Memory
 from feature_selection import CFS, FCBF, ReliefF
 import matplotlib.pyplot as plt
 from matplotlib import style
+
+# ignore QDA clf collinearity warnings
+warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
 
 # config
 parser = ArgumentParser()
@@ -509,7 +513,7 @@ bc_methods = [
     'qnorm',
     'cbt',
     # 'fab',
-    # 'sva',
+    'sva',
     'stica0',
     'stica025',
     'stica05',
@@ -887,11 +891,11 @@ elif args.analysis == 2:
     pipe.set_params(
         **{ k: v for k, v in grid.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
     )
-    for dataset_te in natsorted(list(set(dataset_names) - set(args.datasets_tr))):
+    for dataset_te_basename in natsorted(list(set(dataset_names) - set(args.datasets_tr))):
         if args.no_addon_te:
-            dataset_te_name = '_'.join([dataset_te, prep_methods[0]])
+            dataset_te_name = '_'.join([dataset_te_basename, prep_methods[0]])
         else:
-            dataset_te_name = '_'.join([dataset_tr_name, dataset_te, 'te'])
+            dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
         eset_te_name = 'eset_' + dataset_te_name
         eset_te_file = 'data/' + eset_te_name + '.Rda'
         if not path.isfile(eset_te_file): continue
@@ -1015,56 +1019,81 @@ elif args.analysis == 3:
     if args.datasets_tr and args.num_tr_combo:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_tr_combo)]
     elif args.datasets_tr:
-        dataset_tr_combos = [natsorted(args.datasets_tr)]
+        dataset_tr_combos = [x for x in natsorted(dataset_names) if x in args.datasets_tr]
     else:
         dataset_tr_combos = [list(x) for x in combinations(dataset_names, args.num_tr_combo)]
     if args.datasets_te:
-        dataset_te_names = natsorted(args.datasets_te)
+        dataset_te_basenames = [x for x in natsorted(dataset_names) if x in args.datasets_te]
     else:
-        dataset_te_names = dataset_names
-    prep_methods = ['_'.join(g) for g in prep_groups]
-    dataset_tr_names = ['_'.join(c) for c in dataset_tr_combos]
+        dataset_te_basenames = dataset_names
+    # determine which data combinations will be used
+    dataset_tr_combos_subset, dataset_te_basenames_subset, prep_groups_subset = [], [], []
+    for dataset_tr_combo in dataset_tr_combos:
+        dataset_tr_basename = '_'.join(dataset_tr_combo)
+        for dataset_te_basename in dataset_te_basenames:
+            for prep_steps in prep_groups:
+                prep_method = '_'.join(prep_steps)
+                dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
+                if args.no_addon_te:
+                    dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0]])
+                else:
+                    dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
+                eset_tr_name = 'eset_' + dataset_tr_name
+                eset_te_name = 'eset_' + dataset_te_name
+                eset_tr_file = 'data/' + eset_tr_name + '.Rda'
+                eset_te_file = 'data/' + eset_te_name + '.Rda'
+                if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
+                dataset_tr_combos_subset.append(dataset_tr_combo)
+                dataset_te_basenames_subset.append(dataset_te_basename)
+                prep_groups_subset.append(prep_steps)
+    dataset_tr_combos = [x for x in dataset_tr_combos if x in dataset_tr_combos_subset]
+    dataset_te_basenames = [x for x in dataset_te_basenames if x in dataset_te_basenames_subset]
+    prep_groups = [x for x in prep_groups if x in prep_groups_subset]
     score_dtypes = [
         ('roc_auc_cv', float), ('bcr_cv', float),
         ('roc_auc_te', float), ('bcr_te', float),
         ('num_features', int),
     ]
-    te_pr_results = np.zeros((len(dataset_te_names), len(prep_groups)), dtype=[
+    te_pr_results = np.zeros((len(dataset_te_basenames), len(prep_groups)), dtype=[
         ('tr', score_dtypes, (len(dataset_tr_combos),))
     ])
     tr_pr_results = np.zeros((len(dataset_tr_combos), len(prep_groups)), dtype=[
-        ('te', score_dtypes, (len(dataset_te_names),))
+        ('te', score_dtypes, (len(dataset_te_basenames),))
     ])
-    te_fs_results = np.zeros((len(dataset_te_names), len(pipelines['fs'])), dtype=[
-        ('tr', score_dtypes, (len(dataset_tr_combos),))
+    te_fs_results = np.zeros((len(dataset_te_basenames), len(pipelines['fs'])), dtype=[
+        ('tr', [ ('pr', score_dtypes, (len(prep_groups),)) ], (len(dataset_tr_combos),)),
+        ('pr', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(prep_groups),))
     ])
     tr_fs_results = np.zeros((len(dataset_tr_combos), len(pipelines['fs'])), dtype=[
-        ('te', score_dtypes, (len(dataset_te_names),))
+        ('te', [ ('pr', score_dtypes, (len(prep_groups),)) ], (len(dataset_te_basenames),)),
+        ('pr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(prep_groups),))
     ])
-    te_clf_results = np.zeros((len(dataset_te_names), len(pipelines['clf'])), dtype=[
-        ('tr', score_dtypes, (len(dataset_tr_combos),))
+    te_clf_results = np.zeros((len(dataset_te_basenames), len(pipelines['clf'])), dtype=[
+        ('tr', [ ('pr', score_dtypes, (len(prep_groups),)) ], (len(dataset_tr_combos),)),
+        ('pr', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(prep_groups),))
     ])
     tr_clf_results = np.zeros((len(dataset_tr_combos), len(pipelines['clf'])), dtype=[
-        ('te', score_dtypes, (len(dataset_te_names),))
+        ('te', [ ('pr', score_dtypes, (len(prep_groups),)) ], (len(dataset_te_basenames),)),
+        ('pr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(prep_groups),))
     ])
     pr_fs_results = np.zeros((len(prep_groups), len(pipelines['fs'])), dtype=[
-        ('te', score_dtypes, (len(dataset_te_names),)),
-        ('tr', score_dtypes, (len(dataset_tr_combos),))
+        ('te', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(dataset_te_basenames),)),
+        ('tr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(dataset_tr_combos),))
     ])
     pr_clf_results = np.zeros((len(prep_groups), len(pipelines['clf'])), dtype=[
-        ('te', score_dtypes, (len(dataset_te_names),)),
-        ('tr', score_dtypes, (len(dataset_tr_combos),))
+        ('te', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(dataset_te_basenames),)),
+        ('tr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(dataset_tr_combos),))
     ])
     for tr_idx, dataset_tr_combo in enumerate(dataset_tr_combos):
-        dataset_tr = '_'.join(dataset_tr_combo)
-        for te_idx, dataset_te in enumerate(natsorted(list(set(dataset_te_names) - set(dataset_tr_combo)))):
+        dataset_tr_basename = '_'.join(dataset_tr_combo)
+        for te_idx, dataset_te_basename in enumerate(dataset_te_basenames):
             for pr_idx, prep_steps in enumerate(prep_groups):
                 prep_method = '_'.join(prep_steps)
-                dataset_tr_name = '_'.join([dataset_tr, prep_method, 'tr'])
+                dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
                 if args.no_addon_te:
-                    dataset_te_name = '_'.join([dataset_te, prep_steps[0]])
+                    dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0]])
                 else:
-                    dataset_te_name = '_'.join([dataset_tr_name, dataset_te, 'te'])
+                    dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
                 eset_te_name = 'eset_' + dataset_te_name
                 eset_tr_file = 'data/' + eset_tr_name + '.Rda'
@@ -1149,9 +1178,6 @@ elif args.analysis == 3:
                         ], key=lambda s: pipeline_order.index(s[0]))
                         pipe = Pipeline(pipe_steps)
                         pipe.set_params(**{ k: v for k, v in params.items() if '__' in k })
-
-                        pprint(pipe)
-
                         pipe.fit(X_tr, y_tr)
                         if hasattr(pipe, 'decision_function'):
                             y_score = pipe.decision_function(X_te)
@@ -1174,34 +1200,24 @@ elif args.analysis == 3:
                                     field_key = metric + '_' + category
                                     mean_score = np.mean(metric_scores)
                                     if meth_type == 'fs':
-                                        te_fs_results[te_idx, meth_idx]['tr'][tr_idx][field_key] = mean_score
-                                        tr_fs_results[tr_idx, meth_idx]['te'][te_idx][field_key] = mean_score
-                                        pr_fs_results[pr_idx, meth_idx]['tr'][tr_idx][field_key] = mean_score
-                                        pr_fs_results[pr_idx, meth_idx]['te'][te_idx][field_key] = mean_score
+                                        te_fs_results[te_idx, meth_idx]['tr'][tr_idx]['pr'][pr_idx][field_key] = mean_score
+                                        te_fs_results[te_idx, meth_idx]['pr'][pr_idx]['tr'][tr_idx][field_key] = mean_score
+                                        tr_fs_results[tr_idx, meth_idx]['te'][te_idx]['pr'][pr_idx][field_key] = mean_score
+                                        tr_fs_results[tr_idx, meth_idx]['pr'][pr_idx]['te'][te_idx][field_key] = mean_score
+                                        pr_fs_results[pr_idx, meth_idx]['tr'][tr_idx]['te'][te_idx][field_key] = mean_score
+                                        pr_fs_results[pr_idx, meth_idx]['te'][te_idx]['tr'][tr_idx][field_key] = mean_score
                                     elif meth_type == 'clf':
-                                        te_clf_results[te_idx, meth_idx]['tr'][tr_idx][field_key] = mean_score
-                                        tr_clf_results[tr_idx, meth_idx]['te'][te_idx][field_key] = mean_score
-                                        pr_clf_results[pr_idx, meth_idx]['tr'][tr_idx][field_key] = mean_score
-                                        pr_clf_results[pr_idx, meth_idx]['te'][te_idx][field_key] = mean_score
+                                        te_clf_results[te_idx, meth_idx]['tr'][tr_idx]['pr'][pr_idx][field_key] = mean_score
+                                        te_clf_results[te_idx, meth_idx]['pr'][pr_idx]['tr'][tr_idx][field_key] = mean_score
+                                        tr_clf_results[tr_idx, meth_idx]['te'][te_idx]['pr'][pr_idx][field_key] = mean_score
+                                        tr_clf_results[tr_idx, meth_idx]['pr'][pr_idx]['te'][te_idx][field_key] = mean_score
+                                        pr_clf_results[pr_idx, meth_idx]['tr'][tr_idx]['te'][te_idx][field_key] = mean_score
+                                        pr_clf_results[pr_idx, meth_idx]['te'][te_idx]['tr'][tr_idx][field_key] = mean_score
                                     elif meth_type == 'pr':
                                         te_pr_results[te_idx, pr_idx]['tr'][tr_idx][field_key] = mean_score
                                         tr_pr_results[tr_idx, pr_idx]['te'][te_idx][field_key] = mean_score
-
-                    pprint(param_grid_data)
-                    pprint(meth_scores)
-
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
-
-    pprint(te_pr_results.shape)
-    pprint(te_pr_results)
-    pprint(tr_pr_results.shape)
-    pprint(tr_pr_results)
-    pprint(pr_fs_results.shape)
-    pprint(pr_fs_results)
-    pprint(pr_clf_results.shape)
-    pprint(pr_clf_results)
-
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
         title_sub = 'Classifier: ' + args.clf_meth
@@ -1209,8 +1225,10 @@ elif args.analysis == 3:
         if title_sub: title_sub += ' '
         title_sub = 'Feature Selection: ' + args.fs_meth
     if title_sub: title_sub = '[' + title_sub + ']'
+    prep_methods = ['_'.join(g) for g in prep_groups]
+    dataset_tr_basenames = ['_'.join(c) for c in dataset_tr_combos]
     figures = [
-        # plot prep methods vs test datasets
+        # plot te_pr_results
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
@@ -1218,13 +1236,12 @@ elif args.analysis == 3:
             'lines_title': 'Test Dataset',
             'title_sub': title_sub,
             'results': te_pr_results,
-            'row_names': dataset_te_names,
+            'row_names': dataset_te_basenames,
             'col_results_key': 'tr',
         },
-        # plot test datasets vs prep methods
         {
-            'x_axis': range(1, len(dataset_te_names) + 1),
-            'x_axis_labels': dataset_te_names,
+            'x_axis': range(1, len(dataset_te_basenames) + 1),
+            'x_axis_labels': dataset_te_basenames,
             'x_axis_title': 'Test Dataset',
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
@@ -1232,7 +1249,7 @@ elif args.analysis == 3:
             'row_names': prep_methods,
             'col_results_key': 'tr',
         },
-        # plot prep methods vs train datasets
+        # plot tr_pr_results
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
@@ -1240,13 +1257,12 @@ elif args.analysis == 3:
             'lines_title': 'Train Dataset',
             'title_sub': title_sub,
             'results': tr_pr_results,
-            'row_names': dataset_tr_names,
+            'row_names': dataset_tr_basenames,
             'col_results_key': 'te',
         },
-        # plot train datasets vs prep methods
         {
-            'x_axis': range(1, len(dataset_tr_names) + 1),
-            'x_axis_labels': dataset_tr_names,
+            'x_axis': range(1, len(dataset_tr_basenames) + 1),
+            'x_axis_labels': dataset_tr_basenames,
             'x_axis_title': 'Train Dataset',
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
@@ -1254,29 +1270,99 @@ elif args.analysis == 3:
             'row_names': prep_methods,
             'col_results_key': 'te',
         },
-        # plot classifiers vs prep methods
+        # plot te_fs_results
+        {
+            'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
+            'x_axis_labels': list(pipelines['fs'].keys()),
+            'x_axis_title': 'Feature Selection Method',
+            'lines_title': 'Test Dataset',
+            'title_sub': title_sub,
+            'results': te_fs_results,
+            'row_names': dataset_te_basenames,
+            'col_results_key': 'tr',
+            'sub_results_key': 'pr',
+        },
+        {
+            'x_axis': range(1, len(dataset_te_basenames) + 1),
+            'x_axis_labels': dataset_te_basenames,
+            'x_axis_title': 'Test Dataset',
+            'lines_title': 'Feature Selection Method',
+            'title_sub': title_sub,
+            'results': te_fs_results.T,
+            'row_names': list(pipelines['fs'].keys()),
+            'col_results_key': 'tr',
+            'sub_results_key': 'pr',
+        },
+        # plot tr_fs_results
+        {
+            'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
+            'x_axis_labels': list(pipelines['fs'].keys()),
+            'x_axis_title': 'Feature Selection Method',
+            'lines_title': 'Train Dataset',
+            'title_sub': title_sub,
+            'results': tr_fs_results,
+            'row_names': dataset_tr_basenames,
+            'col_results_key': 'te',
+            'sub_results_key': 'pr',
+        },
+        {
+            'x_axis': range(1, len(dataset_tr_basenames) + 1),
+            'x_axis_labels': dataset_tr_basenames,
+            'x_axis_title': 'Train Dataset',
+            'lines_title': 'Feature Selection Method',
+            'title_sub': title_sub,
+            'results': tr_fs_results.T,
+            'row_names': list(pipelines['fs'].keys()),
+            'col_results_key': 'te',
+            'sub_results_key': 'pr',
+        },
+        # plot te_clf_results
         {
             'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
             'x_axis_labels': list(pipelines['clf'].keys()),
             'x_axis_title': 'Classifier Algorithm',
-            'lines_title': 'Preprocessing Method',
+            'lines_title': 'Test Dataset',
             'title_sub': title_sub,
-            'results': pr_clf_results,
-            'row_names': prep_methods,
-            'col_results_key': 'te',
+            'results': te_clf_results,
+            'row_names': dataset_te_basenames,
+            'col_results_key': 'tr',
+            'sub_results_key': 'pr',
         },
-        # plot prep methods vs classifiers
         {
-            'x_axis': range(1, len(prep_methods) + 1),
-            'x_axis_labels': prep_methods,
-            'x_axis_title': 'Preprocessing Method',
+            'x_axis': range(1, len(dataset_te_basenames) + 1),
+            'x_axis_labels': dataset_te_basenames,
+            'x_axis_title': 'Test Dataset',
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
-            'results': pr_clf_results.T,
+            'results': te_clf_results.T,
+            'row_names': list(pipelines['clf'].keys()),
+            'col_results_key': 'tr',
+            'sub_results_key': 'pr',
+        },
+        # plot tr_clf_results
+        {
+            'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
+            'x_axis_labels': list(pipelines['clf'].keys()),
+            'x_axis_title': 'Classifier Algorithm',
+            'lines_title': 'Train Dataset',
+            'title_sub': title_sub,
+            'results': tr_clf_results,
+            'row_names': dataset_tr_basenames,
+            'col_results_key': 'te',
+            'sub_results_key': 'pr',
+        },
+        {
+            'x_axis': range(1, len(dataset_tr_basenames) + 1),
+            'x_axis_labels': dataset_tr_basenames,
+            'x_axis_title': 'Train Dataset',
+            'lines_title': 'Classifier Algorithm',
+            'title_sub': title_sub,
+            'results': tr_clf_results.T,
             'row_names': list(pipelines['clf'].keys()),
             'col_results_key': 'te',
+            'sub_results_key': 'pr',
         },
-        # plot feature selectors vs prep methods
+        # plot pr_fs_results
         {
             'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
             'x_axis_labels': list(pipelines['fs'].keys()),
@@ -1286,8 +1372,8 @@ elif args.analysis == 3:
             'results': pr_fs_results,
             'row_names': prep_methods,
             'col_results_key': 'te',
+            'sub_results_key': 'tr',
         },
-        # plot prep methods vs feature selectors
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
@@ -1297,6 +1383,30 @@ elif args.analysis == 3:
             'results': pr_fs_results.T,
             'row_names': list(pipelines['fs'].keys()),
             'col_results_key': 'te',
+            'sub_results_key': 'tr',
+        },
+        # plot pr_clf_results
+        {
+            'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
+            'x_axis_labels': list(pipelines['clf'].keys()),
+            'x_axis_title': 'Classifier Algorithm',
+            'lines_title': 'Preprocessing Method',
+            'title_sub': title_sub,
+            'results': pr_clf_results,
+            'row_names': prep_methods,
+            'col_results_key': 'te',
+            'sub_results_key': 'tr',
+        },
+        {
+            'x_axis': range(1, len(prep_methods) + 1),
+            'x_axis_labels': prep_methods,
+            'x_axis_title': 'Preprocessing Method',
+            'lines_title': 'Classifier Algorithm',
+            'title_sub': title_sub,
+            'results': pr_clf_results.T,
+            'row_names': list(pipelines['clf'].keys()),
+            'col_results_key': 'te',
+            'sub_results_key': 'tr',
         },
     ]
     for figure_idx, figure in enumerate(figures):
@@ -1322,10 +1432,23 @@ elif args.analysis == 3:
                 for col_idx, col_results in enumerate(row_results):
                     scores_cv, scores_te = [], []
                     for result in col_results[figure['col_results_key']]:
-                        if result[metric + '_cv'] == 0: continue
-                        scores_cv.append(result[metric + '_cv'])
-                        scores_te.append(result[metric + '_te'])
-                        num_features = np.append(num_features, result['num_features'])
+                        result_num_features = []
+                        if 'sub_results_key' in figure and figure['sub_results_key'] in result.dtype.fields:
+                            sub_scores_cv, sub_scores_te = [], []
+                            for sub_result in result[figure['sub_results_key']]:
+                                sub_scores_cv.append(sub_result[metric + '_cv'])
+                                sub_scores_te.append(sub_result[metric + '_te'])
+                                result_num_features.append(sub_result['num_features'])
+                            score_cv = np.mean(sub_scores_cv)
+                            score_te = np.mean(sub_scores_te)
+                        else:
+                            score_cv = result[metric + '_cv']
+                            score_te = result[metric + '_te']
+                            result_num_features.append(result['num_features'])
+                        if score_cv == 0: continue
+                        scores_cv.append(score_cv)
+                        scores_te.append(score_te)
+                        num_features = np.append(num_features, result_num_features)
                     if scores_cv:
                         mean_scores_cv[col_idx] = np.mean(scores_cv)
                         range_scores_cv[0][col_idx] = np.mean(scores_cv) - min(scores_cv)
