@@ -89,6 +89,7 @@ parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel job
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc, bcr)')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
+parser.add_argument('--save-plt', default=False, action='store_true', help='save pyplot object')
 args = parser.parse_args()
 
 base = importr('base')
@@ -397,14 +398,6 @@ pipelines = {
                 },
             ],
         },
-        'DT': {
-            'steps': [
-                ('clf', DecisionTreeClassifier(class_weight='balanced')),
-            ],
-            'param_grid': [
-                { },
-            ],
-        },
         'ExtraTrees': {
             'steps': [
                 ('clf', ExtraTreesClassifier(class_weight='balanced')),
@@ -436,7 +429,7 @@ pipelines = {
                 },
             ],
         },
-        'GradientBoosting': {
+        'GDBoosting': {
             'steps': [
                 ('clf', GradientBoostingClassifier()),
             ],
@@ -453,25 +446,6 @@ pipelines = {
             ],
             'param_grid': [
                 { },
-            ],
-        },
-        'GaussianProcess': {
-            'steps': [
-                ('clf', GaussianProcessClassifier(1.0 * RBF(1.0))),
-            ],
-            'param_grid': [
-                { },
-            ],
-        },
-        'MLPClassifier': {
-            'steps': [
-                ('clf', MLPClassifier()),
-            ],
-            'param_grid': [
-                {
-                    'clf__alpha': CLF_SVC_C,
-                    'clf__learning_rate': ['constant', 'invscaling', 'adaptive'],
-                },
             ],
         },
         'QDA': {
@@ -1409,6 +1383,7 @@ elif args.analysis == 3:
             'sub_results_key': 'tr',
         },
     ]
+    plt.rcParams['figure.max_open_warning'] = 0
     for figure_idx, figure in enumerate(figures):
         figure_num = figure_idx + 4
         for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
@@ -1481,6 +1456,6 @@ elif args.analysis == 3:
                     )
             plt.legend(loc='best', fontsize='x-small')
             plt.grid('on')
-
+if args.save_plt: dump(plt, '_',join(['results/plt', 'analysis', args.analysis, '.pkl']))
 plt.show()
 if args.pipe_memory: rmtree(cachedir)
