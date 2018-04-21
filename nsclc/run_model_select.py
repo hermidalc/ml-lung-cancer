@@ -655,7 +655,7 @@ if args.analysis == 1:
         std_roc_aucs_cv = np.std(param_cv_scores[param]['roc_auc'], axis=0)
         std_bcrs_cv = np.std(param_cv_scores[param]['bcr'], axis=0)
         plt.figure('Figure 1-' + str(param_idx + 1))
-        plt.rcParams['font.size'] = 16
+        plt.rcParams['font.size'] = 14
         if param in (
             'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs3__n_features_to_select',
         ):
@@ -826,7 +826,7 @@ elif args.analysis == 2:
                     np.ma.getdata(grid.cv_results_['param_' + param])
                 )
             plt.figure('Figure 2-' + str(param_idx + 1))
-            plt.rcParams['font.size'] = 16
+            plt.rcParams['font.size'] = 14
             if param in (
                 'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs3__n_features_to_select',
             ):
@@ -873,7 +873,7 @@ elif args.analysis == 2:
             plt.grid('on')
     # plot num top-ranked features selected vs test dataset perf metrics
     plt.figure('Figure 3')
-    plt.rcParams['font.size'] = 16
+    plt.rcParams['font.size'] = 14
     plt.title(
         dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
         'Effect of Number of Top-Ranked Features Selected Performance Metrics'
@@ -1410,7 +1410,7 @@ elif args.analysis == 3:
         },
     ]
     for figure_idx, figure in enumerate(figures):
-        figure_num = figure_idx + 3
+        figure_num = figure_idx + 4
         for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
             metric_title = metric.replace('_', ' ').upper()
             plt.figure('Figure ' + str(figure_num) + '-' + str(metric_idx + 1))
