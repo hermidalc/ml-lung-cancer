@@ -151,14 +151,14 @@ if args.pipe_memory:
     rfe_svm_estimator = CachedLinearSVC(class_weight='balanced')
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
     sfm_ext_estimator = CachedExtraTreesClassifier(class_weight='balanced')
-    ada_lgr_estimator = CachedLogisticRegression(class_weight='balanced')
+    # ada_lgr_estimator = CachedLogisticRegression(class_weight='balanced')
 else:
     limma_score_func = limma
     mi_score_func = mutual_info_classif
     rfe_svm_estimator = LinearSVC(class_weight='balanced')
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, class_weight='balanced')
     sfm_ext_estimator = ExtraTreesClassifier(class_weight='balanced')
-    ada_lgr_estimator = LogisticRegression(class_weight='balanced')
+    # ada_lgr_estimator = LogisticRegression(class_weight='balanced')
 
 gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
@@ -422,7 +422,7 @@ pipelines = {
         },
         'AdaBoost': {
             'steps': [
-                ('clf', AdaBoostClassifier(ada_lgr_estimator)),
+                ('clf', AdaBoostClassifier(LogisticRegression(class_weight='balanced'))),
             ],
             'param_grid': [
                 {
@@ -431,7 +431,7 @@ pipelines = {
                 },
             ],
         },
-        'GradBoost': {
+        'GradientBoost': {
             'steps': [
                 ('clf', GradientBoostingClassifier()),
             ],
