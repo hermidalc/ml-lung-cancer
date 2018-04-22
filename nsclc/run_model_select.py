@@ -62,7 +62,7 @@ parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c'
 parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-pf-fcbf-k', type=int, nargs='+', help='fs pf fcbf k select')
-parser.add_argument('--fs-pf-fcbf-k-max', type=int, default=15000, help='fs pf fcbf k max')
+parser.add_argument('--fs-pf-fcbf-k-max', type=int, default=5000, help='fs pf fcbf k max')
 parser.add_argument('--fs-pf-rlf-k', type=int, nargs='+', help='fs pf rlf k select')
 parser.add_argument('--fs-pf-rlf-k-max', type=int, default=1000, help='fs pf rlf k max')
 parser.add_argument('--fs-rlf-n', type=int, nargs='+', help='fs rlf n neighbors')
@@ -584,14 +584,14 @@ if args.analysis == 1:
                 reverse=True,
             )
             # print('Fearures:')
-            # for _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', weight)
+            # for _, feature, symbol in feature_ranks: print(feature, '\t', symbol)
         for param_idx, param in enumerate(param_grid[0]):
             if '__' in param and len(param_grid[0][param]) > 1:
                 new_shape = (
                     len(param_grid[0][param]),
                     np.prod([len(v) for k,v in param_grid[0].items() if k != param])
                 )
-                if param in ('fs2__threshold'):
+                if param in ('fs2__threshold', 'clf__weights'):
                     xaxis_group_sorted_idxs = np.argsort(
                         np.ma.getdata(grid.cv_results_['param_' + param]).astype(str)
                     )
@@ -645,14 +645,14 @@ if args.analysis == 1:
         plt.rcParams['font.size'] = 14
         if param in (
             'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs3__n_features_to_select',
-            'clf__n_neighbors', 'clf__weights', 'clf__n_estimators', 'clf__max_depth',
+            'clf__n_neighbors', 'clf__n_estimators', 'clf__max_depth',
         ):
             x_axis = param_grid[0][param]
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
         elif param in (
             'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'fs3__estimator__C', 'clf__C',
-            'clf__base_estimator__C',
+            'clf__weights', 'clf__base_estimator__C',
         ):
             x_axis = range(len(param_grid[0][param]))
             plt.xticks(x_axis, param_grid[0][param])
@@ -808,7 +808,7 @@ elif args.analysis == 2:
             reverse=True,
         )
         print('Features:')
-        for _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', weight)
+        for _, feature, symbol in feature_ranks: print(feature, '\t', symbol)
     # pprint(grid.cv_results_)
     # pprint(param_grid)
     # plot grid search parameters vs cv perf metrics
@@ -818,7 +818,7 @@ elif args.analysis == 2:
                 len(param_grid[0][param]),
                 np.prod([len(v) for k,v in param_grid[0].items() if k != param])
             )
-            if param in ('fs2__threshold'):
+            if param in ('fs2__threshold', 'clf__weights'):
                 xaxis_group_sorted_idxs = np.argsort(
                     np.ma.getdata(grid.cv_results_['param_' + param]).astype(str)
                 )
@@ -830,14 +830,14 @@ elif args.analysis == 2:
             plt.rcParams['font.size'] = 14
             if param in (
                 'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs3__n_features_to_select',
-                'clf__n_neighbors', 'clf__weights', 'clf__n_estimators', 'clf__max_depth',
+                'clf__n_neighbors', 'clf__n_estimators', 'clf__max_depth',
             ):
                 x_axis = param_grid[0][param]
                 plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
                 plt.xticks(x_axis)
             elif param in (
                 'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'fs3__estimator__C', 'clf__C',
-                'clf__base_estimator__C',
+                'clf__weights', 'clf__base_estimator__C',
             ):
                 x_axis = range(len(param_grid[0][param]))
                 plt.xticks(x_axis, param_grid[0][param])
@@ -890,7 +890,10 @@ elif args.analysis == 2:
     x_axis = range(1, feature_idxs.size + 1)
     plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
     plt.xticks(x_axis)
-    ranked_feature_idxs = [x for _, x, _, _ in feature_ranks]
+    if weights.size > 0:
+        ranked_feature_idxs = [x for _, x, _, _ in feature_ranks]
+    else:
+        ranked_feature_idxs = [x for x, _, _ in feature_ranks]
     pipe = Pipeline(
         pipelines['slr'][args.slr_meth]['steps'] +
         pipelines['clf'][args.clf_meth]['steps']
