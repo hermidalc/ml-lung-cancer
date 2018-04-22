@@ -810,7 +810,6 @@ elif args.analysis == 2:
         print('Features:')
         for _, feature, symbol in feature_ranks: print(feature, '\t', symbol)
     # pprint(grid.cv_results_)
-    # pprint(param_grid)
     # plot grid search parameters vs cv perf metrics
     for param_idx, param in enumerate(param_grid[0]):
         if '__' in param and len(param_grid[0][param]) > 1:
@@ -1020,6 +1019,7 @@ elif args.analysis == 3:
                                     params_data['grid_idxs'].append(param_grid_idx)
                                     param_grid_idx += 1
                                 param_grid_data.append(params_data)
+        # pprint(param_grid)
         grid = GridSearchCV(
             Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
             param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
