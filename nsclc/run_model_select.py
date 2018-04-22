@@ -29,11 +29,11 @@ from sklearn.svm import LinearSVC
 from sklearn.metrics import roc_auc_score, roc_curve, make_scorer
 from sklearn.externals.joblib import dump, Memory
 from feature_selection import CFS, FCBF, ReliefF
-# import seaborn as sns
+import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import style
 
-# sns.set_palette(sns.color_palette("hls", 20))
+sns.set_palette(sns.color_palette('hls', 20))
 # ignore QDA collinearity warnings
 warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
 
@@ -87,7 +87,7 @@ parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel job
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc, bcr)')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
-parser.add_argument('--save-plt', default=False, action='store_true', help='save pyplot object')
+parser.add_argument('--save-plots', default=False, action='store_true', help='save figure plots')
 args = parser.parse_args()
 
 base = importr('base')
@@ -999,6 +999,7 @@ elif args.analysis == 3:
     else:
         dataset_te_basenames = dataset_names
     # determine which data combinations will be used
+    num_dataset_pairs = 0
     dataset_tr_combos_subset, dataset_te_basenames_subset, prep_groups_subset = [], [], []
     for dataset_tr_combo in dataset_tr_combos:
         dataset_tr_basename = '_'.join(dataset_tr_combo)
@@ -1018,9 +1019,11 @@ elif args.analysis == 3:
                 dataset_tr_combos_subset.append(dataset_tr_combo)
                 dataset_te_basenames_subset.append(dataset_te_basename)
                 prep_groups_subset.append(prep_steps)
+                num_dataset_pairs += 1
     dataset_tr_combos = [x for x in dataset_tr_combos if x in dataset_tr_combos_subset]
     dataset_te_basenames = [x for x in dataset_te_basenames if x in dataset_te_basenames_subset]
     prep_groups = [x for x in prep_groups if x in prep_groups_subset]
+    print("Num dataset pairs:", num_dataset_pairs)
     score_dtypes = [
         ('roc_auc_cv', float), ('bcr_cv', float),
         ('roc_auc_te', float), ('bcr_te', float),
@@ -1056,6 +1059,7 @@ elif args.analysis == 3:
         ('te', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(dataset_te_basenames),)),
         ('tr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(dataset_tr_combos),))
     ])
+    dataset_pair_counter = 1
     for tr_idx, dataset_tr_combo in enumerate(dataset_tr_combos):
         dataset_tr_basename = '_'.join(dataset_tr_combo)
         for te_idx, dataset_te_basename in enumerate(dataset_te_basenames):
@@ -1071,7 +1075,7 @@ elif args.analysis == 3:
                 eset_tr_file = 'data/' + eset_tr_name + '.Rda'
                 eset_te_file = 'data/' + eset_te_name + '.Rda'
                 if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
-                print(dataset_tr_name, '->', dataset_te_name)
+                print(str(dataset_pair_counter), ': ', dataset_tr_name, ' -> ', dataset_te_name, sep='')
                 base.load('data/' + eset_tr_name + '.Rda')
                 eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
                 X_tr = np.array(base.t(biobase.exprs(eset_tr)))
@@ -1190,6 +1194,7 @@ elif args.analysis == 3:
                                         tr_pr_results[tr_idx, pr_idx]['te'][te_idx][field_key] = mean_score
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
+                dataset_pair_counter += 1
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
         title_sub = 'Classifier: ' + args.clf_meth
@@ -1204,6 +1209,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
+            'x_ticks_rotation': 10,
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Test Dataset',
             'title_sub': title_sub,
@@ -1225,6 +1231,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
+            'x_ticks_rotation': 10,
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Train Dataset',
             'title_sub': title_sub,
@@ -1349,6 +1356,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
+            'x_ticks_rotation': 10,
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
@@ -1372,6 +1380,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
+            'x_ticks_rotation': 10,
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
@@ -1396,7 +1405,10 @@ elif args.analysis == 3:
             )
             plt.xlabel(figure['x_axis_title'])
             plt.ylabel(metric_title)
-            plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='x-small')
+            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 8:
+                plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='x-small', rotation=figure['x_ticks_rotation'])
+            else:
+                plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
             plt.figure(figure_name + 'B')
             plt.rcParams['font.size'] = 14
             plt.title(
@@ -1406,7 +1418,10 @@ elif args.analysis == 3:
             )
             plt.xlabel(figure['x_axis_title'])
             plt.ylabel(metric_title)
-            plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='x-small')
+            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 8:
+                plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='x-small', rotation=figure['x_ticks_rotation'])
+            else:
+                plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
             for row_idx, row_results in enumerate(figure['results']):
                 mean_scores_cv = np.full((figure['results'].shape[1],), np.nan, dtype=float)
                 range_scores_cv = np.full((2, figure['results'].shape[1]), np.nan, dtype=float)
@@ -1477,6 +1492,5 @@ elif args.analysis == 3:
             plt.figure(figure_name + 'B')
             plt.legend(loc='best', fontsize='x-small')
             plt.grid('on')
-if args.save_plt: dump(plt, '_',join(['results/plt', 'analysis', args.analysis, '.pkl']))
 plt.show()
 if args.pipe_memory: rmtree(cachedir)
