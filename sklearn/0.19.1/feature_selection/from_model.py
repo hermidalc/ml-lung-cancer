@@ -151,19 +151,19 @@ class SelectFromModel(BaseEstimator, SelectorMixin, MetaEstimatorMixin):
             raise ValueError(
                 'Either fit SelectFromModel before transform or set "prefit='
                 'True" and pass a fitted estimator to the constructor.')
-        scores = _get_feature_importances(estimator, self.norm_order)
+        self.scores_ = _get_feature_importances(estimator, self.norm_order)
         if self.k is None:
-            threshold = _calculate_threshold(estimator, scores, self.threshold)
-            return scores >= threshold
+            threshold = _calculate_threshold(estimator, self.scores_, self.threshold)
+            return self.scores_ >= threshold
         elif self.k == 'all':
-            return np.ones(scores.shape, dtype=bool)
+            return np.ones(self.scores_.shape, dtype=bool)
         elif self.k == 0:
-            return np.zeros(scores.shape, dtype=bool)
+            return np.zeros(self.scores_.shape, dtype=bool)
         else:
-            mask = np.zeros(scores.shape, dtype=bool)
+            mask = np.zeros(self.scores_.shape, dtype=bool)
             # Request a stable sort. Mergesort takes more memory (~40MB per
             # megafeature on x86-64).
-            mask[np.argsort(scores, kind="mergesort")[-self.k:]] = True
+            mask[np.argsort(self.scores_, kind="mergesort")[-self.k:]] = True
             return mask
 
     def fit(self, X, y=None, **fit_params):
