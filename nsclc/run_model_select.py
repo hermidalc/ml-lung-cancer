@@ -54,7 +54,7 @@ parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection me
 parser.add_argument('--slr-meth', type=str, nargs='+', default=['StandardScaler'], help='scaling method')
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
-parser.add_argument('--fs-skb-k-max', type=int, default=30, help='fs skb k max')
+parser.add_argument('--fs-skb-k-max', type=int, default=50, help='fs skb k max')
 parser.add_argument('--fs-fpr-p', type=float, nargs='+', help='fs fpr p-value')
 parser.add_argument('--fs-sfm-thres', type=float, nargs='+', help='fs sfm threshold')
 parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
@@ -178,7 +178,7 @@ else:
 if args.fs_sfm_svm_c:
     SFM_SVC_C = sorted(args.fs_sfm_svm_c)
 else:
-    SFM_SVC_C = np.logspace(-2, 2, 5)
+    SFM_SVC_C = np.logspace(-4, 2, 7)
 if args.fs_rfe_svm_c:
     RFE_SVC_C = sorted(args.fs_rfe_svm_c)
 else:
@@ -275,7 +275,6 @@ pipelines = {
                 {
                     'fs2__k': SKB_K,
                     'fs2__estimator__C': SFM_SVC_C,
-                    'fs2__threshold': SFM_THRES,
                 },
             ],
         },
@@ -287,7 +286,6 @@ pipelines = {
                 {
                     'fs2__k': SKB_K,
                     'fs2__estimator__n_estimators': CLF_EXT_N_ESTS,
-                    'fs2__threshold': SFM_THRES,
                 },
             ],
         },
@@ -528,6 +526,8 @@ if args.analysis == 1:
         for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
             for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
                 param_grid.append({ **fs_params, **slr_params, **clf_params })
+    print("GridSearchCV param grid:")
+    pprint(param_grid)
     grid = GridSearchCV(
         Pipeline(sorted(
             pipelines['fs'][args.fs_meth]['steps'] +
@@ -549,6 +549,7 @@ if args.analysis == 1:
             if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
                 feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
         feature_names = np.array(biobase.featureNames(eset), dtype=str)[feature_idxs]
+        weights = np.array([], dtype=float)
         if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
             weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
         elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
@@ -563,10 +564,6 @@ if args.analysis == 1:
         fpr, tpr, thres = roc_curve(y[te_idxs], y_score, pos_label=1)
         y_pred = grid.predict(X[te_idxs])
         bcr_te = bcr_score(y[te_idxs], y_pred)
-        feature_ranks = sorted(
-            zip(weights, feature_idxs, feature_names, r_eset_gene_symbols(eset, feature_idxs + 1)),
-            reverse=True,
-        )
         print(
             'Split: %3s' % (split_idx + 1),
             ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
@@ -574,8 +571,20 @@ if args.analysis == 1:
             ' Features: %3s' % feature_idxs.size,
             ' Params:',  grid.best_params_,
         )
-        # print('Rankings:')
-        # for weight, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', weight)
+        if weights.size > 0:
+            feature_ranks = sorted(
+                zip(weights, feature_idxs, feature_names, r_eset_gene_symbols(eset, feature_idxs + 1)),
+                reverse=True,
+            )
+            # print('Rankings:')
+            # for weight, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', weight)
+        else:
+            feature_ranks = sorted(
+                zip(feature_idxs, feature_names, r_eset_gene_symbols(eset, feature_idxs + 1)),
+                reverse=True,
+            )
+            # print('Fearures:')
+            # for _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', weight)
         for param_idx, param in enumerate(param_grid[0]):
             if '__' in param and len(param_grid[0][param]) > 1:
                 new_shape = (
@@ -636,12 +645,14 @@ if args.analysis == 1:
         plt.rcParams['font.size'] = 14
         if param in (
             'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs3__n_features_to_select',
+            'clf__n_neighbors', 'clf__weights', 'clf__n_estimators', 'clf__max_depth',
         ):
             x_axis = param_grid[0][param]
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
         elif param in (
             'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'fs3__estimator__C', 'clf__C',
+            'clf__base_estimator__C',
         ):
             x_axis = range(len(param_grid[0][param]))
             plt.xticks(x_axis, param_grid[0][param])
@@ -750,6 +761,8 @@ elif args.analysis == 2:
         for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
             for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
                 param_grid.append({ **fs_params, **slr_params, **clf_params })
+    print("GridSearchCV param grid:")
+    pprint(param_grid)
     grid = GridSearchCV(
         Pipeline(sorted(
             pipelines['fs'][args.fs_meth]['steps'] +
@@ -769,24 +782,33 @@ elif args.analysis == 2:
         if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
             feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
+    weights = np.array([], dtype=float)
     if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
         weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
     elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
         weights = grid.best_estimator_.named_steps['clf'].feature_importances_
     roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
     bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
-    feature_ranks = sorted(
-        zip(weights, feature_idxs, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
-        reverse=True,
-    )
     print(
         'ROC AUC (CV): %.4f' % roc_auc_cv,
         ' BCR (CV): %.4f' % bcr_cv,
         ' Features: %3s' % feature_idxs.size,
         ' Params:',  grid.best_params_,
     )
-    print('Rankings:')
-    for weight, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', weight)
+    if weights.size > 0:
+        feature_ranks = sorted(
+            zip(weights, feature_idxs, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
+            reverse=True,
+        )
+        print('Rankings:')
+        for weight, _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', weight)
+    else:
+        feature_ranks = sorted(
+            zip(feature_idxs, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
+            reverse=True,
+        )
+        print('Features:')
+        for _, feature, symbol in feature_ranks: print(feature, '\t', symbol, '\t', weight)
     # pprint(grid.cv_results_)
     # pprint(param_grid)
     # plot grid search parameters vs cv perf metrics
@@ -808,12 +830,14 @@ elif args.analysis == 2:
             plt.rcParams['font.size'] = 14
             if param in (
                 'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs3__n_features_to_select',
+                'clf__n_neighbors', 'clf__weights', 'clf__n_estimators', 'clf__max_depth',
             ):
                 x_axis = param_grid[0][param]
                 plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
                 plt.xticks(x_axis)
             elif param in (
                 'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'fs3__estimator__C', 'clf__C',
+                'clf__base_estimator__C',
             ):
                 x_axis = range(len(param_grid[0][param]))
                 plt.xticks(x_axis, param_grid[0][param])
@@ -837,6 +861,10 @@ elif args.analysis == 2:
                 std_scores_cv = std_scores_cv[
                     np.arange(len(std_scores_cv)), mean_scores_cv_max_idxs
                 ]
+                if metric_idx == 0:
+                    label = r'$\pm$ 1 std. dev.'
+                else:
+                    label = None
                 plt.plot(
                     x_axis,
                     mean_scores_cv,
@@ -846,7 +874,7 @@ elif args.analysis == 2:
                     x_axis,
                     [m - s for m, s in zip(mean_scores_cv, std_scores_cv)],
                     [m + s for m, s in zip(mean_scores_cv, std_scores_cv)],
-                    color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+                    color='grey', alpha=0.2, label=label,
                 )
             plt.legend(loc='lower right', fontsize='small')
             plt.grid('on')
@@ -1102,6 +1130,7 @@ elif args.analysis == 3:
                         if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
                             feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
                     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
+                    weights = np.array([], dtype=float)
                     if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
                         weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
                     elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
@@ -1121,11 +1150,12 @@ elif args.analysis == 3:
                         ' Features: %3s' % feature_idxs.size,
                         ' Params:',  grid.best_params_,
                     )
-                    # print('Rankings:')
-                    # for rank, feature, symbol in sorted(
-                    #     zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
-                    #     reverse=True,
-                    # ): print(feature, '\t', symbol, '\t', rank)
+                    # if weights.size > 0:
+                    #     print('Rankings:')
+                    #     for rank, feature, symbol in sorted(
+                    #         zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
+                    #         reverse=True,
+                    #     ): print(feature, '\t', symbol, '\t', rank)
                     te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['roc_auc_cv'] = roc_auc_cv
                     te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['bcr_te'] = bcr_te
                     te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['roc_auc_te'] = roc_auc_te
