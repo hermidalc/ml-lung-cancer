@@ -61,12 +61,14 @@ parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c'
 parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
 parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
-parser.add_argument('--fs-fcbf-k', type=int, nargs='+', help='fs fcbf k select')
-parser.add_argument('--fs-fcbf-k-max', type=int, default=30, help='fs fcbf k max')
-parser.add_argument('--fs-rlf-k', type=int, nargs='+', help='fs rlf k select')
-parser.add_argument('--fs-rlf-k-max', type=int, default=30, help='fs rlf k max')
+parser.add_argument('--fs-pf-fcbf-k', type=int, nargs='+', help='fs pf fcbf k select')
+parser.add_argument('--fs-pf-fcbf-k-max', type=int, default=15000, help='fs pf fcbf k max')
+parser.add_argument('--fs-pf-rlf-k', type=int, nargs='+', help='fs pf rlf k select')
+parser.add_argument('--fs-pf-rlf-k-max', type=int, default=1000, help='fs pf rlf k max')
 parser.add_argument('--fs-rlf-n', type=int, nargs='+', help='fs rlf n neighbors')
 parser.add_argument('--fs-rlf-n-max', type=int, default=20, help='fs rlf n neighbors max')
+parser.add_argument('--fs-pf-cfs-k', type=int, nargs='+', help='fs pf cfs k select')
+parser.add_argument('--fs-pf-cfs-k-max', type=int, default=1000, help='fs pf cfs k max')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_weights', help='fs rank method')
 parser.add_argument('--clf-svm-c', type=float, nargs='+', help='clf svm c')
 parser.add_argument('--clf-svm-cache', type=int, default=2000, help='libsvm cache size')
@@ -162,17 +164,17 @@ gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 if args.fs_skb_k:
-    SKB_N_FEATURES = sorted(args.fs_skb_k)
+    SKB_K = sorted(args.fs_skb_k)
 else:
-    SKB_N_FEATURES = list(range(1, args.fs_skb_k_max + 1))
+    SKB_K = list(range(1, args.fs_skb_k_max + 1))
 if args.fs_fpr_p:
     SFP_ALPHA = sorted(args.fs_fpr_p)
 else:
     SFP_ALPHA = np.logspace(-3, -2, 2)
 if args.fs_sfm_thres:
-    SFM_THRESHOLDS = sorted(args.fs_sfm_thres)
+    SFM_THRES = sorted(args.fs_sfm_thres)
 else:
-    SFM_THRESHOLDS = np.logspace(-9, -5, 5)
+    SFM_THRES = np.logspace(-9, -5, 5)
 if args.fs_sfm_svm_c:
     SFM_SVC_C = sorted(args.fs_sfm_svm_c)
 else:
@@ -181,14 +183,18 @@ if args.fs_rfe_svm_c:
     RFE_SVC_C = sorted(args.fs_rfe_svm_c)
 else:
     RFE_SVC_C = np.logspace(-7, 2, 10)
-if args.fs_fcbf_k:
-    FCBF_N_FEATURES = sorted(args.fs_fcbf_k)
+if args.fs_pf_fcbf_k:
+    PF_FCBF_SKB_K = sorted(args.fs_pf_fcbf_k)
 else:
-    FCBF_N_FEATURES = list(range(1, args.fs_fcbf_k_max + 1))
-if args.fs_rlf_k:
-    RLF_N_FEATURES = sorted(args.fs_rlf_k)
+    PF_FCBF_SKB_K = list(range(1, args.fs_pf_fcbf_k_max + 1))
+if args.fs_pf_rlf_k:
+    PF_RLF_SKB_K = sorted(args.fs_pf_rlf_k)
 else:
-    RLF_N_FEATURES = list(range(1, args.fs_rlf_k_max + 1))
+    PF_RLF_SKB_K = list(range(1, args.fs_pf_rlf_k_max + 1))
+if args.fs_pf_cfs_k:
+    PF_CFS_SKB_K = sorted(args.fs_pf_cfs_k)
+else:
+    PF_CFS_SKB_K = list(range(1, args.fs_pf_cfs_k_max + 1))
 if args.fs_rlf_n:
     RLF_KNN_N = sorted(args.fs_rlf_n)
 else:
@@ -202,9 +208,9 @@ if args.clf_knn_n:
 else:
     CLF_KNN_N = list(range(1, args.clf_knn_n_max + 1, 1))
 if args.clf_knn_w:
-    CLF_KNN_WEIGHTS = sorted(args.clf_knn_w)
+    CLF_KNN_W = sorted(args.clf_knn_w)
 else:
-    CLF_KNN_WEIGHTS = ['uniform', 'distance']
+    CLF_KNN_W = ['uniform', 'distance']
 if args.clf_ext_n:
     CLF_EXT_N_ESTS = sorted(args.clf_ext_n)
 else:
@@ -247,7 +253,7 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs1__k': SKB_N_FEATURES,
+                    'fs1__k': SKB_K,
                 },
             ],
         },
@@ -257,7 +263,7 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__k': SKB_N_FEATURES,
+                    'fs2__k': SKB_K,
                 },
             ],
         },
@@ -267,9 +273,9 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__k': SKB_N_FEATURES,
+                    'fs2__k': SKB_K,
                     'fs2__estimator__C': SFM_SVC_C,
-                    'fs2__threshold': SFM_THRESHOLDS,
+                    'fs2__threshold': SFM_THRES,
                 },
             ],
         },
@@ -279,9 +285,9 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__k': SKB_N_FEATURES,
+                    'fs2__k': SKB_K,
                     'fs2__estimator__n_estimators': CLF_EXT_N_ESTS,
-                    'fs2__threshold': SFM_THRESHOLDS,
+                    'fs2__threshold': SFM_THRES,
                 },
             ],
         },
@@ -294,7 +300,7 @@ pipelines = {
                 {
                     'fs1__alpha': SFP_ALPHA,
                     'fs3__estimator__C': RFE_SVC_C,
-                    'fs3__n_features_to_select': SKB_N_FEATURES,
+                    'fs3__n_features_to_select': SKB_K,
                 },
             ],
         },
@@ -306,9 +312,9 @@ pipelines = {
             'param_grid': [
                 {
                     'fs2__estimator__C': SFM_SVC_C,
-                    'fs2__threshold': SFM_THRESHOLDS,
+                    'fs2__threshold': SFM_THRES,
                     'fs3__estimator__C': RFE_SVC_C,
-                    'fs3__n_features_to_select': SKB_N_FEATURES,
+                    'fs3__n_features_to_select': SKB_K,
                 },
             ],
         },
@@ -320,9 +326,9 @@ pipelines = {
             'param_grid': [
                 {
                     'fs2__estimator__n_estimators': CLF_EXT_N_ESTS,
-                    'fs2__threshold': SFM_THRESHOLDS,
+                    'fs2__threshold': SFM_THRES,
                     'fs3__estimator__C': RFE_SVC_C,
-                    'fs3__n_features_to_select': SKB_N_FEATURES,
+                    'fs3__n_features_to_select': SKB_K,
                 },
             ],
         },
@@ -333,7 +339,7 @@ pipelines = {
         #     'param_grid': [
         #         {
         #             'fs3__estimator__C': RFE_SVC_C,
-        #             'fs3__n_features_to_select': SKB_N_FEATURES,
+        #             'fs3__n_features_to_select': SKB_K,
         #         },
         #     ],
         # },
@@ -344,8 +350,8 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs1__k': SKB_N_FEATURES,
-                    'fs2__k': FCBF_N_FEATURES,
+                    'fs1__k': PF_FCBF_SKB_K,
+                    'fs2__k': SKB_K,
                 },
             ],
         },
@@ -356,8 +362,8 @@ pipelines = {
         #     ],
         #     'param_grid': [
         #         {
-        #             'fs1__k': SKB_N_FEATURES,
-        #             'fs2__k': RLF_N_FEATURES,
+        #             'fs1__k': PF_RLF_SKB_K,
+        #             'fs2__k': SKB_K,
         #             'fs__n_neighbors': RLF_KNN_N,
         #         },
         #     ],
@@ -369,7 +375,7 @@ pipelines = {
         #     ],
         #     'param_grid': [
         #         {
-        #             'fs1__k': SKB_N_FEATURES,
+        #             'fs1__k': PF_CFS_SKB_K,
         #         },
         #     ],
         # },
@@ -392,7 +398,7 @@ pipelines = {
             'param_grid': [
                 {
                     'clf__n_neighbors': CLF_KNN_N,
-                    'clf__weights': CLF_KNN_WEIGHTS,
+                    'clf__weights': CLF_KNN_W,
                 },
             ],
         },
@@ -497,13 +503,13 @@ bc_methods = [
 if args.analysis == 1:
     norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
     prep_methods = [norm_meth]
-    if args.id_type and args.id_type != 'none':
+    if args.id_type and args.id_type[0] != 'none':
         id_type = [x for x in id_types if x in args.id_type][0]
         prep_methods.append(id_type)
-    if args.merge_type and args.merge_type != 'none':
+    if args.merge_type and args.merge_type[0] != 'none':
         merge_type = [x for x in merge_types if x in args.merge_type][0]
         prep_methods.append(merge_type)
-    if args.bc_meth and args.bc_meth != 'none':
+    if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_methods.append(bc_meth)
     args.datasets_tr = natsorted(args.datasets_tr)
@@ -718,13 +724,14 @@ if args.analysis == 1:
 elif args.analysis == 2:
     norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
     prep_methods = [norm_meth]
-    if args.id_type and args.id_type != 'none':
+    if args.id_type and args.id_type[0] != 'none':
         id_type = [x for x in id_types if x in args.id_type][0]
         prep_methods.append(id_type)
-    if args.merge_type and args.merge_type != 'none':
+    if args.merge_type and args.merge_type[0] != 'none':
+        print(args.merge_type)
         merge_type = [x for x in merge_types if x in args.merge_type][0]
         prep_methods.append(merge_type)
-    if args.bc_meth and args.bc_meth != 'none':
+    if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_methods.append(bc_meth)
     args.datasets_tr = natsorted(args.datasets_tr)
