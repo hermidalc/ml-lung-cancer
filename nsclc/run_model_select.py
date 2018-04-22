@@ -174,11 +174,11 @@ else:
 if args.fs_sfm_thres:
     SFM_THRES = sorted(args.fs_sfm_thres)
 else:
-    SFM_THRES = np.logspace(-9, -5, 5)
+    SFM_THRES = np.logspace(-11, -5, 7)
 if args.fs_sfm_svm_c:
     SFM_SVC_C = sorted(args.fs_sfm_svm_c)
 else:
-    SFM_SVC_C = np.logspace(-4, 2, 7)
+    SFM_SVC_C = np.logspace(-1, 3, 5)
 if args.fs_rfe_svm_c:
     RFE_SVC_C = sorted(args.fs_rfe_svm_c)
 else:
@@ -330,6 +330,17 @@ pipelines = {
                 },
             ],
         },
+        # 'SVM-SFM': {
+        #     'steps': [
+        #         ('fs2', SelectFromModel(sfm_svm_estimator)),
+        #     ],
+        #     'param_grid': [
+        #         {
+        #             'fs2__threshold': SFM_THRES,
+        #             'fs2__estimator__C': SFM_SVC_C,
+        #         },
+        #     ],
+        # },
         # 'SVM-RFE': {
         #     'steps': [
         #         ('fs3', RFE(rfe_svm_estimator, step=args.fs_rfe_step, verbose=args.fs_rfe_verbose)),
@@ -739,7 +750,6 @@ elif args.analysis == 2:
         id_type = [x for x in id_types if x in args.id_type][0]
         prep_methods.append(id_type)
     if args.merge_type and args.merge_type[0] != 'none':
-        print(args.merge_type)
         merge_type = [x for x in merge_types if x in args.merge_type][0]
         prep_methods.append(merge_type)
     if args.bc_meth and args.bc_meth[0] != 'none':
