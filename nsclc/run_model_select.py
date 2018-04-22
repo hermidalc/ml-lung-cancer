@@ -80,7 +80,7 @@ parser.add_argument('--clf-ext-n-max', type=int, default=100, help='clf ext n es
 parser.add_argument('--clf-ada-n', type=int, nargs='+', help='clf ada n estimators')
 parser.add_argument('--clf-ada-n-max', type=int, default=200, help='clf ada n estimators max')
 parser.add_argument('--clf-grb-n', type=int, nargs='+', help='clf grb n estimators')
-parser.add_argument('--clf-grb-n-max', type=int, default=100, help='clf grb n estimators max')
+parser.add_argument('--clf-grb-n-max', type=int, default=300, help='clf grb n estimators max')
 parser.add_argument('--clf-grb-d', type=int, nargs='+', help='clf grb max depth')
 parser.add_argument('--clf-grb-d-max', type=int, default=20, help='clf grb max depth max')
 parser.add_argument('--gscv-splits', type=int, default=80, help='gscv splits')
