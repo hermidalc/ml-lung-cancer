@@ -1176,11 +1176,6 @@ elif args.analysis == 3:
                     te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['num_features'] = feature_idxs.size
                     tr_pr_results[tr_idx, pr_idx]['te'][te_idx] = te_pr_results[te_idx, pr_idx]['tr'][tr_idx]
                 elif analysis_type == 'all_methods':
-                    print(
-                        'ROC AUC (CV): %.4f' % grid.cv_results_['mean_test_roc_auc'][grid.best_index_],
-                        ' BCR (CV): %.4f' % grid.cv_results_['mean_test_bcr'][grid.best_index_],
-                        ' Params:',  grid.best_params_,
-                    )
                     best_grid_idxs = []
                     meth_scores = { 'cv': {}, 'te': {} }
                     for group_idx, param_grid_group in enumerate(param_grid_data):
@@ -1202,13 +1197,16 @@ elif args.analysis == 3:
                                 meth_scores['cv'][meth_type][meth_idx][metric].append(
                                     grid.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
                                 )
-                    pipe_te_fit_counter = 0
+                    pipe_fit_counter_te = 0
+                    best_roc_auc_te = 0
+                    best_bcr_te = 0
+                    best_params_te = {}
                     for group_idx, param_grid_group in enumerate(param_grid_data):
                         params = grid.cv_results_['params'][best_grid_idxs[group_idx]]
                         pipe_steps = sorted([
                             (k, v) for k, v in params.items() if k in pipeline_order
                         ], key=lambda s: pipeline_order.index(s[0]))
-                        pipe = Pipeline(pipe_steps)
+                        pipe = Pipeline(pipe_steps, memory=memory)
                         pipe.set_params(**{ k: v for k, v in params.items() if '__' in k })
                         pipe.fit(X_tr, y_tr)
                         if hasattr(pipe, 'decision_function'):
@@ -1225,9 +1223,23 @@ elif args.analysis == 3:
                                 meth_scores['te'][meth_type].append({ 'roc_auc': [], 'bcr': [] })
                             meth_scores['te'][meth_type][meth_idx]['roc_auc'].append(roc_auc_te)
                             meth_scores['te'][meth_type][meth_idx]['bcr'].append(bcr_te)
-                        pipe_te_fit_counter += 1
-                        print("Pipeline test fits:", pipe_te_fit_counter, end='\r', flush=True)
+                        if roc_auc_te > best_roc_auc_te:
+                            best_roc_auc_te = roc_auc_te
+                            best_bcr_te = bcr_te
+                            best_params_te = params
+                        pipe_fit_counter_te += 1
+                        print("Pipeline test fits:", pipe_fit_counter_te, end='\r', flush=True)
                     print()
+                    print(
+                        'ROC AUC (CV / Test): %.4f / %.4f' % (
+                            grid.cv_results_['mean_test_roc_auc'][grid.best_index_], best_roc_auc_te
+                        ),
+                        ' BCR (CV / Test): %.4f / %.4f' % (
+                            grid.cv_results_['mean_test_bcr'][grid.best_index_], best_bcr_te
+                        ),
+                        '\nBest Params (Train):',  grid.best_params_,
+                        '\nBest Params (Test):', best_params_te,
+                    )
                     for category, category_scores in meth_scores.items():
                         for meth_type, meth_type_scores in category_scores.items():
                             for meth_idx, meth_metric_scores in enumerate(meth_type_scores):
