@@ -1176,6 +1176,11 @@ elif args.analysis == 3:
                     te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['num_features'] = feature_idxs.size
                     tr_pr_results[tr_idx, pr_idx]['te'][te_idx] = te_pr_results[te_idx, pr_idx]['tr'][tr_idx]
                 elif analysis_type == 'all_methods':
+                    print(
+                        'ROC AUC (CV): %.4f' % grid.cv_results_['mean_test_roc_auc'][grid.best_index_],
+                        ' BCR (CV): %.4f' % grid.cv_results_['mean_test_bcr'][grid.best_index_],
+                        ' Params:',  grid.best_params_,
+                    )
                     best_grid_idxs = []
                     meth_scores = { 'cv': {}, 'te': {} }
                     for group_idx, param_grid_group in enumerate(param_grid_data):
@@ -1197,6 +1202,7 @@ elif args.analysis == 3:
                                 meth_scores['cv'][meth_type][meth_idx][metric].append(
                                     grid.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
                                 )
+                    pipe_te_fit_counter = 0
                     for group_idx, param_grid_group in enumerate(param_grid_data):
                         params = grid.cv_results_['params'][best_grid_idxs[group_idx]]
                         pipe_steps = sorted([
@@ -1219,6 +1225,9 @@ elif args.analysis == 3:
                                 meth_scores['te'][meth_type].append({ 'roc_auc': [], 'bcr': [] })
                             meth_scores['te'][meth_type][meth_idx]['roc_auc'].append(roc_auc_te)
                             meth_scores['te'][meth_type][meth_idx]['bcr'].append(bcr_te)
+                        pipe_te_fit_counter += 1
+                        print("Pipeline test fits:", pipe_te_fit_counter, end='\r', flush=True)
+                    print()
                     for category, category_scores in meth_scores.items():
                         for meth_type, meth_type_scores in category_scores.items():
                             for meth_idx, meth_metric_scores in enumerate(meth_type_scores):
