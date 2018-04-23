@@ -1267,6 +1267,8 @@ elif args.analysis == 3:
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
                 dataset_pair_counter += 1
+                # flush cache with each pair run (grows too big if not)
+                memory.clear(warn=False)
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
         title_sub = 'Classifier: ' + args.clf_meth
