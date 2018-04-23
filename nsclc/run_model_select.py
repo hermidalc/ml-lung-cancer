@@ -1197,7 +1197,7 @@ elif args.analysis == 3:
                                 meth_scores['cv'][meth_type][meth_idx][metric].append(
                                     grid.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
                                 )
-                    pipe_fit_counter_te = 0
+                    pipe_fit_counter = 0
                     best_roc_auc_te = 0
                     best_bcr_te = 0
                     best_params_te = {}
@@ -1227,8 +1227,8 @@ elif args.analysis == 3:
                             best_roc_auc_te = roc_auc_te
                             best_bcr_te = bcr_te
                             best_params_te = params
-                        pipe_fit_counter_te += 1
-                        print("Pipeline test fits:", pipe_fit_counter_te, end='\r', flush=True)
+                        pipe_fit_counter += 1
+                        print("Pipeline test fits:", pipe_fit_counter, end='\r', flush=True)
                     print()
                     print(
                         'ROC AUC (CV / Test): %.4f / %.4f' % (
