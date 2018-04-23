@@ -90,7 +90,7 @@ parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity'
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc, bcr)')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--save-plots', default=False, action='store_true', help='save figure plots')
-parser.add_argument('--cache-dir', type=str, default='/tmp' help='cache dir')
+parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 args = parser.parse_args()
 
 base = importr('base')
