@@ -22,7 +22,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import AdaBoostClassifier, ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
-from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
@@ -33,7 +33,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import style
 
-sns.set_palette(sns.color_palette('hls', 20))
+sns.set_palette(sns.color_palette('hls', 30))
 # ignore QDA collinearity warnings
 warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
 
@@ -101,6 +101,7 @@ r_eset_class_labels = robjects.globalenv['esetClassLabels']
 r_eset_gene_symbols = robjects.globalenv['esetGeneSymbols']
 r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
 numpy2ri.activate()
+
 if args.pipe_memory:
     cachedir = mkdtemp(dir=args.cache_dir)
     memory = Memory(cachedir=cachedir, verbose=0)
@@ -152,14 +153,12 @@ if args.pipe_memory:
     rfe_svm_estimator = CachedLinearSVC(class_weight='balanced')
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, class_weight='balanced')
     sfm_ext_estimator = CachedExtraTreesClassifier(class_weight='balanced')
-    # ada_lgr_estimator = CachedLogisticRegression(class_weight='balanced')
 else:
     limma_score_func = limma
     mi_score_func = mutual_info_classif
     rfe_svm_estimator = LinearSVC(class_weight='balanced')
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, class_weight='balanced')
     sfm_ext_estimator = ExtraTreesClassifier(class_weight='balanced')
-    # ada_lgr_estimator = LogisticRegression(class_weight='balanced')
 
 gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
@@ -454,7 +453,7 @@ pipelines = {
                 },
             ],
         },
-        'GaussNB': {
+        'GaussianNB': {
             'steps': [
                 ('clf', GaussianNB()),
             ],
@@ -462,9 +461,9 @@ pipelines = {
                 { },
             ],
         },
-        'QDA': {
+        'LDA': {
             'steps': [
-                ('clf', QuadraticDiscriminantAnalysis()),
+                ('clf', LinearDiscriminantAnalysis()),
             ],
             'param_grid': [
                 { },
@@ -538,7 +537,7 @@ if args.analysis == 1:
         for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
             for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
                 param_grid.append({ **fs_params, **slr_params, **clf_params })
-    print("GridSearchCV param grid:")
+    print("Param grid:")
     pprint(param_grid)
     grid = GridSearchCV(
         Pipeline(sorted(
@@ -737,7 +736,7 @@ if args.analysis == 1:
         feature_ranks = feature_mean_weights
     elif args.fs_rank_meth == 'mean_roc_aucs':
         feature_ranks = feature_mean_roc_aucs
-    else:
+    elif args.fs_rank_meth == 'mean_bcrs':
         feature_ranks = feature_mean_bcrs
     print('Rankings:')
     for rank, feature, symbol in sorted(
@@ -772,7 +771,7 @@ elif args.analysis == 2:
         for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
             for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
                 param_grid.append({ **fs_params, **slr_params, **clf_params })
-    print("GridSearchCV param grid:")
+    print("Param grid:")
     pprint(param_grid)
     grid = GridSearchCV(
         Pipeline(sorted(
@@ -1033,7 +1032,7 @@ elif args.analysis == 3:
         # pprint(param_grid)
         grid = GridSearchCV(
             Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-            param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
+            param_grid=param_grid, scoring=gscv_scoring, refit=False,
             cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
             error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
         )
@@ -1107,6 +1106,11 @@ elif args.analysis == 3:
     pr_clf_results = np.zeros((len(prep_groups), len(pipelines['clf'])), dtype=[
         ('te', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(dataset_te_basenames),)),
         ('tr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(dataset_tr_combos),))
+    ])
+    fs_clf_results = np.zeros((len(pipelines['fs']), len(pipelines['clf'])), dtype=[
+        ('te', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(dataset_te_basenames),)),
+        ('tr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(dataset_tr_combos),)),
+
     ])
     dataset_pair_counter = 1
     for tr_idx, dataset_tr_combo in enumerate(dataset_tr_combos):
@@ -1224,21 +1228,22 @@ elif args.analysis == 3:
                                 meth_scores['te'][meth_type].append({ 'roc_auc': [], 'bcr': [] })
                             meth_scores['te'][meth_type][meth_idx]['roc_auc'].append(roc_auc_te)
                             meth_scores['te'][meth_type][meth_idx]['bcr'].append(bcr_te)
-                        if roc_auc_te > best_roc_auc_te:
-                            best_roc_auc_te = roc_auc_te
-                            best_bcr_te = bcr_te
-                            best_params_te = params
+                        if ((args.gscv_refit == 'roc_auc' and roc_auc_te > best_roc_auc_te) or
+                            (args.gscv_refit == 'bcr' and bcr_te > best_bcr_te)):
+                                best_roc_auc_te = roc_auc_te
+                                best_bcr_te = bcr_te
+                                best_params_te = params
                         pipe_fit_counter += 1
                         print("Pipeline test fits:", pipe_fit_counter, end='\r', flush=True)
                     print()
+                    best_idx_cv = np.argmin(grid.cv_results_['rank_test_' + args.gscv_refit])
+                    best_roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][best_idx_cv]
+                    best_bcr_cv = grid.cv_results_['mean_test_bcr'][best_idx_cv]
+                    best_params_cv = grid.cv_results_['params'][best_idx_cv]
                     print(
-                        'ROC AUC (CV / Test): %.4f / %.4f' % (
-                            grid.cv_results_['mean_test_roc_auc'][grid.best_index_], best_roc_auc_te
-                        ),
-                        ' BCR (CV / Test): %.4f / %.4f' % (
-                            grid.cv_results_['mean_test_bcr'][grid.best_index_], best_bcr_te
-                        ),
-                        '\nBest Params (Train):',  grid.best_params_,
+                        'ROC AUC (CV / Test): %.4f / %.4f' % (best_roc_auc_cv, best_roc_auc_te),
+                        ' BCR (CV / Test): %.4f / %.4f' % (best_bcr_cv, best_bcr_te),
+                        '\nBest Params (Train):',  best_params_cv,
                         '\nBest Params (Test):', best_params_te,
                     )
                     for category, category_scores in meth_scores.items():
@@ -1267,8 +1272,8 @@ elif args.analysis == 3:
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
                 dataset_pair_counter += 1
-                # flush cache with each pair run (grows too big if not)
-                memory.clear(warn=False)
+                # flush cache with each tr/te pair run (grows too big if not)
+                if args.pipe_memory: memory.clear(warn=False)
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
         title_sub = 'Classifier: ' + args.clf_meth
