@@ -6,9 +6,9 @@ suppressPackageStartupMessages(suppressWarnings(library("hgu133plus2hsentrezg.db
 source("config.R")
 
 cmd_args <- commandArgs(trailingOnly=TRUE)
-batch_type <- cmd_args[1]
-num_subset <- cmd_args[2]
-id_type <- cmd_args[3]
+num_subset <- as.integer(cmd_args[1])
+id_type <- cmd_args[2]
+batch_type <- cmd_args[3]
 if (id_type == "gene") {
     cdfname <- "hgu133plus2hsentrezg"
 } else {
