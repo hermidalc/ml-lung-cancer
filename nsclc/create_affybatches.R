@@ -33,8 +33,7 @@ if (batch_type == "single") {
                 affybatch <- bg.adjust.gcrma(
                     affybatch, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
                 )
-            }
-            else if (norm_type == "rma") {
+            } else if (norm_type == "rma") {
                 cat("Performing background correction\n")
                 affybatch <- bg.correct.rma(affybatch)
             }
@@ -42,8 +41,8 @@ if (batch_type == "single") {
             save(list=affybatch_name, file=paste0("data/", affybatch_name, ".Rda"))
         }
     }
-}
-else if (batch_type == "combo") {
+# combo only needed for gcrma currently
+} else if (batch_type == "combo" & "gcrma" %in% cmd_args[4:length(cmd_args)]) {
     dataset_name_combos <- combn(dataset_names, num_subset)
     for (col in 1:ncol(dataset_name_combos)) {
         cel_files <- c()
@@ -64,15 +63,9 @@ else if (batch_type == "combo") {
             affybatch_name <- paste0(c("affybatch", dataset_name_combos[,col], suffixes), collapse="_")
             cat("Creating AffyBatch:", affybatch_name, "\n")
             affybatch <- ReadAffy(filenames=cel_files, cdfname=cdfname, verbose=TRUE)
-            if (norm_type == "gcrma") {
-                affybatch <- bg.adjust.gcrma(
-                    affybatch, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
-                )
-            }
-            else if (norm_type == "rma") {
-                cat("Performing background correction\n")
-                affybatch <- bg.correct.rma(affybatch)
-            }
+            affybatch <- bg.adjust.gcrma(
+                affybatch, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
+            )
             assign(affybatch_name, affybatch)
             save(list=affybatch_name, file=paste0("data/", affybatch_name, ".Rda"))
         }
