@@ -34,6 +34,11 @@ r-rgl \
 autopep8 \
 rpy2 \
 libiconv \
+'icu=58.*' \
+lxml \
+natsort \
+mlxtend \
+seaborn \
 bioconductor-biocinstaller \
 bioconductor-biobase \
 bioconductor-affyplm \
@@ -42,11 +47,7 @@ bioconductor-limma \
 bioconductor-sva \
 bioconductor-vsn \
 bioconductor-gcrma \
-bioconductor-impute \
-'icu=58.*' \
-lxml \
-natsort \
-mlxtend
+bioconductor-impute
 ```
 
 3. Setup for rJava (used by some R packages)
