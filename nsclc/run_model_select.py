@@ -55,34 +55,42 @@ parser.add_argument('--slr-meth', type=str, nargs='+', default=['StandardScaler'
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=50, help='fs skb k max')
-parser.add_argument('--fs-fpr-p', type=float, nargs='+', help='fs fpr p-value')
+parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
 parser.add_argument('--fs-sfm-thres', type=float, nargs='+', help='fs sfm threshold')
+parser.add_argument('--fs-sfm-ext-e', type=int, nargs='+', help='fs sfm ext n estimators')
+parser.add_argument('--fs-sfm-ext-e-max', type=int, default=100, help='fs sfm ext n estimators max')
+parser.add_argument('--fs-sfm-ext-d', type=int, nargs='+', help='fs sfm ext max depth')
+parser.add_argument('--fs-sfm-ext-d-max', type=int, default=50, help='fs sfm ext max depth max')
 parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
 parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
-parser.add_argument('--fs-rfe-step', type=float, default=0.2, help='fs rfe step')
+parser.add_argument('--fs-rfe-step', type=float, default=0.1, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-pf-fcbf-k', type=int, nargs='+', help='fs pf fcbf k select')
 parser.add_argument('--fs-pf-fcbf-k-max', type=int, default=5000, help='fs pf fcbf k max')
 parser.add_argument('--fs-pf-rlf-k', type=int, nargs='+', help='fs pf rlf k select')
 parser.add_argument('--fs-pf-rlf-k-max', type=int, default=1000, help='fs pf rlf k max')
 parser.add_argument('--fs-rlf-n', type=int, nargs='+', help='fs rlf n neighbors')
-parser.add_argument('--fs-rlf-n-max', type=int, default=20, help='fs rlf n neighbors max')
+parser.add_argument('--fs-rlf-n-max', type=int, default=50, help='fs rlf n neighbors max')
+parser.add_argument('--fs-rlf-s', type=int, nargs='+', help='fs rlf sample size')
+parser.add_argument('--fs-rlf-s-max', type=int, default=50, help='fs rlf sample size max')
 parser.add_argument('--fs-pf-cfs-k', type=int, nargs='+', help='fs pf cfs k select')
 parser.add_argument('--fs-pf-cfs-k-max', type=int, default=1000, help='fs pf cfs k max')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_weights', help='fs rank method')
 parser.add_argument('--clf-svm-c', type=float, nargs='+', help='clf svm c')
 parser.add_argument('--clf-svm-cache', type=int, default=2000, help='libsvm cache size')
-parser.add_argument('--clf-knn-n', type=int, nargs='+', help='clf knn neighbors')
-parser.add_argument('--clf-knn-n-max', type=int, default=20, help='clf knn neighbors max')
+parser.add_argument('--clf-knn-k', type=int, nargs='+', help='clf knn neighbors')
+parser.add_argument('--clf-knn-k-max', type=int, default=20, help='clf knn neighbors max')
 parser.add_argument('--clf-knn-w', type=str, nargs='+', help='clf knn weights')
-parser.add_argument('--clf-ext-n', type=int, nargs='+', help='clf ext n estimators')
-parser.add_argument('--clf-ext-n-max', type=int, default=100, help='clf ext n estimators max')
-parser.add_argument('--clf-ada-n', type=int, nargs='+', help='clf ada n estimators')
-parser.add_argument('--clf-ada-n-max', type=int, default=200, help='clf ada n estimators max')
-parser.add_argument('--clf-grb-n', type=int, nargs='+', help='clf grb n estimators')
-parser.add_argument('--clf-grb-n-max', type=int, default=300, help='clf grb n estimators max')
+parser.add_argument('--clf-ext-e', type=int, nargs='+', help='clf ext n estimators')
+parser.add_argument('--clf-ext-e-max', type=int, default=100, help='clf ext n estimators max')
+parser.add_argument('--clf-ext-d', type=int, nargs='+', help='clf ext max depth')
+parser.add_argument('--clf-ext-d-max', type=int, default=50, help='clf ext max depth max')
+parser.add_argument('--clf-ada-e', type=int, nargs='+', help='clf ada n estimators')
+parser.add_argument('--clf-ada-e-max', type=int, default=200, help='clf ada n estimators max')
+parser.add_argument('--clf-grb-e', type=int, nargs='+', help='clf grb n estimators')
+parser.add_argument('--clf-grb-e-max', type=int, default=300, help='clf grb n estimators max')
 parser.add_argument('--clf-grb-d', type=int, nargs='+', help='clf grb max depth')
-parser.add_argument('--clf-grb-d-max', type=int, default=20, help='clf grb max depth max')
+parser.add_argument('--clf-grb-d-max', type=int, default=50, help='clf grb max depth max')
 parser.add_argument('--gscv-splits', type=int, default=80, help='gscv splits')
 parser.add_argument('--gscv-size', type=float, default=0.3, help='gscv size')
 parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
@@ -164,69 +172,85 @@ gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 if args.fs_skb_k:
-    SKB_K = sorted(args.fs_skb_k)
+    FS_SKB_K = sorted(args.fs_skb_k)
 else:
-    SKB_K = list(range(1, args.fs_skb_k_max + 1))
-if args.fs_fpr_p:
-    SFP_ALPHA = sorted(args.fs_fpr_p)
+    FS_SKB_K = list(range(1, args.fs_skb_k_max + 1))
+if args.fs_sfp_p:
+    FS_SFP_P = sorted(args.fs_sfp_p)
 else:
-    SFP_ALPHA = np.logspace(-3, -2, 2)
+    FS_SFP_P = np.logspace(-3, -2, 2)
 if args.fs_sfm_thres:
-    SFM_THRES = sorted(args.fs_sfm_thres)
+    FS_SFM_THRES = sorted(args.fs_sfm_thres)
 else:
-    SFM_THRES = np.logspace(-11, -5, 7)
+    FS_SFM_THRES = np.logspace(-11, -5, 7)
+if args.fs_sfm_ext_e:
+    FS_SFM_EXT_E = sorted(args.fs_sfm_ext_e)
+else:
+    FS_SFM_EXT_E = list(range(5, args.fs_sfm_ext_e_max + 1, 5))
+if args.fs_sfm_ext_d:
+    FS_SFM_EXT_D = sorted(args.fs_sfm_ext_d)
+else:
+    FS_SFM_EXT_D = list(range(1, args.fs_sfm_ext_d_max + 1, 1)) + [None]
 if args.fs_sfm_svm_c:
-    SFM_SVC_C = sorted(args.fs_sfm_svm_c)
+    FS_SFM_SVM_C = sorted(args.fs_sfm_svm_c)
 else:
-    SFM_SVC_C = np.logspace(-1, 3, 5)
+    FS_SFM_SVM_C = np.logspace(-1, 3, 5)
 if args.fs_rfe_svm_c:
-    RFE_SVC_C = sorted(args.fs_rfe_svm_c)
+    FS_RFE_SVM_C = sorted(args.fs_rfe_svm_c)
 else:
-    RFE_SVC_C = np.logspace(-7, 2, 10)
+    FS_RFE_SVM_C = np.logspace(-7, 2, 10)
 if args.fs_pf_fcbf_k:
-    PF_FCBF_SKB_K = sorted(args.fs_pf_fcbf_k)
+    FS_PF_FCBF_K = sorted(args.fs_pf_fcbf_k)
 else:
-    PF_FCBF_SKB_K = list(range(1, args.fs_pf_fcbf_k_max + 1))
+    FS_PF_FCBF_K = list(range(1, args.fs_pf_fcbf_k_max + 1))
 if args.fs_pf_rlf_k:
-    PF_RLF_SKB_K = sorted(args.fs_pf_rlf_k)
+    FS_PF_RLF_K = sorted(args.fs_pf_rlf_k)
 else:
-    PF_RLF_SKB_K = list(range(1, args.fs_pf_rlf_k_max + 1))
+    FS_PF_RLF_K = list(range(1, args.fs_pf_rlf_k_max + 1))
 if args.fs_pf_cfs_k:
-    PF_CFS_SKB_K = sorted(args.fs_pf_cfs_k)
+    FS_PF_CFS_K = sorted(args.fs_pf_cfs_k)
 else:
-    PF_CFS_SKB_K = list(range(1, args.fs_pf_cfs_k_max + 1))
+    FS_PF_CFS_K = list(range(1, args.fs_pf_cfs_k_max + 1))
 if args.fs_rlf_n:
-    RLF_KNN_N = sorted(args.fs_rlf_n)
+    FS_RLF_N = sorted(args.fs_rlf_n)
 else:
-    RLF_KNN_N = list(range(1, args.fs_rlf_n_max + 1, 1))
+    FS_RLF_N = list(range(1, args.fs_rlf_n_max + 1, 1))
+if args.fs_rlf_s:
+    FS_RLF_S = sorted(args.fs_rlf_s)
+else:
+    FS_RLF_S = list(range(1, args.fs_rlf_s_max + 1, 1))
 if args.clf_svm_c:
-    CLF_SVC_C = sorted(args.clf_svm_c)
+    CLF_SVM_C = sorted(args.clf_svm_c)
 else:
-    CLF_SVC_C = np.logspace(-7, 3, 11)
-if args.clf_knn_n:
-    CLF_KNN_N = sorted(args.clf_knn_n)
+    CLF_SVM_C = np.logspace(-7, 3, 11)
+if args.clf_knn_k:
+    CLF_KNN_K = sorted(args.clf_knn_k)
 else:
-    CLF_KNN_N = list(range(1, args.clf_knn_n_max + 1, 1))
+    CLF_KNN_K = list(range(1, args.clf_knn_k_max + 1, 1))
 if args.clf_knn_w:
     CLF_KNN_W = sorted(args.clf_knn_w)
 else:
-    CLF_KNN_W = ['uniform', 'distance']
-if args.clf_ext_n:
-    CLF_EXT_N_ESTS = sorted(args.clf_ext_n)
+    CLF_KNN_W = ['distance', 'uniform']
+if args.clf_ext_e:
+    CLF_EXT_E = sorted(args.clf_ext_e)
 else:
-    CLF_EXT_N_ESTS = list(range(5, args.clf_ext_n_max + 1, 5))
-if args.clf_ada_n:
-    CLF_ADA_N_ESTS = sorted(args.clf_ada_n)
+    CLF_EXT_E = list(range(5, args.clf_ext_e_max + 1, 5))
+if args.clf_ext_d:
+    CLF_EXT_D = sorted(args.clf_ext_d)
 else:
-    CLF_ADA_N_ESTS = list(range(10, args.clf_ada_n_max + 1, 10))
-if args.clf_grb_n:
-    CLF_GRB_N_ESTS = sorted(args.clf_grb_n)
+    CLF_EXT_D = list(range(1, args.clf_ext_d_max + 1, 1)) + [None]
+if args.clf_ada_e:
+    CLF_ADA_E = sorted(args.clf_ada_e)
 else:
-    CLF_GRB_N_ESTS = list(range(5, args.clf_grb_n_max + 1, 5))
+    CLF_ADA_E = list(range(10, args.clf_ada_e_max + 1, 10))
+if args.clf_grb_e:
+    CLF_GRB_E = sorted(args.clf_grb_e)
+else:
+    CLF_GRB_E = list(range(5, args.clf_grb_e_max + 1, 5))
 if args.clf_grb_d:
-    CLF_GRB_MAX_D = sorted(args.clf_grb_d)
+    CLF_GRB_D = sorted(args.clf_grb_d)
 else:
-    CLF_GRB_MAX_D = list(range(1, args.clf_grb_d_max + 1, 1))
+    CLF_GRB_D = list(range(1, args.clf_grb_d_max + 1, 1))
 
 pipeline_order = [
     'fs1',
@@ -253,7 +277,7 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs1__k': SKB_K,
+                    'fs1__k': FS_SKB_K,
                 },
             ],
         },
@@ -263,7 +287,7 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__k': SKB_K,
+                    'fs2__k': FS_SKB_K,
                 },
             ],
         },
@@ -273,8 +297,8 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__k': SKB_K,
-                    'fs2__estimator__C': SFM_SVC_C,
+                    'fs2__estimator__C': FS_SFM_SVM_C,
+                    'fs2__k': FS_SKB_K,
                 },
             ],
         },
@@ -284,8 +308,9 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__k': SKB_K,
-                    'fs2__estimator__n_estimators': CLF_EXT_N_ESTS,
+                    'fs2__estimator__n_estimators': FS_SFM_EXT_E,
+                    'fs2__estimator__max_depth': FS_SFM_EXT_D,
+                    'fs2__k': FS_SKB_K,
                 },
             ],
         },
@@ -296,9 +321,9 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs1__alpha': SFP_ALPHA,
-                    'fs3__estimator__C': RFE_SVC_C,
-                    'fs3__n_features_to_select': SKB_K,
+                    'fs1__alpha': FS_SFP_P,
+                    'fs3__estimator__C': FS_RFE_SVM_C,
+                    'fs3__n_features_to_select': FS_SKB_K,
                 },
             ],
         },
@@ -309,10 +334,10 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__estimator__C': SFM_SVC_C,
-                    'fs2__threshold': SFM_THRES,
-                    'fs3__estimator__C': RFE_SVC_C,
-                    'fs3__n_features_to_select': SKB_K,
+                    'fs2__estimator__C': FS_SFM_SVM_C,
+                    'fs2__threshold': FS_SFM_THRES,
+                    'fs3__estimator__C': FS_RFE_SVM_C,
+                    'fs3__n_features_to_select': FS_SKB_K,
                 },
             ],
         },
@@ -323,10 +348,11 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__estimator__n_estimators': CLF_EXT_N_ESTS,
-                    'fs2__threshold': SFM_THRES,
-                    'fs3__estimator__C': RFE_SVC_C,
-                    'fs3__n_features_to_select': SKB_K,
+                    'fs2__estimator__n_estimators': FS_SFM_EXT_E,
+                    'fs2__estimator__max_depth': FS_SFM_EXT_D,
+                    'fs2__threshold': FS_SFM_THRES,
+                    'fs3__estimator__C': FS_RFE_SVM_C,
+                    'fs3__n_features_to_select': FS_SKB_K,
                 },
             ],
         },
@@ -336,8 +362,8 @@ pipelines = {
         #     ],
         #     'param_grid': [
         #         {
-        #             'fs2__threshold': SFM_THRES,
-        #             'fs2__estimator__C': SFM_SVC_C,
+        #             'fs2__estimator__C': FS_SFM_SVM_C,
+        #             'fs2__threshold': FS_SFM_THRES,
         #         },
         #     ],
         # },
@@ -347,8 +373,8 @@ pipelines = {
         #     ],
         #     'param_grid': [
         #         {
-        #             'fs3__estimator__C': RFE_SVC_C,
-        #             'fs3__n_features_to_select': SKB_K,
+        #             'fs3__estimator__C': FS_RFE_SVM_C,
+        #             'fs3__n_features_to_select': FS_SKB_K,
         #         },
         #     ],
         # },
@@ -359,8 +385,8 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs1__k': PF_FCBF_SKB_K,
-                    'fs2__k': SKB_K,
+                    'fs1__k': FS_PF_FCBF_K,
+                    'fs2__k': FS_SKB_K,
                 },
             ],
         },
@@ -371,9 +397,9 @@ pipelines = {
         #     ],
         #     'param_grid': [
         #         {
-        #             'fs1__k': PF_RLF_SKB_K,
-        #             'fs2__k': SKB_K,
-        #             'fs__n_neighbors': RLF_KNN_N,
+        #             'fs1__k': FS_PF_RLF_K,
+        #             'fs2__n_neighbors': FS_RLF_N,
+        #             'fs2__sample_size': FS_RLF_S,
         #         },
         #     ],
         # },
@@ -384,7 +410,7 @@ pipelines = {
         #     ],
         #     'param_grid': [
         #         {
-        #             'fs1__k': PF_CFS_SKB_K,
+        #             'fs1__k': FS_PF_CFS_K,
         #         },
         #     ],
         # },
@@ -396,7 +422,7 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'clf__C': CLF_SVC_C,
+                    'clf__C': CLF_SVM_C,
                 },
             ],
         },
@@ -406,7 +432,7 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'clf__n_neighbors': CLF_KNN_N,
+                    'clf__n_neighbors': CLF_KNN_K,
                     'clf__weights': CLF_KNN_W,
                 },
             ],
@@ -417,7 +443,8 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'clf__n_estimators': CLF_EXT_N_ESTS,
+                    'clf__n_estimators': CLF_EXT_E,
+                    'clf__max_depth': CLF_EXT_D,
                 },
             ],
         },
@@ -427,7 +454,8 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'clf__n_estimators': CLF_EXT_N_ESTS,
+                    'clf__n_estimators': CLF_EXT_E,
+                    'clf__max_depth': CLF_EXT_D,
                 },
             ],
         },
@@ -437,8 +465,8 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'clf__base_estimator__C': CLF_SVC_C,
-                    'clf__n_estimators': CLF_ADA_N_ESTS,
+                    'clf__base_estimator__C': CLF_SVM_C,
+                    'clf__n_estimators': CLF_ADA_E,
                 },
             ],
         },
@@ -448,8 +476,8 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'clf__max_depth': CLF_GRB_MAX_D,
-                    'clf__n_estimators': CLF_GRB_N_ESTS,
+                    'clf__n_estimators': CLF_GRB_E,
+                    'clf__max_depth': CLF_GRB_D,
                 },
             ],
         },
@@ -655,8 +683,9 @@ if args.analysis == 1:
         plt.figure('Figure 1-' + str(param_idx + 1))
         plt.rcParams['font.size'] = 14
         if param in (
-            'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs3__n_features_to_select',
-            'clf__n_neighbors', 'clf__n_estimators', 'clf__max_depth',
+            'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__estimator__max_depth',
+            'fs2__n_neighbors', 'fs2__sample_size', 'fs3__n_features_to_select', 'clf__n_neighbors',
+            'clf__n_estimators', 'clf__max_depth',
         ):
             x_axis = param_grid[0][param]
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
@@ -838,8 +867,9 @@ elif args.analysis == 2:
             plt.figure('Figure 2-' + str(param_idx + 1))
             plt.rcParams['font.size'] = 14
             if param in (
-                'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs3__n_features_to_select',
-                'clf__n_neighbors', 'clf__n_estimators', 'clf__max_depth',
+                'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__estimator__max_depth',
+                'fs2__n_neighbors', 'fs2__sample_size', 'fs3__n_features_to_select', 'clf__n_neighbors',
+                'clf__n_estimators', 'clf__max_depth',
             ):
                 x_axis = param_grid[0][param]
                 plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
