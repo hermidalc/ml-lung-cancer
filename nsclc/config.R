@@ -6,26 +6,34 @@ dataset_names <- c(
     "gse37745",
     "gse50081"
 )
-norm_types <- c(
+norm_methods <- c(
     "gcrma",
     "rma",
     "mas5"
 )
-bc_types <- c(
-    'none',
-    'ctr',
-    'std',
-    'rta',
-    'rtg',
-    'qnorm',
-    'cbt',
-    #'fab',
-    #'sva',
-    'stica0',
-    'stica025',
-    'stica05',
-    'stica1',
-    'svd'
+id_types <- c(
+    "none",
+    "gene"
+)
+merge_types <- c(
+    "none",
+    "merged"
+)
+bc_methods <- c(
+    "none",
+    "ctr",
+    "std",
+    "rta",
+    "rtg",
+    "qnorm",
+    "cbt",
+    # "fab",
+    "sva",
+    "stica0",
+    "stica025",
+    "stica05",
+    "stica1",
+    "svd"
 )
 common_pheno_colnames <- c("Age", "Gender", "Histology", "Class", "Batch")
 matfact_k <- 20
