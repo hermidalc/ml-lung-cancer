@@ -12,13 +12,18 @@ parser <- ArgumentParser()
 parser$add_argument("--num-tr-combo", type="integer", help="num datasets to combine")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocessing/normalization method")
 parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
+parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
 args <- parser$parse_args()
 num_tr_combo <- as.integer(args$num_tr_combo)
 if (!is.null(args$norm_meth)) {
     arg_norm_methods <- norm_methods[norm_methods %in% args$norm_meth]
+} else {
+    arg_norm_methods <- norm_methods
 }
 if (!is.null(args$id_type)) {
     arg_id_types <- id_types[id_types %in% args$id_type]
+} else {
+    arg_id_types <- id_types
 }
 if ("gene" %in% arg_id_types) {
     cdfname <- "hgu133plus2hsentrezg"
@@ -98,6 +103,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 }
                 cat("\n")
             }
+            if (args$load_only) next
             # process data
             dataset_tr_norm_name <- paste0(c(dataset_tr_name_combos[,col], suffixes), collapse="_")
             eset_tr_norm_name <- paste("eset", dataset_tr_norm_name, "tr", sep="_")

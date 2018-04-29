@@ -13,6 +13,7 @@ parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocess
 parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
 parser$add_argument("--merge-type", type="character", nargs="+", help="dataset merge type")
 parser$add_argument("--bc-meth", type="character", nargs="+", help="dataset batch correct method")
+parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
 args <- parser$parse_args()
 num_tr_combo <- as.integer(args$num_tr_combo)
 if (!is.null(args$norm_meth)) {
@@ -41,7 +42,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                     eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
                 }
                 eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
-                if (file.exists(eset_tr_file)) {
+                if (file.exists(eset_tr_file) & !exists(eset_tr_name)) {
                     cat("Loading:", eset_tr_name, "\n")
                     load(eset_tr_file)
                 }
@@ -61,6 +62,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                         load(eset_te_file)
                     }
                 }
+                if (args$load_only) next
                 for (bc_type in bc_types) {
                     if (grepl("^(stica\\d+|svd)$", bc_type)) {
                         Xtr <- exprs(get(eset_tr_name))
