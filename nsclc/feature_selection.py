@@ -138,7 +138,7 @@ class ReliefF(BaseEstimator, SelectorMixin):
         """
         X, y = check_X_y(X, y)
         warnings.filterwarnings('ignore', category=RRuntimeWarning, message="^Rjava\.init\.warning")
-        self.scores_ = np.array(r_relieff_feature_score(X, y), dtype=int)
+        self.scores_ = np.array(r_relieff_feature_score(X, y))
         warnings.filterwarnings('always', category=RRuntimeWarning)
         return self
 
