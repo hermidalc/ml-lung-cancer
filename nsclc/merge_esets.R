@@ -7,7 +7,7 @@ source("config.R")
 parser <- ArgumentParser()
 parser$add_argument("--num-tr-combo", type="integer", help="num datasets to combine")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocessing/normalization method")
-parser$add_argument("--id-type", type="character", nargs="+", help="dataset ID type")
+parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
 args <- parser$parse_args()
 num_tr_combo <- as.integer(args$num_tr_combo)
 if (!is.null(args$norm_meth)) {
@@ -19,7 +19,7 @@ if (!is.null(args$id_type)) {
 for (norm_meth in norm_methods) {
     for (id_type in id_types) {
         suffixes <- c(norm_meth)
-        if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+        if (id_type != "none") suffixes <- c(suffixes, id_type)
         for (dataset_name in dataset_names) {
             eset_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
             eset_file <- paste0("data/", eset_name, ".Rda")
