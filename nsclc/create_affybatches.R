@@ -9,7 +9,7 @@ source("config.R")
 parser <- ArgumentParser()
 parser$add_argument("--num-tr-combo", type="integer", help="num datasets to combine")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocessing/normalization method")
-parser$add_argument("--id-type", type="character", nargs="+", help="dataset ID type")
+parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
 args <- parser$parse_args()
 num_tr_combo <- as.integer(args$num_tr_combo)
 if (!is.null(args$norm_meth)) {
@@ -45,7 +45,7 @@ for (norm_meth in norm_methods) {
             if (is.null(cel_files)) next
             for (id_type in id_types) {
                 suffixes <- c(norm_meth)
-                if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+                if (id_type != "none") suffixes <- c(suffixes, id_type)
                 affybatch_name <- paste0(c("affybatch", dataset_tr_name_combos[,col], suffixes), collapse="_")
                 cat("Creating AffyBatch:", affybatch_name, "\n")
                 affybatch <- ReadAffy(filenames=cel_files, cdfname=cdfname, verbose=TRUE)
@@ -63,7 +63,7 @@ for (norm_meth in norm_methods) {
             if (!dir.exists(paste0("data/raw/", dataset_name))) next
             for (id_type in id_types) {
                 suffixes <- c(norm_meth)
-                if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+                if (id_type != "none") suffixes <- c(suffixes, id_type)
                 affybatch_name <- paste0(c("affybatch", dataset_name, suffixes), collapse="_")
                 cat("Creating AffyBatch:", affybatch_name, "\n")
                 affybatch <- ReadAffy(celfile.path=paste0("data/raw/", dataset_name), cdfname=cdfname, verbose=TRUE)
