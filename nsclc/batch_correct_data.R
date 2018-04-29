@@ -12,7 +12,6 @@ parser$add_argument("--num-tr-combo", type="integer", help="num datasets to comb
 parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocessing/normalization method")
 parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
 parser$add_argument("--merge-type", type="character", nargs="+", help="dataset merge type")
-parser$add_argument("--merge-type", type="character", nargs="+", help="dataset merge type")
 parser$add_argument("--bc-meth", type="character", nargs="+", help="dataset batch correct method")
 args <- parser$parse_args()
 num_tr_combo <- as.integer(args$num_tr_combo)
