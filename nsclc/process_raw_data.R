@@ -26,7 +26,6 @@ if ("gene" %in% id_types) {
     cdfname <- "hgu133plus2"
 }
 for (norm_meth in norm_methods) {
-    # preload all relevant esets and base affybatches
     dataset_tr_name_combos <- combn(dataset_names, num_tr_combo)
     for (col in 1:ncol(dataset_tr_name_combos)) {
         skip_processing <- FALSE
@@ -37,86 +36,63 @@ for (norm_meth in norm_methods) {
             }
         }
         if (skip_processing) next
-        # load affybatches
         for (id_type in id_types) {
-            suffixes <- c(norm_meth)
-            if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
-            if (norm_meth == "gcrma") {
-                affybatch_name <- paste0(c("affybatch", dataset_tr_name_combos[,col], suffixes), collapse="_")
-                if (!exists(affybatch_name)) {
-                    cat("Loading:", affybatch_name, "\n")
-                    load(paste0("data/", affybatch_name, ".Rda"))
-                }
-                for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
-                    if (!dir.exists(paste0("data/raw/", dataset_te_name))) next
-                    affybatch_name <- paste0(c("affybatch", dataset_te_name, suffixes), collapse="_")
-                    if (!exists(affybatch_name)) {
-                        cat("Loading:", affybatch_name, "\n")
-                        load(paste0("data/", affybatch_name, ".Rda"))
-                    }
-                }
-            }
-            else if (norm_meth == "rma") {
-                for (dataset_tr_name in dataset_tr_name_combos[,col]) {
-                    affybatch_name <- paste0(c("affybatch", dataset_tr_name, suffixes), collapse="_")
-                    if (!exists(affybatch_name)) {
-                        cat("Loading:", affybatch_name, "\n")
-                        load(paste0("data/", affybatch_name, ".Rda"))
-                    }
-                }
-            }
-        }
-        # load a reference eset set
-        for (id_type in id_types) {
-            suffixes <- c(norm_meth)
-            if (!is.na(id_type) & !(id_type %in% c("none", "gene"))) suffixes <- c(suffixes, id_type)
+            # load a reference eset set
+            ref_suffixes <- c(norm_meth)
+            if (!is.na(id_type) & !(id_type %in% c("none", "gene"))) ref_suffixes <- c(ref_suffixes, id_type)
             if (num_tr_combo > 1) {
-                eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
+                eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], ref_suffixes, "merged", "tr"), collapse="_")
             }
             else {
-                eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes), collapse="_")
+                eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], ref_suffixes), collapse="_")
             }
-            eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
-            if (file.exists(eset_tr_file) & !exists(eset_tr_name)) {
+            if (!exists(eset_tr_name)) {
                 cat("Loading:", eset_tr_name, "\n")
-                load(eset_tr_file)
+                load(paste0("data/", eset_tr_name, ".Rda"))
                 for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
                     if (!dir.exists(paste0("data/raw/", dataset_te_name))) next
-                    eset_te_name <- paste0(c("eset", dataset_te_name, suffixes), collapse="_")
+                    eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
                     if (!exists(eset_te_name)) {
                         cat("Loading:", eset_te_name, "\n")
                         load(paste0("data/", eset_te_name, ".Rda"))
                     }
                 }
-                ref_suffixes <- suffixes
-                break
             }
-        }
-    }
-    # process data
-    for (col in 1:ncol(dataset_tr_name_combos)) {
-        for (id_type in id_types) {
+            # load affybatches
             suffixes <- c(norm_meth)
             if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
             if (norm_meth == "gcrma") {
-                affybatch_name <- paste0(c("affybatch", dataset_tr_name_combos[,col], suffixes), collapse="_")
-                affybatch_tr <- get(affybatch_name)
+                affybatch_tr_name <- paste0(c("affybatch", dataset_tr_name_combos[,col], suffixes), collapse="_")
+                if (!exists(affybatch_tr_name)) {
+                    cat("Loading:", affybatch_tr_name, "\n")
+                    load(paste0("data/", affybatch_tr_name, ".Rda"))
+                }
+                affybatch_tr <- get(affybatch_tr_name)
             }
             else if (norm_meth == "rma") {
+                if (length(dataset_tr_name_combos[,col]) > 1) {
+                    cat("Loading/Merging: ")
+                }
+                else {
+                    cat("Loading: ")
+                }
                 affybatch_tr <- NULL
-                if (length(dataset_tr_name_combos[,col]) != 1) cat("Merging: ")
                 for (dataset_tr_name in dataset_tr_name_combos[,col]) {
-                    affybatch_name <- paste0(c("affybatch", dataset_tr_name, suffixes), collapse="_")
-                    cat(affybatch_name, "")
+                    affybatch_tr_name <- paste0(c("affybatch", dataset_tr_name, suffixes), collapse="_")
+                    cat(affybatch_tr_name, "")
+                    if (!exists(affybatch_tr_name)) {
+                        load(paste0("data/", affybatch_tr_name, ".Rda"))
+                    }
                     if (is.null(affybatch_tr)) {
-                        affybatch_tr <- get(affybatch_name)
+                        affybatch_tr <- get(affybatch_tr_name)
                     }
                     else {
-                        affybatch_tr <- merge.AffyBatch(affybatch_tr, get(affybatch_name), notes="")
+                        affybatch_tr <- merge.AffyBatch(affybatch_tr, get(affybatch_tr_name), notes="")
                     }
                 }
                 cat("\n")
             }
+            # process data
             dataset_tr_norm_name <- paste0(c(dataset_tr_name_combos[,col], suffixes), collapse="_")
             eset_tr_norm_name <- paste("eset", dataset_tr_norm_name, "tr", sep="_")
             cat("Creating:", eset_tr_norm_name, "\n")
@@ -144,11 +120,15 @@ for (norm_meth in norm_methods) {
             for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
                 cel_te_dir <- paste0("data/raw/", dataset_te_name)
                 if (!dir.exists(cel_te_dir)) next
-                affybatch_name <- paste0(c("affybatch", dataset_te_name, suffixes), collapse="_")
+                affybatch_te_name <- paste0(c("affybatch", dataset_te_name, suffixes), collapse="_")
+                if (!exists(affybatch_te_name)) {
+                    cat("Loading:", affybatch_te_name, "\n")
+                    load(paste0("data/", affybatch_te_name, ".Rda"))
+                }
                 eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
                 eset_te_norm_name <- paste(eset_tr_norm_name, dataset_te_name, "te", sep="_")
                 cat("Creating:", eset_te_norm_name, "\n")
-                xnorm_te <- rmaaddon(norm_obj, get(affybatch_name))
+                xnorm_te <- rmaaddon(norm_obj, get(affybatch_te_name))
                 rownames(xnorm_te) <- sub("\\.CEL$", "", rownames(xnorm_te))
                 if (id_type == "gene") {
                     eset_te_norm <- ExpressionSet(
@@ -169,6 +149,10 @@ for (norm_meth in norm_methods) {
                 remove(list=c(eset_te_norm_name))
             }
             remove(list=c(eset_tr_norm_obj_name, eset_tr_norm_name))
+            # unload multi-dataset gcrma affybatch tr and reference eset set
+            if (norm_meth == "gcrma" & num_tr_combo > 1) {
+                remove(list=c(affybatch_tr_name, eset_tr_name))
+            }
         }
     }
 }
