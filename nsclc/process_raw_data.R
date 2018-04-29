@@ -11,7 +11,7 @@ source("config.R")
 parser <- ArgumentParser()
 parser$add_argument("--num-tr-combo", type="integer", help="num datasets to combine")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocessing/normalization method")
-parser$add_argument("--id-type", type="character", nargs="+", help="dataset ID type")
+parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
 args <- parser$parse_args()
 num_tr_combo <- as.integer(args$num_tr_combo)
 if (!is.null(args$norm_meth)) {
@@ -25,21 +25,21 @@ if ("gene" %in% id_types) {
 } else {
     cdfname <- "hgu133plus2"
 }
-for (norm_meth in norm_methods) {
-    dataset_tr_name_combos <- combn(dataset_names, num_tr_combo)
-    for (col in 1:ncol(dataset_tr_name_combos)) {
-        skip_processing <- FALSE
-        for (dataset_tr_name in dataset_tr_name_combos[,col]) {
-            if (!dir.exists(paste0("data/raw/", dataset_tr_name))) {
-                skip_processing <- TRUE
-                break
-            }
+dataset_tr_name_combos <- combn(dataset_names, num_tr_combo)
+for (col in 1:ncol(dataset_tr_name_combos)) {
+    skip_processing <- FALSE
+    for (dataset_tr_name in dataset_tr_name_combos[,col]) {
+        if (!dir.exists(paste0("data/raw/", dataset_tr_name))) {
+            skip_processing <- TRUE
+            break
         }
-        if (skip_processing) next
+    }
+    if (skip_processing) next
+    for (norm_meth in norm_methods) {
         for (id_type in id_types) {
             # load a reference eset set
             ref_suffixes <- c(norm_meth)
-            if (!is.na(id_type) & !(id_type %in% c("none", "gene"))) ref_suffixes <- c(ref_suffixes, id_type)
+            if (!(id_type %in% c("none", "gene"))) ref_suffixes <- c(ref_suffixes, id_type)
             if (num_tr_combo > 1) {
                 eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], ref_suffixes, "merged", "tr"), collapse="_")
             }
@@ -60,7 +60,7 @@ for (norm_meth in norm_methods) {
             }
             # load affybatches
             suffixes <- c(norm_meth)
-            if (!is.na(id_type) & id_type != "none") suffixes <- c(suffixes, id_type)
+            if (id_type != "none") suffixes <- c(suffixes, id_type)
             if (norm_meth == "gcrma") {
                 affybatch_tr_name <- paste0(c("affybatch", dataset_tr_name_combos[,col], suffixes), collapse="_")
                 if (!exists(affybatch_tr_name)) {
