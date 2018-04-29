@@ -103,7 +103,10 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 }
                 cat("\n")
             }
-            if (args$load_only) next
+            if (args$load_only) {
+                remove(list=c(affybatch_tr_name, eset_tr_name))
+                next
+            }
             # process data
             dataset_tr_norm_name <- paste0(c(dataset_tr_name_combos[,col], suffixes), collapse="_")
             eset_tr_norm_name <- paste("eset", dataset_tr_norm_name, "tr", sep="_")
