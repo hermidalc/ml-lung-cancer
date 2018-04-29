@@ -7,7 +7,7 @@ randPermSampleNums <- function(eset, is.positive) {
 }
 
 filterEset <- function(eset, features=NULL, samples=NULL) {
-    if (!is.null(features) && !is.null(samples)) {
+    if (!is.null(features) & !is.null(samples)) {
         return(eset[c(features),c(samples)])
     }
     else if (!is.null(features)) {
