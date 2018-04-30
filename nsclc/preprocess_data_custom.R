@@ -88,8 +88,8 @@ for (dataset_name in dataset_names) {
     }
 }
 if (exists(eset_gse67639_name) & exists(common_feature_names) {
-    eset_gse67639_gene_new <- get(eset_gse67639_name)
-    eset_gse67639_gene_new <- eset_gse67639_gene_new[common_feature_names,]
-    assign(eset_gse67639_name, eset_gse67639_gene_new)
+    eset_gse67639_gene_filtered <- get(eset_gse67639_name)
+    eset_gse67639_gene_filtered <- eset_gse67639_gene_filtered[common_feature_names,]
+    assign(eset_gse67639_name, eset_gse67639_gene_filtered)
     save(list=eset_gse67639_name, file=paste0("data/", eset_gse67639_name, ".Rda"))
 }
