@@ -17,14 +17,14 @@ if (!is.null(args$norm_meth)) {
     arg_norm_methods <- norm_methods[norm_methods %in% args$norm_meth]
 }
 if (!is.null(args$id_type)) {
-    id_types <- id_types[id_types %in% args$id_type]
+    arg_id_types <- id_types[id_types %in% args$id_type]
 }
 if ("gene" %in% id_types) {
     cdfname <- "hgu133plus2hsentrezg"
 } else {
     cdfname <- "hgu133plus2"
 }
-if (id_type == "gene" & "mas5" %in% cmd_args[2:length(cmd_args)]) {
+if (id_type == "gene" & "mas5" %in% arg_norm_methods) {
     eset_gse67639_name <- "eset_gse67639_mas5_gene"
     cat("Loading:", eset_gse67639_name, "\n")
     load(paste0("data/", eset_gse67639_name, ".Rda"))
@@ -32,11 +32,11 @@ if (id_type == "gene" & "mas5" %in% cmd_args[2:length(cmd_args)]) {
 for (dataset_name in dataset_names) {
     if (!dir.exists(paste0("data/raw/", dataset_name))) next
     for (norm_meth in arg_norm_methods) {
-        for (id_type in id_types) {
-            # load a reference eset
-            for (ref_norm_meth in norm_methods) {
+        # load a reference eset
+        for (ref_norm_meth in norm_methods) {
+            for (ref_id_type in id_types) {
                 ref_suffixes <- c(ref_norm_meth)
-                if (id_type != "gene") ref_suffixes <- c(ref_suffixes, id_type)
+                if (!(ref_id_type %in% c("none", "gene"))) ref_suffixes <- c(ref_suffixes, ref_id_type)
                 eset_ref_name <- paste0(c("eset", dataset_name, ref_suffixes), collapse="_")
                 eset_ref_file <- paste0("data/", eset_ref_name, ".Rda")
                 if (file.exists(eset_ref_file) & !exists(eset_ref_name)) {
@@ -45,6 +45,8 @@ for (dataset_name in dataset_names) {
                     break
                 }
             }
+        }
+        for (id_type in arg_id_types) {
             suffixes <- c(norm_meth)
             if (id_type != "none") suffixes <- c(suffixes, id_type)
             eset_norm_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
@@ -60,9 +62,6 @@ for (dataset_name in dataset_names) {
             }
             colnames(exprs) <- sub("\\.CEL$", "", colnames(exprs))
             if (id_type == "gene") {
-                if (exists(eset_gse67639_name)) {
-                    
-                }
                 eset_norm <- ExpressionSet(
                     assayData=exprs,
                     phenoData=phenoData(get(eset_ref_name)),
@@ -71,6 +70,12 @@ for (dataset_name in dataset_names) {
                     )),
                     annotation=cdfname
                 )
+                if (exists(eset_gse67639_name)) {
+                    if (!exists(common_feature_names) {
+                        common_feature_names <- intersect(featureNames(get(eset_gse67639_name)), featureNames(eset_norm))
+                    }
+                    eset_norm <- eset_norm[common_feature_names,]
+                }
             }
             else {
                 eset_norm <- get(eset_ref_name)
@@ -81,4 +86,10 @@ for (dataset_name in dataset_names) {
             remove(list=c(eset_norm_name))
         }
     }
+}
+if (exists(eset_gse67639_name) & exists(common_feature_names) {
+    eset_gse67639_gene_new <- get(eset_gse67639_name)
+    eset_gse67639_gene_new <- eset_gse67639_gene_new[common_feature_names,]
+    assign(eset_gse67639_name, eset_gse67639_gene_new)
+    save(list=eset_gse67639_name, file=paste0("data/", eset_gse67639_name, ".Rda"))
 }
