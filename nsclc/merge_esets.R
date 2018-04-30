@@ -8,7 +8,9 @@ parser <- ArgumentParser()
 parser$add_argument("--num-tr-combo", type="integer", help="num datasets to combine")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocessing/normalization method")
 parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
+parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
 args <- parser$parse_args()
+
 num_tr_combo <- as.integer(args$num_tr_combo)
 if (!is.null(args$norm_meth)) {
     norm_methods <- norm_methods[norm_methods %in% args$norm_meth]
@@ -32,6 +34,7 @@ for (norm_meth in norm_methods) {
                 assign(eset_name, eset)
             }
         }
+        if (args$load_only) next
         dataset_name_combos <- combn(dataset_names, num_tr_combo)
         for (col in 1:ncol(dataset_name_combos)) {
             eset_merged_name <- paste0(c("eset", dataset_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
