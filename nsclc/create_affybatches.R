@@ -10,7 +10,9 @@ parser <- ArgumentParser()
 parser$add_argument("--num-tr-combo", type="integer", help="num datasets to combine")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocessing/normalization method")
 parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
+parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and dataset load only")
 args <- parser$parse_args()
+
 num_tr_combo <- as.integer(args$num_tr_combo)
 if (!is.null(args$norm_meth)) {
     norm_methods <- norm_methods[norm_methods %in% args$norm_meth]
@@ -48,6 +50,7 @@ for (norm_meth in norm_methods) {
                 if (id_type != "none") suffixes <- c(suffixes, id_type)
                 affybatch_name <- paste0(c("affybatch", dataset_tr_name_combos[,col], suffixes), collapse="_")
                 cat("Creating AffyBatch:", affybatch_name, "\n")
+                if (args$load_only) next
                 affybatch <- ReadAffy(filenames=cel_files, cdfname=cdfname, verbose=TRUE)
                 affybatch <- bg.adjust.gcrma(
                     affybatch, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
@@ -66,6 +69,7 @@ for (norm_meth in norm_methods) {
                 if (id_type != "none") suffixes <- c(suffixes, id_type)
                 affybatch_name <- paste0(c("affybatch", dataset_name, suffixes), collapse="_")
                 cat("Creating AffyBatch:", affybatch_name, "\n")
+                if (args$load_only) next
                 affybatch <- ReadAffy(celfile.path=paste0("data/raw/", dataset_name), cdfname=cdfname, verbose=TRUE)
                 cat("Performing background correction\n")
                 affybatch <- bg.correct.rma(affybatch)
