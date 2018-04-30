@@ -165,10 +165,8 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 remove(list=c(eset_te_norm_name))
             }
             remove(list=c(eset_tr_norm_obj_name, eset_tr_norm_name))
-            # unload multi-dataset gcrma affybatch tr and reference eset set
-            if (norm_meth == "gcrma" & num_tr_combo > 1) {
-                remove(list=c(affybatch_tr_name, eset_tr_name))
-            }
+            # unload multi-dataset gcrma affybatch tr (to save memory)
+            if (norm_meth == "gcrma" & num_tr_combo > 1) remove(list=c(affybatch_tr_name))
         }
     }
 }
