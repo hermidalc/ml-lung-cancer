@@ -15,6 +15,7 @@ parser$add_argument("--merge-type", type="character", nargs="+", help="dataset m
 parser$add_argument("--bc-meth", type="character", nargs="+", help="dataset batch correct method")
 parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
 args <- parser$parse_args()
+
 num_tr_combo <- as.integer(args$num_tr_combo)
 if (!is.null(args$norm_meth)) {
     norm_methods <- norm_methods[norm_methods %in% args$norm_meth]
@@ -42,12 +43,14 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                     eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes, "merged", "tr"), collapse="_")
                 }
                 eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
-                if (file.exists(eset_tr_file) & !exists(eset_tr_name)) {
-                    cat("Loading:", eset_tr_name, "\n")
-                    load(eset_tr_file)
-                }
-                else if (!exists(eset_tr_name)) {
-                    next
+                if (!exists(eset_tr_name)) {
+                    if (file.exists(eset_tr_file)) {
+                        cat("Loading:", eset_tr_name, "\n")
+                        load(eset_tr_file)
+                    }
+                    else {
+                        next
+                    }
                 }
                 for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
                     if (merge_type == "none") {
