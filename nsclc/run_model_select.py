@@ -162,7 +162,7 @@ def fit_pipeline(params, pipeline_order, X_tr, y_tr):
     pipe = Pipeline(pipe_steps, memory=memory)
     pipe.set_params(**{ k: v for k, v in params.items() if '__' in k })
     pipe.fit(X_tr, y_tr)
-    print('.', end='', flush=True)
+    if args.gscv_verbose == 0: print('.', end='', flush=True)
     return pipe
 
 # config
@@ -931,6 +931,8 @@ elif args.analysis == 2:
             plt.legend(loc='lower right', fontsize='small')
             plt.grid('on')
     # plot num top-ranked features selected vs test dataset perf metrics
+    dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.datasets_tr)))
+    sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames)))
     plt.figure('Figure 3')
     plt.rcParams['font.size'] = 14
     plt.title(
@@ -953,8 +955,6 @@ elif args.analysis == 2:
     pipe.set_params(
         **{ k: v for k, v in grid.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
     )
-    dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.datasets_tr)))
-    sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames)))
     for dataset_te_basename in dataset_te_basenames:
         if args.no_addon_te:
             dataset_te_name = '_'.join([dataset_te_basename, prep_methods[0]])
@@ -1239,12 +1239,13 @@ elif args.analysis == 3:
                                     best_grid_idxs[group_idx] = grid_idx
                             else:
                                 best_grid_idxs.append(grid_idx)
-                    print('Fitting pipelines', end='', flush=True)
+                    print('Fitting ' + str(len(best_grid_idxs)) + ' pipelines', end='', flush=True)
+                    if args.gscv_verbose > 0: print()
                     pipes = Parallel(n_jobs=args.num_cores, verbose=args.gscv_verbose)(
                         delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr)
                         for params in map(lambda i: grid.cv_results_['params'][i], best_grid_idxs)
                     )
-                    print('Done')
+                    if args.gscv_verbose == 0: print('done')
                     best_roc_auc_te = 0
                     best_bcr_te = 0
                     meth_scores, best_params_te = {}, {}
@@ -1308,29 +1309,40 @@ elif args.analysis == 3:
                             for metric, metric_scores in meth_metric_scores.items():
                                 mean_score = np.mean(metric_scores)
                                 if meth_type == 'fs':
-                                    results['te_fs'][te_idx, meth_idx]['tr_pr'][tr_idx, pr_idx][metric] = mean_score
-                                    results['tr_fs'][tr_idx, meth_idx]['te_pr'][te_idx, pr_idx][metric] = mean_score
-                                    results['pr_fs'][pr_idx, meth_idx]['te_tr'][te_idx, tr_idx][metric] = mean_score
+                                    (results['te_fs'][te_idx, meth_idx]
+                                        ['tr_pr'][tr_idx, pr_idx][metric]) = mean_score
+                                    (results['tr_fs'][tr_idx, meth_idx]
+                                        ['te_pr'][te_idx, pr_idx][metric]) = mean_score
+                                    (results['pr_fs'][pr_idx, meth_idx]
+                                        ['te_tr'][te_idx, tr_idx][metric]) = mean_score
                                 elif meth_type == 'clf':
-                                    results['te_clf'][te_idx, meth_idx]['tr_pr'][tr_idx, pr_idx][metric] = mean_score
-                                    results['tr_clf'][tr_idx, meth_idx]['te_pr'][te_idx, pr_idx][metric] = mean_score
-                                    results['pr_clf'][pr_idx, meth_idx]['te_tr'][te_idx, tr_idx][metric] = mean_score
+                                    (results['te_clf'][te_idx, meth_idx]
+                                        ['tr_pr'][tr_idx, pr_idx][metric]) = mean_score
+                                    (results['tr_clf'][tr_idx, meth_idx]
+                                        ['te_pr'][te_idx, pr_idx][metric]) = mean_score
+                                    (results['pr_clf'][pr_idx, meth_idx]
+                                        ['te_tr'][te_idx, tr_idx][metric]) = mean_score
                                 elif meth_type == 'pr':
-                                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx][metric] = mean_score
-                                    results['tr_pr'][tr_idx, pr_idx]['te'][te_idx][metric] = mean_score
+                                    (results['te_pr'][te_idx, pr_idx]
+                                        ['tr'][tr_idx][metric]) = mean_score
+                                    (results['tr_pr'][tr_idx, pr_idx]
+                                        ['te'][te_idx][metric]) = mean_score
                     for meth_type_combo, meth_type_combo_scores in meth_combo_scores.items():
                         if meth_type_combo == 'fs_clf':
                             for fs_idx, fs_scores in enumerate(meth_type_combo_scores):
                                 for clf_idx, fs_clf_scores in enumerate(fs_scores):
                                     for metric, metric_scores in fs_clf_scores.items():
                                         mean_score = np.mean(metric_scores)
-                                        results['fs_clf'][fs_idx, clf_idx]['te_tr'][te_idx, tr_idx]['pr'][pr_idx][metric] = mean_score
-                                        results['fs_clf'][fs_idx, clf_idx]['pr_te'][pr_idx, te_idx]['tr'][tr_idx][metric] = mean_score
-                                        results['fs_clf'][fs_idx, clf_idx]['pr_tr'][pr_idx, tr_idx]['te'][te_idx][metric] = mean_score
+                                        (results['fs_clf'][fs_idx, clf_idx]['te_tr'][te_idx, tr_idx]
+                                            ['pr'][pr_idx][metric]) = mean_score
+                                        (results['fs_clf'][fs_idx, clf_idx]['pr_te'][pr_idx, te_idx]
+                                            ['tr'][tr_idx][metric]) = mean_score
+                                        (results['fs_clf'][fs_idx, clf_idx]['pr_tr'][pr_idx, tr_idx]
+                                            ['te'][te_idx][metric]) = mean_score
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
                 dataset_pair_counter += 1
-                # flush cache with each tr/te pair run (grows too big if not)
+                # flush cache with each tr/te pair run (can grow too big if not)
                 if args.pipe_memory: memory.clear(warn=False)
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
@@ -1541,6 +1553,7 @@ elif args.analysis == 3:
     plt.rcParams['figure.max_open_warning'] = 0
     for figure_idx, figure in enumerate(figures):
         figure_num = figure_idx + 4
+        sns.set_palette(sns.color_palette('hls', len(figure['row_names'])))
         for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
             metric_title = metric.replace('_', ' ').upper()
             figure_name = 'Figure ' + str(figure_num) + '-' + str(metric_idx + 1)
@@ -1577,7 +1590,6 @@ elif args.analysis == 3:
             else:
                 plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
             for row_idx, row_results in enumerate(figure['results']):
-                sns.set_palette(sns.color_palette('hls', row_results.size))
                 mean_scores_cv = np.full((figure['results'].shape[1],), np.nan, dtype=float)
                 range_scores_cv = np.full((2, figure['results'].shape[1]), np.nan, dtype=float)
                 mean_scores_te = np.full((figure['results'].shape[1],), np.nan, dtype=float)
