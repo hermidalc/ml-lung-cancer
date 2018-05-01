@@ -27,7 +27,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 from sklearn.metrics import roc_auc_score, roc_curve, make_scorer
-from sklearn.externals.joblib import dump, Memory
+from sklearn.externals.joblib import delayed, dump, Memory, Parallel
 from feature_selection import CFS, FCBF, ReliefF
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -154,6 +154,17 @@ def bcr_score(y_true, y_pred):
         return tn / mes2
     else:
         return (tp / mes1 + tn / mes2) / 2
+
+# parallel pipeline fit function
+def fit_pipeline(params, pipeline_order, X_tr, y_tr):
+    pipe_steps = sorted([
+        (k, v) for k, v in params.items() if k in pipeline_order
+    ], key=lambda s: pipeline_order.index(s[0]))
+    pipe = Pipeline(pipe_steps, memory=memory)
+    pipe.set_params(**{ k: v for k, v in params.items() if '__' in k })
+    pipe.fit(X_tr, y_tr)
+    print('.', end='', flush=True)
+    return pipe
 
 # config
 if args.pipe_memory:
@@ -1219,33 +1230,32 @@ elif args.analysis == 3:
                     results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['num_features'] = feature_idxs.size
                     results['tr_pr'][tr_idx, pr_idx]['te'][te_idx] = results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]
                 elif analysis_type == 'all_methods':
-                    pipe_fit_counter = 0
+                    best_grid_idxs = []
+                    for group_idx, param_grid_group in enumerate(param_grid_data):
+                        for grid_idx in param_grid_group['grid_idxs']:
+                            if group_idx < len(best_grid_idxs):
+                                if (grid.cv_results_['rank_test_' + args.gscv_refit][grid_idx] <
+                                    grid.cv_results_['rank_test_' + args.gscv_refit][best_grid_idxs[group_idx]]):
+                                    best_grid_idxs[group_idx] = grid_idx
+                            else:
+                                best_grid_idxs.append(grid_idx)
+                    print('Fitting pipelines: ', end='', flush=True)
+                    pipes = Parallel(n_jobs=args.gscv_jobs)(
+                        delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr)
+                        for params in map(lambda i: grid.cv_results_['params'][i], best_grid_idxs)
+                    )
+                    print('Done')
                     best_roc_auc_te = 0
                     best_bcr_te = 0
                     meth_scores, best_params_te = {}, {}
                     meth_combo_scores = { 'fs_clf': [] }
-                    for param_grid_group in param_grid_data:
-                        best_grid_idx = None
-                        for grid_idx in param_grid_group['grid_idxs']:
-                            if best_grid_idx is not None:
-                                if (grid.cv_results_['rank_test_' + args.gscv_refit][grid_idx] <
-                                    grid.cv_results_['rank_test_' + args.gscv_refit][best_grid_idx]):
-                                    best_grid_idx = grid_idx
-                            else:
-                                best_grid_idx = grid_idx
-                        params = grid.cv_results_['params'][best_grid_idx]
-                        pipe_steps = sorted([
-                            (k, v) for k, v in params.items() if k in pipeline_order
-                        ], key=lambda s: pipeline_order.index(s[0]))
-                        pipe = Pipeline(pipe_steps, memory=memory)
-                        pipe.set_params(**{ k: v for k, v in params.items() if '__' in k })
-                        pipe.fit(X_tr, y_tr)
-                        if hasattr(pipe, 'decision_function'):
-                            y_score = pipe.decision_function(X_te)
+                    for group_idx, param_grid_group in enumerate(param_grid_data):
+                        if hasattr(pipes[group_idx], 'decision_function'):
+                            y_score = pipes[group_idx].decision_function(X_te)
                         else:
-                            y_score = pipe.predict_proba(X_te)[:,1]
+                            y_score = pipes[group_idx].predict_proba(X_te)[:,1]
                         roc_auc_te = roc_auc_score(y_te, y_score)
-                        y_pred = pipe.predict(X_te)
+                        y_pred = pipes[group_idx].predict(X_te)
                         bcr_te = bcr_score(y_te, y_pred)
                         for meth_type, meth_idx in param_grid_group['meth_idxs'].items():
                             if meth_type not in meth_scores:
@@ -1258,7 +1268,7 @@ elif args.analysis == 3:
                                 if metric + '_te' not in meth_scores[meth_type][meth_idx]:
                                     meth_scores[meth_type][meth_idx][metric + '_te'] = []
                                 meth_scores[meth_type][meth_idx][metric + '_cv'].append(
-                                    grid.cv_results_['mean_test_' + metric][best_grid_idx]
+                                    grid.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
                                 )
                             meth_scores[meth_type][meth_idx]['roc_auc_te'].append(roc_auc_te)
                             meth_scores[meth_type][meth_idx]['bcr_te'].append(bcr_te)
@@ -1274,7 +1284,7 @@ elif args.analysis == 3:
                             if metric + '_te' not in meth_combo_scores['fs_clf'][fs_idx][clf_idx]:
                                 meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_te'] = []
                             meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_cv'].append(
-                                grid.cv_results_['mean_test_' + metric][best_grid_idx]
+                                grid.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
                             )
                         meth_combo_scores['fs_clf'][fs_idx][clf_idx]['roc_auc_te'].append(roc_auc_te)
                         meth_combo_scores['fs_clf'][fs_idx][clf_idx]['bcr_te'].append(bcr_te)
@@ -1283,9 +1293,6 @@ elif args.analysis == 3:
                                 best_roc_auc_te = roc_auc_te
                                 best_bcr_te = bcr_te
                                 best_params_te = params
-                        pipe_fit_counter += 1
-                        print("Pipeline test fits:", pipe_fit_counter, end='\r', flush=True)
-                    print()
                     best_idx_cv = np.argmin(grid.cv_results_['rank_test_' + args.gscv_refit])
                     best_roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][best_idx_cv]
                     best_bcr_cv = grid.cv_results_['mean_test_bcr'][best_idx_cv]
