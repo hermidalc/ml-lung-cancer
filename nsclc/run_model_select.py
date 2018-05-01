@@ -1369,7 +1369,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['te_pr'],
             'row_names': dataset_te_basenames,
-            'col_results_key': 'tr',
+            'field_results_key': 'tr',
         },
         {
             'x_axis': range(1, len(dataset_te_basenames) + 1),
@@ -1379,7 +1379,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['te_pr'].T,
             'row_names': prep_methods,
-            'col_results_key': 'tr',
+            'field_results_key': 'tr',
         },
         # plot results['tr_pr']
         {
@@ -1391,7 +1391,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['tr_pr'],
             'row_names': dataset_tr_basenames,
-            'col_results_key': 'te',
+            'field_results_key': 'te',
         },
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
@@ -1401,7 +1401,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['tr_pr'].T,
             'row_names': prep_methods,
-            'col_results_key': 'te',
+            'field_results_key': 'te',
         },
         # plot results['te_fs']
         {
@@ -1412,7 +1412,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['te_fs'],
             'row_names': dataset_te_basenames,
-            'col_results_key': 'tr_pr',
+            'field_results_key': 'tr_pr',
         },
         {
             'x_axis': range(1, len(dataset_te_basenames) + 1),
@@ -1422,7 +1422,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['te_fs'].T,
             'row_names': list(pipelines['fs'].keys()),
-            'col_results_key': 'tr_pr',
+            'field_results_key': 'tr_pr',
         },
         # plot results['tr_fs']
         {
@@ -1433,7 +1433,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['tr_fs'],
             'row_names': dataset_tr_basenames,
-            'col_results_key': 'te_pr',
+            'field_results_key': 'te_pr',
         },
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
@@ -1443,7 +1443,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['tr_fs'].T,
             'row_names': list(pipelines['fs'].keys()),
-            'col_results_key': 'te_pr',
+            'field_results_key': 'te_pr',
         },
         # plot results['te_clf']
         {
@@ -1454,7 +1454,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['te_clf'],
             'row_names': dataset_te_basenames,
-            'col_results_key': 'tr_pr',
+            'field_results_key': 'tr_pr',
         },
         {
             'x_axis': range(1, len(dataset_te_basenames) + 1),
@@ -1464,7 +1464,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['te_clf'].T,
             'row_names': list(pipelines['clf'].keys()),
-            'col_results_key': 'tr_pr',
+            'field_results_key': 'tr_pr',
         },
         # plot results['tr_clf']
         {
@@ -1475,7 +1475,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['tr_clf'],
             'row_names': dataset_tr_basenames,
-            'col_results_key': 'te_pr',
+            'field_results_key': 'te_pr',
         },
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
@@ -1485,7 +1485,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['tr_clf'].T,
             'row_names': list(pipelines['clf'].keys()),
-            'col_results_key': 'te_pr',
+            'field_results_key': 'te_pr',
         },
         # plot results['pr_fs']
         {
@@ -1496,7 +1496,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['pr_fs'],
             'row_names': prep_methods,
-            'col_results_key': 'te_tr',
+            'field_results_key': 'te_tr',
         },
         {
             'x_axis': range(1, len(prep_methods) + 1),
@@ -1507,7 +1507,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['pr_fs'].T,
             'row_names': list(pipelines['fs'].keys()),
-            'col_results_key': 'te_tr',
+            'field_results_key': 'te_tr',
         },
         # plot results['pr_clf']
         {
@@ -1518,7 +1518,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['pr_clf'],
             'row_names': prep_methods,
-            'col_results_key': 'te_tr',
+            'field_results_key': 'te_tr',
         },
         {
             'x_axis': range(1, len(prep_methods) + 1),
@@ -1529,7 +1529,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['pr_clf'].T,
             'row_names': list(pipelines['clf'].keys()),
-            'col_results_key': 'te_tr',
+            'field_results_key': 'te_tr',
         },
         # plot results['fs_clf']
         {
@@ -1540,7 +1540,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['fs_clf'],
             'row_names': list(pipelines['fs'].keys()),
-            'col_results_key': 'pr_te',
+            'field_results_key': 'pr_te',
             'sub_results_key': 'tr',
         },
         {
@@ -1551,7 +1551,7 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['fs_clf'].T,
             'row_names': list(pipelines['clf'].keys()),
-            'col_results_key': 'pr_te',
+            'field_results_key': 'pr_te',
             'sub_results_key': 'tr',
         },
     ]
@@ -1603,7 +1603,7 @@ elif args.analysis == 3:
                 for col_idx, col_results in enumerate(row_results):
                     scores_cv = np.array([], dtype=float)
                     scores_te = np.array([], dtype=float)
-                    field_results = col_results[figure['col_results_key']]
+                    field_results = col_results[figure['field_results_key']]
                     if 'sub_results_key' in figure:
                         sub_field_results = field_results[figure['sub_results_key']]
                         scores_cv = sub_field_results[metric + '_cv'][sub_field_results[metric + '_cv'] > 0]
