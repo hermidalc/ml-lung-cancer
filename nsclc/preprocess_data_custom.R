@@ -17,7 +17,7 @@ if (!is.null(args$norm_meth)) {
     arg_norm_methods <- norm_methods[norm_methods %in% args$norm_meth]
 }
 if (!is.null(args$id_type)) {
-    arg_id_types <- id_types[id_types %in% args$id_type]
+    id_types <- id_types[id_types %in% args$id_type]
 }
 if ("gene" %in% id_types) {
     cdfname <- "hgu133plus2hsentrezg"
@@ -32,21 +32,24 @@ if (id_type == "gene" & "mas5" %in% arg_norm_methods) {
 for (dataset_name in dataset_names) {
     if (!dir.exists(paste0("data/raw/", dataset_name))) next
     for (norm_meth in arg_norm_methods) {
-        # load a reference eset
-        for (ref_norm_meth in norm_methods) {
-            for (ref_id_type in id_types) {
+        for (id_type in id_types) {
+            # load a reference eset
+            for (ref_norm_meth in norm_methods) {
                 ref_suffixes <- c(ref_norm_meth)
                 if (!(ref_id_type %in% c("none", "gene"))) ref_suffixes <- c(ref_suffixes, ref_id_type)
                 eset_ref_name <- paste0(c("eset", dataset_name, ref_suffixes), collapse="_")
                 eset_ref_file <- paste0("data/", eset_ref_name, ".Rda")
-                if (file.exists(eset_ref_file) & !exists(eset_ref_name)) {
-                    cat("Loading:", eset_ref_name, "\n")
-                    load(eset_ref_file)
+                if (file.exists(eset_ref_file) {
+                    if (!exists(eset_ref_name)) {
+                        cat("Loading:", eset_ref_name, "\n")
+                        load(eset_ref_file)
+                        break
+                    }
+                }
+                else {
                     break
                 }
             }
-        }
-        for (id_type in arg_id_types) {
             suffixes <- c(norm_meth)
             if (id_type != "none") suffixes <- c(suffixes, id_type)
             eset_norm_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")

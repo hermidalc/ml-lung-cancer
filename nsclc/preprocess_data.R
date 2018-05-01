@@ -23,11 +23,11 @@ if (!is.null(args$norm_meth)) {
     arg_norm_methods <- norm_methods
 }
 if (!is.null(args$id_type)) {
-    arg_id_types <- id_types[id_types %in% args$id_type]
+    id_types <- id_types[id_types %in% args$id_type]
 } else {
-    arg_id_types <- id_types
+    id_types <- id_types
 }
-if ("gene" %in% arg_id_types) {
+if ("gene" %in% id_types) {
     cdfname <- "hgu133plus2hsentrezg"
 } else {
     cdfname <- "hgu133plus2"
@@ -43,12 +43,11 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
     }
     if (skip_processing) next
     for (norm_meth in arg_norm_methods) {
-        # load a reference eset set
-        ref_eset_set_loaded <- FALSE
-        for (ref_norm_meth in norm_methods) {
-            for (ref_id_type in id_types) {
+        for (id_type in id_types) {
+            # load a reference eset set
+            for (ref_norm_meth in norm_methods) {
                 ref_suffixes <- c(ref_norm_meth)
-                if (!(ref_id_type %in% c("none", "gene"))) ref_suffixes <- c(ref_suffixes, ref_id_type)
+                if (!(id_type %in% c("none", "gene"))) ref_suffixes <- c(ref_suffixes, id_type)
                 if (num_tr_combo > 1) {
                     eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], ref_suffixes, "merged", "tr"), collapse="_")
                 }
@@ -56,23 +55,25 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                     eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], ref_suffixes), collapse="_")
                 }
                 eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
-                if (!exists(eset_tr_name) & file.exists(eset_tr_file)) {
-                    cat("Loading:", eset_tr_name, "\n")
-                    load(eset_tr_file)
-                    for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
-                        if (!dir.exists(paste0("data/raw/", dataset_te_name))) next
-                        eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
-                        if (!exists(eset_te_name)) {
-                            cat("Loading:", eset_te_name, "\n")
-                            load(paste0("data/", eset_te_name, ".Rda"))
+                if (!exists(eset_tr_name)) {
+                    if (file.exists(eset_tr_file)) {
+                        cat("Loading:", eset_tr_name, "\n")
+                        load(eset_tr_file)
+                        for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
+                            if (!dir.exists(paste0("data/raw/", dataset_te_name))) next
+                            eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
+                            if (!exists(eset_te_name)) {
+                                cat("Loading:", eset_te_name, "\n")
+                                load(paste0("data/", eset_te_name, ".Rda"))
+                            }
                         }
+                        break
                     }
-                    ref_eset_set_loaded <- TRUE
+                }
+                else {
+                    break
                 }
             }
-            if (ref_eset_set_loaded) break
-        }
-        for (id_type in arg_id_types) {
             # load affybatches
             suffixes <- c(norm_meth)
             if (id_type != "none") suffixes <- c(suffixes, id_type)
