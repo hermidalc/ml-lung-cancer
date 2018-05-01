@@ -1239,8 +1239,8 @@ elif args.analysis == 3:
                                     best_grid_idxs[group_idx] = grid_idx
                             else:
                                 best_grid_idxs.append(grid_idx)
-                    print('Fitting pipelines: ', end='', flush=True)
-                    pipes = Parallel(n_jobs=args.num_cores)(
+                    print('Fitting pipelines', end='', flush=True)
+                    pipes = Parallel(n_jobs=args.num_cores, verbose=args.gscv_verbose)(
                         delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr)
                         for params in map(lambda i: grid.cv_results_['params'][i], best_grid_idxs)
                     )
