@@ -93,7 +93,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                         assign(eset_tr_bc_obj_name, bc_obj)
                         save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
                         for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
-                            if (merged_type == "none") {
+                            if (merge_type == "none") {
                                 eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
                             }
                             else {
@@ -170,7 +170,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                         assign(eset_tr_bc_obj_name, bc_obj)
                         save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
                         for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
-                            if (merged_type == "none") {
+                            if (merge_type == "none") {
                                 eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
                             }
                             else {
