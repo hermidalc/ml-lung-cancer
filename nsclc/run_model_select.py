@@ -98,7 +98,7 @@ parser.add_argument('--num-cores', type=int, default=-1, help='num parallel core
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--save-plots', default=False, action='store_true', help='save figure plots')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
-parser.add_argument('--verbose', default=False, action='store_true', help='be more verbose')
+parser.add_argument('--verbose', default=int, default=1, help='program verbosity')
 args = parser.parse_args()
 
 base = importr('base')
@@ -576,8 +576,9 @@ if args.analysis == 1:
         for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
             for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
                 param_grid.append({ **fs_params, **slr_params, **clf_params })
-    print("Param grid:")
-    pprint(param_grid)
+    if args.verbose > 0:
+        print("Param grid:")
+        pprint(param_grid)
     grid = GridSearchCV(
         Pipeline(sorted(
             pipelines['fs'][args.fs_meth]['steps'] +
@@ -812,8 +813,9 @@ elif args.analysis == 2:
         for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
             for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
                 param_grid.append({ **fs_params, **slr_params, **clf_params })
-    print("Param grid:")
-    pprint(param_grid)
+    if args.verbose > 0:
+        print("Param grid:")
+        pprint(param_grid)
     grid = GridSearchCV(
         Pipeline(sorted(
             pipelines['fs'][args.fs_meth]['steps'] +
@@ -1028,8 +1030,9 @@ elif args.analysis == 3:
             for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
                 for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
                     param_grid.append({ **fs_params, **slr_params, **clf_params })
-        print("Param grid:")
-        pprint(param_grid)
+        if args.verbose > 0:
+            print("Param grid:")
+            pprint(param_grid)
         grid = GridSearchCV(
             Pipeline(sorted(
                 pipelines['fs'][args.fs_meth]['steps'] +
@@ -1073,10 +1076,11 @@ elif args.analysis == 3:
                                     params_data['grid_idxs'].append(param_grid_idx)
                                     param_grid_idx += 1
                                 param_grid_data.append(params_data)
-        print("Param grid:")
-        pprint(param_grid)
-        print("Param grid data:")
-        pprint(param_grid_data)
+        if args.verbose > 0:
+            print("Param grid:")
+            pprint(param_grid)
+            print("Param grid data:")
+            pprint(param_grid_data)
         grid = GridSearchCV(
             Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
             param_grid=param_grid, scoring=gscv_scoring, refit=False,
