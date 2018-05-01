@@ -799,7 +799,7 @@ elif args.analysis == 2:
         prep_methods.append(bc_meth)
     args.datasets_tr = natsorted(args.datasets_tr)
     dataset_tr_name = '_'.join(args.datasets_tr + prep_methods + ['tr'])
-    print('Train Dataset:', dataset_tr_name)
+    print('Train:', dataset_tr_name)
     eset_tr_name = 'eset_' + dataset_tr_name
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
@@ -995,7 +995,7 @@ elif args.analysis == 2:
         # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
         # print summary info
         print(
-            'Test Dataset: %3s' % dataset_te_name,
+            'Test: %3s' % dataset_te_name,
             ' ROC AUC: %.4f' % np.max(roc_aucs_te),
             ' BCR: %.4f' % np.max(bcrs_te),
         )
