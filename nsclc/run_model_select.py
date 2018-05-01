@@ -99,6 +99,7 @@ parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refi
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--save-plots', default=False, action='store_true', help='save figure plots')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
+parser.add_argument('--verbose', default=False, action='store_true', help='be more verbose')
 args = parser.parse_args()
 
 base = importr('base')
@@ -1016,6 +1017,8 @@ elif args.analysis == 3:
             for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
                 for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
                     param_grid.append({ **fs_params, **slr_params, **clf_params })
+        print("Param grid:")
+        pprint(param_grid)
         grid = GridSearchCV(
             Pipeline(sorted(
                 pipelines['fs'][args.fs_meth]['steps'] +
@@ -1059,7 +1062,10 @@ elif args.analysis == 3:
                                     params_data['grid_idxs'].append(param_grid_idx)
                                     param_grid_idx += 1
                                 param_grid_data.append(params_data)
-        # pprint(param_grid)
+        print("Param grid:")
+        pprint(param_grid)
+        print("Param grid data:")
+        pprint(param_grid_data)
         grid = GridSearchCV(
             Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
             param_grid=param_grid, scoring=gscv_scoring, refit=False,
@@ -1107,41 +1113,43 @@ elif args.analysis == 3:
         ('roc_auc_te', float), ('bcr_te', float),
         ('num_features', int),
     ]
-    te_pr_results = np.zeros((len(dataset_te_basenames), len(prep_groups)), dtype=[
-        ('tr', score_dtypes, (len(dataset_tr_combos),))
-    ])
-    tr_pr_results = np.zeros((len(dataset_tr_combos), len(prep_groups)), dtype=[
-        ('te', score_dtypes, (len(dataset_te_basenames),))
-    ])
-    te_fs_results = np.zeros((len(dataset_te_basenames), len(pipelines['fs'])), dtype=[
-        ('tr', [ ('pr', score_dtypes, (len(prep_groups),)) ], (len(dataset_tr_combos),)),
-        ('pr', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(prep_groups),))
-    ])
-    tr_fs_results = np.zeros((len(dataset_tr_combos), len(pipelines['fs'])), dtype=[
-        ('te', [ ('pr', score_dtypes, (len(prep_groups),)) ], (len(dataset_te_basenames),)),
-        ('pr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(prep_groups),))
-    ])
-    te_clf_results = np.zeros((len(dataset_te_basenames), len(pipelines['clf'])), dtype=[
-        ('tr', [ ('pr', score_dtypes, (len(prep_groups),)) ], (len(dataset_tr_combos),)),
-        ('pr', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(prep_groups),))
-    ])
-    tr_clf_results = np.zeros((len(dataset_tr_combos), len(pipelines['clf'])), dtype=[
-        ('te', [ ('pr', score_dtypes, (len(prep_groups),)) ], (len(dataset_te_basenames),)),
-        ('pr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(prep_groups),))
-    ])
-    pr_fs_results = np.zeros((len(prep_groups), len(pipelines['fs'])), dtype=[
-        ('te', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(dataset_te_basenames),)),
-        ('tr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(dataset_tr_combos),))
-    ])
-    pr_clf_results = np.zeros((len(prep_groups), len(pipelines['clf'])), dtype=[
-        ('te', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(dataset_te_basenames),)),
-        ('tr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(dataset_tr_combos),))
-    ])
-    fs_clf_results = np.zeros((len(pipelines['fs']), len(pipelines['clf'])), dtype=[
-        ('te', [ ('tr', score_dtypes, (len(dataset_tr_combos),)) ], (len(dataset_te_basenames),)),
-        ('tr', [ ('te', score_dtypes, (len(dataset_te_basenames),)) ], (len(dataset_tr_combos),)),
-
-    ])
+    results = {
+        'te_pr': np.zeros((len(dataset_te_basenames), len(prep_groups)), dtype=[
+            ('tr', score_dtypes, (len(dataset_tr_combos),))
+        ]),
+        'tr_pr': np.zeros((len(dataset_tr_combos), len(prep_groups)), dtype=[
+            ('te', score_dtypes, (len(dataset_te_basenames),))
+        ]),
+        'te_fs': np.zeros((len(dataset_te_basenames), len(pipelines['fs'])), dtype=[
+            ('tr_pr', score_dtypes, (len(dataset_tr_combos), len(prep_groups)))
+        ]),
+        'tr_fs': np.zeros((len(dataset_tr_combos), len(pipelines['fs'])), dtype=[
+            ('te_pr', score_dtypes, (len(dataset_te_basenames), len(prep_groups)))
+        ]),
+        'te_clf': np.zeros((len(dataset_te_basenames), len(pipelines['clf'])), dtype=[
+            ('tr_pr', score_dtypes, (len(dataset_tr_combos), len(prep_groups)))
+        ]),
+        'tr_clf': np.zeros((len(dataset_tr_combos), len(pipelines['clf'])), dtype=[
+            ('te_pr', score_dtypes, (len(dataset_te_basenames), len(prep_groups)))
+        ]),
+        'pr_fs': np.zeros((len(prep_groups), len(pipelines['fs'])), dtype=[
+            ('te_tr', score_dtypes, (len(dataset_te_basenames), len(dataset_tr_combos)))
+        ]),
+        'pr_clf': np.zeros((len(prep_groups), len(pipelines['clf'])), dtype=[
+            ('te_tr', score_dtypes, (len(dataset_te_basenames), len(dataset_tr_combos)))
+        ]),
+        'fs_clf': np.zeros((len(pipelines['fs']), len(pipelines['clf'])), dtype=[
+            ('te_tr', [
+                ('pr', score_dtypes, (len(prep_groups),))
+            ], (len(dataset_te_basenames), len(dataset_tr_combos))),
+            ('pr_te', [
+                ('tr', score_dtypes, (len(dataset_tr_combos),))
+            ], (len(prep_groups), len(dataset_te_basenames))),
+            ('pr_tr', [
+                ('te', score_dtypes, (len(dataset_te_basenames),))
+            ], (len(prep_groups), len(dataset_tr_combos))),
+        ]),
+    }
     dataset_pair_counter = 1
     for tr_idx, dataset_tr_combo in enumerate(dataset_tr_combos):
         dataset_tr_basename = '_'.join(dataset_tr_combo)
@@ -1204,40 +1212,28 @@ elif args.analysis == 3:
                     #         zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
                     #         reverse=True,
                     #     ): print(feature, '\t', symbol, '\t', rank)
-                    te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['roc_auc_cv'] = roc_auc_cv
-                    te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['bcr_te'] = bcr_te
-                    te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['roc_auc_te'] = roc_auc_te
-                    te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['bcr_cv'] = bcr_cv
-                    te_pr_results[te_idx, pr_idx]['tr'][tr_idx]['num_features'] = feature_idxs.size
-                    tr_pr_results[tr_idx, pr_idx]['te'][te_idx] = te_pr_results[te_idx, pr_idx]['tr'][tr_idx]
+                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['roc_auc_cv'] = roc_auc_cv
+                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['roc_auc_te'] = roc_auc_te
+                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['bcr_cv'] = bcr_cv
+                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['bcr_te'] = bcr_te
+                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['num_features'] = feature_idxs.size
+                    results['tr_pr'][tr_idx, pr_idx]['te'][te_idx] = results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]
                 elif analysis_type == 'all_methods':
-                    best_grid_idxs = []
-                    meth_scores = { 'cv': {}, 'te': {} }
-                    for group_idx, param_grid_group in enumerate(param_grid_data):
-                        for grid_idx in param_grid_group['grid_idxs']:
-                            if group_idx < len(best_grid_idxs):
-                                if (grid.cv_results_['rank_test_' + args.gscv_refit][grid_idx] <
-                                    grid.cv_results_['rank_test_' + args.gscv_refit][best_grid_idxs[group_idx]]):
-                                    best_grid_idxs[group_idx] = grid_idx
-                            else:
-                                best_grid_idxs.append(grid_idx)
-                        for meth_type, meth_idx in param_grid_group['meth_idxs'].items():
-                            if meth_type not in meth_scores['cv']:
-                                meth_scores['cv'][meth_type] = []
-                            if meth_idx >= len(meth_scores['cv'][meth_type]):
-                                meth_scores['cv'][meth_type].append({})
-                            for metric in gscv_scoring.keys():
-                                if metric not in meth_scores['cv'][meth_type][meth_idx]:
-                                    meth_scores['cv'][meth_type][meth_idx][metric] = []
-                                meth_scores['cv'][meth_type][meth_idx][metric].append(
-                                    grid.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
-                                )
                     pipe_fit_counter = 0
                     best_roc_auc_te = 0
                     best_bcr_te = 0
-                    best_params_te = {}
-                    for group_idx, param_grid_group in enumerate(param_grid_data):
-                        params = grid.cv_results_['params'][best_grid_idxs[group_idx]]
+                    meth_scores, best_params_te = {}, {}
+                    meth_combo_scores = { 'fs_clf': [] }
+                    for param_grid_group in param_grid_data:
+                        best_grid_idx = None
+                        for grid_idx in param_grid_group['grid_idxs']:
+                            if best_grid_idx is not None:
+                                if (grid.cv_results_['rank_test_' + args.gscv_refit][grid_idx] <
+                                    grid.cv_results_['rank_test_' + args.gscv_refit][best_grid_idx]):
+                                    best_grid_idx = grid_idx
+                            else:
+                                best_grid_idx = grid_idx
+                        params = grid.cv_results_['params'][best_grid_idx]
                         pipe_steps = sorted([
                             (k, v) for k, v in params.items() if k in pipeline_order
                         ], key=lambda s: pipeline_order.index(s[0]))
@@ -1252,12 +1248,36 @@ elif args.analysis == 3:
                         y_pred = pipe.predict(X_te)
                         bcr_te = bcr_score(y_te, y_pred)
                         for meth_type, meth_idx in param_grid_group['meth_idxs'].items():
-                            if meth_type not in meth_scores['te']:
-                                meth_scores['te'][meth_type] = []
-                            if meth_idx >= len(meth_scores['te'][meth_type]):
-                                meth_scores['te'][meth_type].append({ 'roc_auc': [], 'bcr': [] })
-                            meth_scores['te'][meth_type][meth_idx]['roc_auc'].append(roc_auc_te)
-                            meth_scores['te'][meth_type][meth_idx]['bcr'].append(bcr_te)
+                            if meth_type not in meth_scores:
+                                meth_scores[meth_type] = []
+                            if meth_idx >= len(meth_scores[meth_type]):
+                                meth_scores[meth_type].append({})
+                            for metric in gscv_scoring.keys():
+                                if metric + '_cv' not in meth_scores[meth_type][meth_idx]:
+                                    meth_scores[meth_type][meth_idx][metric + '_cv'] = []
+                                if metric + '_te' not in meth_scores[meth_type][meth_idx]:
+                                    meth_scores[meth_type][meth_idx][metric + '_te'] = []
+                                meth_scores[meth_type][meth_idx][metric + '_cv'].append(
+                                    grid.cv_results_['mean_test_' + metric][best_grid_idx]
+                                )
+                            meth_scores[meth_type][meth_idx]['roc_auc_te'].append(roc_auc_te)
+                            meth_scores[meth_type][meth_idx]['bcr_te'].append(bcr_te)
+                        fs_idx = param_grid_group['meth_idxs']['fs']
+                        clf_idx = param_grid_group['meth_idxs']['clf']
+                        if fs_idx >= len(meth_combo_scores['fs_clf']):
+                             meth_combo_scores['fs_clf'].append([])
+                        if clf_idx >= len(meth_combo_scores['fs_clf'][fs_idx]):
+                            meth_combo_scores['fs_clf'][fs_idx].append({})
+                        for metric in gscv_scoring.keys():
+                            if metric + '_cv' not in meth_combo_scores['fs_clf'][fs_idx][clf_idx]:
+                                meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_cv'] = []
+                            if metric + '_te' not in meth_combo_scores['fs_clf'][fs_idx][clf_idx]:
+                                meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_te'] = []
+                            meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_cv'].append(
+                                grid.cv_results_['mean_test_' + metric][best_grid_idx]
+                            )
+                        meth_combo_scores['fs_clf'][fs_idx][clf_idx]['roc_auc_te'].append(roc_auc_te)
+                        meth_combo_scores['fs_clf'][fs_idx][clf_idx]['bcr_te'].append(bcr_te)
                         if ((args.gscv_refit == 'roc_auc' and roc_auc_te > best_roc_auc_te) or
                             (args.gscv_refit == 'bcr' and bcr_te > best_bcr_te)):
                                 best_roc_auc_te = roc_auc_te
@@ -1276,29 +1296,30 @@ elif args.analysis == 3:
                         '\nBest Params (Train):',  best_params_cv,
                         '\nBest Params (Test):', best_params_te,
                     )
-                    for category, category_scores in meth_scores.items():
-                        for meth_type, meth_type_scores in category_scores.items():
-                            for meth_idx, meth_metric_scores in enumerate(meth_type_scores):
-                                for metric, metric_scores in meth_metric_scores.items():
-                                    field_key = metric + '_' + category
-                                    mean_score = np.mean(metric_scores)
-                                    if meth_type == 'fs':
-                                        te_fs_results[te_idx, meth_idx]['tr'][tr_idx]['pr'][pr_idx][field_key] = mean_score
-                                        te_fs_results[te_idx, meth_idx]['pr'][pr_idx]['tr'][tr_idx][field_key] = mean_score
-                                        tr_fs_results[tr_idx, meth_idx]['te'][te_idx]['pr'][pr_idx][field_key] = mean_score
-                                        tr_fs_results[tr_idx, meth_idx]['pr'][pr_idx]['te'][te_idx][field_key] = mean_score
-                                        pr_fs_results[pr_idx, meth_idx]['tr'][tr_idx]['te'][te_idx][field_key] = mean_score
-                                        pr_fs_results[pr_idx, meth_idx]['te'][te_idx]['tr'][tr_idx][field_key] = mean_score
-                                    elif meth_type == 'clf':
-                                        te_clf_results[te_idx, meth_idx]['tr'][tr_idx]['pr'][pr_idx][field_key] = mean_score
-                                        te_clf_results[te_idx, meth_idx]['pr'][pr_idx]['tr'][tr_idx][field_key] = mean_score
-                                        tr_clf_results[tr_idx, meth_idx]['te'][te_idx]['pr'][pr_idx][field_key] = mean_score
-                                        tr_clf_results[tr_idx, meth_idx]['pr'][pr_idx]['te'][te_idx][field_key] = mean_score
-                                        pr_clf_results[pr_idx, meth_idx]['tr'][tr_idx]['te'][te_idx][field_key] = mean_score
-                                        pr_clf_results[pr_idx, meth_idx]['te'][te_idx]['tr'][tr_idx][field_key] = mean_score
-                                    elif meth_type == 'pr':
-                                        te_pr_results[te_idx, pr_idx]['tr'][tr_idx][field_key] = mean_score
-                                        tr_pr_results[tr_idx, pr_idx]['te'][te_idx][field_key] = mean_score
+                    for meth_type, meth_type_scores in meth_scores.items():
+                        for meth_idx, meth_metric_scores in enumerate(meth_type_scores):
+                            for metric, metric_scores in meth_metric_scores.items():
+                                mean_score = np.mean(metric_scores)
+                                if meth_type == 'fs':
+                                    results['te_fs'][te_idx, meth_idx]['tr_pr'][tr_idx, pr_idx][metric] = mean_score
+                                    results['tr_fs'][tr_idx, meth_idx]['te_pr'][te_idx, pr_idx][metric] = mean_score
+                                    results['pr_fs'][pr_idx, meth_idx]['te_tr'][te_idx, tr_idx][metric] = mean_score
+                                elif meth_type == 'clf':
+                                    results['te_clf'][te_idx, meth_idx]['tr_pr'][tr_idx, pr_idx][metric] = mean_score
+                                    results['tr_clf'][tr_idx, meth_idx]['te_pr'][te_idx, pr_idx][metric] = mean_score
+                                    results['pr_clf'][pr_idx, meth_idx]['te_tr'][te_idx, tr_idx][metric] = mean_score
+                                elif meth_type == 'pr':
+                                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx][metric] = mean_score
+                                    results['tr_pr'][tr_idx, pr_idx]['te'][te_idx][metric] = mean_score
+                    for meth_type_combo, meth_type_combo_scores in meth_combo_scores.items():
+                        if meth_type_combo == 'fs_clf':
+                            for fs_idx, fs_scores in enumerate(meth_type_combo_scores):
+                                for clf_idx, fs_clf_scores in enumerate(fs_scores):
+                                    for metric, metric_scores in fs_clf_scores.items():
+                                        mean_score = np.mean(metric_scores)
+                                        results['fs_clf'][fs_idx, clf_idx]['te_tr'][te_idx, tr_idx]['pr'][pr_idx][metric] = mean_score
+                                        results['fs_clf'][fs_idx, clf_idx]['pr_te'][pr_idx, te_idx]['tr'][tr_idx][metric] = mean_score
+                                        results['fs_clf'][fs_idx, clf_idx]['pr_tr'][pr_idx, tr_idx]['te'][te_idx][metric] = mean_score
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
                 dataset_pair_counter += 1
@@ -1314,7 +1335,7 @@ elif args.analysis == 3:
     prep_methods = ['_'.join(g) for g in prep_groups]
     dataset_tr_basenames = ['_'.join(c) for c in dataset_tr_combos]
     figures = [
-        # plot te_pr_results
+        # plot results['te_pr']
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
@@ -1322,7 +1343,7 @@ elif args.analysis == 3:
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Test Dataset',
             'title_sub': title_sub,
-            'results': te_pr_results,
+            'results': results['te_pr'],
             'row_names': dataset_te_basenames,
             'col_results_key': 'tr',
         },
@@ -1332,11 +1353,11 @@ elif args.analysis == 3:
             'x_axis_title': 'Test Dataset',
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
-            'results': te_pr_results.T,
+            'results': results['te_pr'].T,
             'row_names': prep_methods,
             'col_results_key': 'tr',
         },
-        # plot tr_pr_results
+        # plot results['tr_pr']
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
@@ -1344,7 +1365,7 @@ elif args.analysis == 3:
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Train Dataset',
             'title_sub': title_sub,
-            'results': tr_pr_results,
+            'results': results['tr_pr'],
             'row_names': dataset_tr_basenames,
             'col_results_key': 'te',
         },
@@ -1354,21 +1375,20 @@ elif args.analysis == 3:
             'x_axis_title': 'Train Dataset',
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
-            'results': tr_pr_results.T,
+            'results': results['tr_pr'].T,
             'row_names': prep_methods,
             'col_results_key': 'te',
         },
-        # plot te_fs_results
+        # plot results['te_fs']
         {
             'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
             'x_axis_labels': list(pipelines['fs'].keys()),
             'x_axis_title': 'Feature Selection Method',
             'lines_title': 'Test Dataset',
             'title_sub': title_sub,
-            'results': te_fs_results,
+            'results': results['te_fs'],
             'row_names': dataset_te_basenames,
-            'col_results_key': 'tr',
-            'sub_results_key': 'pr',
+            'col_results_key': 'tr_pr',
         },
         {
             'x_axis': range(1, len(dataset_te_basenames) + 1),
@@ -1376,22 +1396,20 @@ elif args.analysis == 3:
             'x_axis_title': 'Test Dataset',
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
-            'results': te_fs_results.T,
+            'results': results['te_fs'].T,
             'row_names': list(pipelines['fs'].keys()),
-            'col_results_key': 'tr',
-            'sub_results_key': 'pr',
+            'col_results_key': 'tr_pr',
         },
-        # plot tr_fs_results
+        # plot results['tr_fs']
         {
             'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
             'x_axis_labels': list(pipelines['fs'].keys()),
             'x_axis_title': 'Feature Selection Method',
             'lines_title': 'Train Dataset',
             'title_sub': title_sub,
-            'results': tr_fs_results,
+            'results': results['tr_fs'],
             'row_names': dataset_tr_basenames,
-            'col_results_key': 'te',
-            'sub_results_key': 'pr',
+            'col_results_key': 'te_pr',
         },
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
@@ -1399,22 +1417,20 @@ elif args.analysis == 3:
             'x_axis_title': 'Train Dataset',
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
-            'results': tr_fs_results.T,
+            'results': results['tr_fs'].T,
             'row_names': list(pipelines['fs'].keys()),
-            'col_results_key': 'te',
-            'sub_results_key': 'pr',
+            'col_results_key': 'te_pr',
         },
-        # plot te_clf_results
+        # plot results['te_clf']
         {
             'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
             'x_axis_labels': list(pipelines['clf'].keys()),
             'x_axis_title': 'Classifier Algorithm',
             'lines_title': 'Test Dataset',
             'title_sub': title_sub,
-            'results': te_clf_results,
+            'results': results['te_clf'],
             'row_names': dataset_te_basenames,
-            'col_results_key': 'tr',
-            'sub_results_key': 'pr',
+            'col_results_key': 'tr_pr',
         },
         {
             'x_axis': range(1, len(dataset_te_basenames) + 1),
@@ -1422,22 +1438,20 @@ elif args.analysis == 3:
             'x_axis_title': 'Test Dataset',
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
-            'results': te_clf_results.T,
+            'results': results['te_clf'].T,
             'row_names': list(pipelines['clf'].keys()),
-            'col_results_key': 'tr',
-            'sub_results_key': 'pr',
+            'col_results_key': 'tr_pr',
         },
-        # plot tr_clf_results
+        # plot results['tr_clf']
         {
             'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
             'x_axis_labels': list(pipelines['clf'].keys()),
             'x_axis_title': 'Classifier Algorithm',
             'lines_title': 'Train Dataset',
             'title_sub': title_sub,
-            'results': tr_clf_results,
+            'results': results['tr_clf'],
             'row_names': dataset_tr_basenames,
-            'col_results_key': 'te',
-            'sub_results_key': 'pr',
+            'col_results_key': 'te_pr',
         },
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
@@ -1445,22 +1459,20 @@ elif args.analysis == 3:
             'x_axis_title': 'Train Dataset',
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
-            'results': tr_clf_results.T,
+            'results': results['tr_clf'].T,
             'row_names': list(pipelines['clf'].keys()),
-            'col_results_key': 'te',
-            'sub_results_key': 'pr',
+            'col_results_key': 'te_pr',
         },
-        # plot pr_fs_results
+        # plot results['pr_fs']
         {
             'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
             'x_axis_labels': list(pipelines['fs'].keys()),
             'x_axis_title': 'Feature Selection Method',
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
-            'results': pr_fs_results,
+            'results': results['pr_fs'],
             'row_names': prep_methods,
-            'col_results_key': 'te',
-            'sub_results_key': 'tr',
+            'col_results_key': 'te_tr',
         },
         {
             'x_axis': range(1, len(prep_methods) + 1),
@@ -1469,22 +1481,20 @@ elif args.analysis == 3:
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
-            'results': pr_fs_results.T,
+            'results': results['pr_fs'].T,
             'row_names': list(pipelines['fs'].keys()),
-            'col_results_key': 'te',
-            'sub_results_key': 'tr',
+            'col_results_key': 'te_tr',
         },
-        # plot pr_clf_results
+        # plot results['pr_clf']
         {
             'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
             'x_axis_labels': list(pipelines['clf'].keys()),
             'x_axis_title': 'Classifier Algorithm',
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
-            'results': pr_clf_results,
+            'results': results['pr_clf'],
             'row_names': prep_methods,
-            'col_results_key': 'te',
-            'sub_results_key': 'tr',
+            'col_results_key': 'te_tr',
         },
         {
             'x_axis': range(1, len(prep_methods) + 1),
@@ -1493,9 +1503,31 @@ elif args.analysis == 3:
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
-            'results': pr_clf_results.T,
+            'results': results['pr_clf'].T,
             'row_names': list(pipelines['clf'].keys()),
-            'col_results_key': 'te',
+            'col_results_key': 'te_tr',
+        },
+        # plot results['fs_clf']
+        {
+            'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
+            'x_axis_labels': list(pipelines['clf'].keys()),
+            'x_axis_title': 'Classifier Algorithm',
+            'lines_title': 'Feature Selection Method',
+            'title_sub': title_sub,
+            'results': results['fs_clf'],
+            'row_names': list(pipelines['fs'].keys()),
+            'col_results_key': 'pr_te',
+            'sub_results_key': 'tr',
+        },
+        {
+            'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
+            'x_axis_labels': list(pipelines['fs'].keys()),
+            'x_axis_title': 'Feature Selection Method',
+            'lines_title': 'Classifier Algorithm',
+            'title_sub': title_sub,
+            'results': results['fs_clf'].T,
+            'row_names': list(pipelines['clf'].keys()),
+            'col_results_key': 'pr_te',
             'sub_results_key': 'tr',
         },
     ]
@@ -1515,7 +1547,10 @@ elif args.analysis == 3:
             plt.xlabel(figure['x_axis_title'])
             plt.ylabel(metric_title)
             if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 8:
-                plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='x-small', rotation=figure['x_ticks_rotation'])
+                plt.xticks(
+                    figure['x_axis'], figure['x_axis_labels'],
+                    fontsize='x-small', rotation=figure['x_ticks_rotation'],
+                )
             else:
                 plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
             plt.figure(figure_name + 'B')
@@ -1528,7 +1563,10 @@ elif args.analysis == 3:
             plt.xlabel(figure['x_axis_title'])
             plt.ylabel(metric_title)
             if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 8:
-                plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='x-small', rotation=figure['x_ticks_rotation'])
+                plt.xticks(
+                    figure['x_axis'], figure['x_axis_labels'],
+                    fontsize='x-small', rotation=figure['x_ticks_rotation'],
+                )
             else:
                 plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
             for row_idx, row_results in enumerate(figure['results']):
@@ -1538,29 +1576,25 @@ elif args.analysis == 3:
                 range_scores_te = np.full((2, figure['results'].shape[1]), np.nan, dtype=float)
                 num_features = np.array([], dtype=int)
                 for col_idx, col_results in enumerate(row_results):
-                    scores_cv, scores_te = [], []
-                    for result in col_results[figure['col_results_key']]:
-                        if 'sub_results_key' in figure and figure['sub_results_key'] in result.dtype.fields:
-                            sub_scores_cv, sub_scores_te = [], []
-                            for sub_result in result[figure['sub_results_key']]:
-                                if sub_result[metric + '_te'] > 0:
-                                    sub_scores_cv.append(sub_result[metric + '_cv'])
-                                    sub_scores_te.append(sub_result[metric + '_te'])
-                                    num_features = np.append(num_features, sub_result['num_features'])
-                            if sub_scores_cv:
-                                scores_cv.append(np.mean(sub_scores_cv))
-                                scores_te.append(np.mean(sub_scores_te))
-                        elif result[metric + '_te'] > 0:
-                            scores_cv.append(result[metric + '_cv'])
-                            scores_te.append(result[metric + '_te'])
-                            num_features = np.append(num_features, result['num_features'])
-                    if scores_cv:
+                    scores_cv = np.array([], dtype=float)
+                    scores_te = np.array([], dtype=float)
+                    field_results = col_results[figure['col_results_key']]
+                    if 'sub_results_key' in figure:
+                        sub_field_results = field_results[figure['sub_results_key']]
+                        scores_cv = sub_field_results[metric + '_cv'][sub_field_results[metric + '_cv'] > 0]
+                        scores_te = sub_field_results[metric + '_te'][sub_field_results[metric + '_te'] > 0]
+                        num_features = np.append(num_features, sub_field_results['num_features'])
+                    else:
+                        scores_cv = field_results[metric + '_cv'][field_results[metric + '_cv'] > 0]
+                        scores_te = field_results[metric + '_te'][field_results[metric + '_te'] > 0]
+                        num_features = np.append(num_features, field_results['num_features'])
+                    if scores_cv.size > 0:
                         mean_scores_cv[col_idx] = np.mean(scores_cv)
-                        range_scores_cv[0][col_idx] = np.mean(scores_cv) - min(scores_cv)
-                        range_scores_cv[1][col_idx] = max(scores_cv) - np.mean(scores_cv)
+                        range_scores_cv[0][col_idx] = np.mean(scores_cv) - np.min(scores_cv)
+                        range_scores_cv[1][col_idx] = np.max(scores_cv) - np.mean(scores_cv)
                         mean_scores_te[col_idx] = np.mean(scores_te)
-                        range_scores_te[0][col_idx] = np.mean(scores_te) - min(scores_te)
-                        range_scores_te[1][col_idx] = max(scores_te) - np.mean(scores_te)
+                        range_scores_te[0][col_idx] = np.mean(scores_te) - np.min(scores_te)
+                        range_scores_te[1][col_idx] = np.max(scores_te) - np.mean(scores_te)
                 if not np.all(np.isnan(mean_scores_cv)):
                     label_values_cv = (
                         figure['row_names'][row_idx], 'CV',
