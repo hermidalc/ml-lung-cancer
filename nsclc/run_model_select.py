@@ -33,7 +33,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import style
 
-sns.set_palette(sns.color_palette('hls', 30))
 # ignore QDA collinearity warnings
 warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
 
@@ -687,6 +686,7 @@ if args.analysis == 1:
         })
         split_idx += 1
     # plot grid search parameters vs cv perf metrics
+    sns.set_palette(sns.color_palette('hls', len(gscv_scoring)))
     for param_idx, param in enumerate(param_cv_scores):
         mean_roc_aucs_cv = np.mean(param_cv_scores[param]['roc_auc'], axis=0)
         mean_bcrs_cv = np.mean(param_cv_scores[param]['bcr'], axis=0)
@@ -862,6 +862,7 @@ elif args.analysis == 2:
         for _, feature, symbol in feature_ranks: print(feature, '\t', symbol)
     # pprint(grid.cv_results_)
     # plot grid search parameters vs cv perf metrics
+    sns.set_palette(sns.color_palette('hls', len(gscv_scoring)))
     for param_idx, param in enumerate(param_grid[0]):
         if '__' in param and len(param_grid[0][param]) > 1:
             new_shape = (
@@ -952,7 +953,9 @@ elif args.analysis == 2:
     pipe.set_params(
         **{ k: v for k, v in grid.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
     )
-    for dataset_te_basename in natsorted(list(set(dataset_names) - set(args.datasets_tr))):
+    dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.datasets_tr)))
+    sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames)))
+    for dataset_te_basename in dataset_te_basenames:
         if args.no_addon_te:
             dataset_te_name = '_'.join([dataset_te_basename, prep_methods[0]])
         else:
@@ -980,17 +983,14 @@ elif args.analysis == 2:
             roc_aucs_te.append(roc_auc_te)
             bcrs_te.append(bcr_te)
         plt.plot(
-            x_axis, roc_aucs_te,
-            lw=2, alpha=0.8, label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, BCR = %0.4f $\pm$ %0.2f)' % (
+            x_axis, roc_aucs_te, lw=2, alpha=0.8,
+            label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, BCR = %0.4f $\pm$ %0.2f)' % (
                 dataset_te_name,
                 np.mean(roc_aucs_te), np.std(roc_aucs_te),
                 np.mean(bcrs_te), np.std(bcrs_te),
             ),
         )
-        # plt.plot(
-        #     x_axis, bcrs_te,
-        #     lw=2, alpha=0.8,
-        # )
+        # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
         # print summary info
         print(
             'Test Dataset: %3s' % dataset_te_name,
@@ -1577,6 +1577,7 @@ elif args.analysis == 3:
             else:
                 plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
             for row_idx, row_results in enumerate(figure['results']):
+                sns.set_palette(sns.color_palette('hls', row_results.size))
                 mean_scores_cv = np.full((figure['results'].shape[1],), np.nan, dtype=float)
                 range_scores_cv = np.full((2, figure['results'].shape[1]), np.nan, dtype=float)
                 mean_scores_te = np.full((figure['results'].shape[1],), np.nan, dtype=float)
