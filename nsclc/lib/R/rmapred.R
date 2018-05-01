@@ -16,7 +16,7 @@ rmatrain <- function(affybatch) {
     return(rma_obj)
 }
 
-rmaaddon <- function(rma_obj, affybatch, num.cores=max(detectCores()/2, 1)) {
+rmaaddon <- function(rma_obj, affybatch, num.cores=detectCores()) {
     if (class(rma_obj) != "rmatrain")
         stop("Input parameter 'rma_obj' has to be of class 'rmatrain'.")
     cat("Performing add-on normalization/summarization")

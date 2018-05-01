@@ -12,6 +12,7 @@ parser <- ArgumentParser()
 parser$add_argument("--num-tr-combo", type="integer", help="num datasets to combine")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocessing/normalization method")
 parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
+parser$add_argument("--num-cores", type="integer", default=detectCores(), help="num parallel cores")
 parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
 args <- parser$parse_args()
 
@@ -43,6 +44,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
     if (skip_processing) next
     for (norm_meth in arg_norm_methods) {
         # load a reference eset set
+        ref_eset_set_loaded <- FALSE
         for (ref_norm_meth in norm_methods) {
             for (ref_id_type in id_types) {
                 ref_suffixes <- c(ref_norm_meth)
@@ -65,9 +67,10 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                             load(paste0("data/", eset_te_name, ".Rda"))
                         }
                     }
-                    break
+                    ref_eset_set_loaded <- TRUE
                 }
             }
+            if (ref_eset_set_loaded) break
         }
         for (id_type in arg_id_types) {
             # load affybatches
@@ -144,7 +147,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 eset_te_name <- paste0(c("eset", dataset_te_name, ref_suffixes), collapse="_")
                 eset_te_norm_name <- paste(eset_tr_norm_name, dataset_te_name, "te", sep="_")
                 cat("Creating:", eset_te_norm_name, "\n")
-                xnorm_te <- rmaaddon(norm_obj, get(affybatch_te_name))
+                xnorm_te <- rmaaddon(norm_obj, get(affybatch_te_name), num.cores=args$num_cores)
                 rownames(xnorm_te) <- sub("\\.CEL$", "", rownames(xnorm_te))
                 if (id_type == "gene") {
                     eset_te_norm <- ExpressionSet(
