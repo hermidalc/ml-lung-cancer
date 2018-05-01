@@ -93,9 +93,9 @@ parser.add_argument('--clf-grb-d', type=int, nargs='+', help='clf grb max depth'
 parser.add_argument('--clf-grb-d-max', type=int, default=50, help='clf grb max depth max')
 parser.add_argument('--gscv-splits', type=int, default=80, help='gscv splits')
 parser.add_argument('--gscv-size', type=float, default=0.3, help='gscv size')
-parser.add_argument('--gscv-jobs', type=int, default=-1, help='gscv parallel jobs')
 parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
 parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc, bcr)')
+parser.add_argument('--num-cores', type=int, default=-1, help='num parallel cores')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--save-plots', default=False, action='store_true', help='save figure plots')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
@@ -587,7 +587,7 @@ if args.analysis == 1:
             key=lambda s: pipeline_order.index(s[0])
         ), memory=memory), param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
         cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-        error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.gscv_verbose,
     )
     split_idx = 0
     split_results = []
@@ -822,7 +822,7 @@ elif args.analysis == 2:
             key=lambda s: pipeline_order.index(s[0])
         ), memory=memory), param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
         cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-        error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.gscv_verbose,
     )
     grid.fit(X_tr, y_tr)
     dump(grid, '_'.join([
@@ -1038,7 +1038,7 @@ elif args.analysis == 3:
                 key=lambda s: pipeline_order.index(s[0])
             ), memory=memory), param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
             cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.gscv_verbose,
         )
     else:
         analysis_type = 'all_methods'
@@ -1081,7 +1081,7 @@ elif args.analysis == 3:
             Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
             param_grid=param_grid, scoring=gscv_scoring, refit=False,
             cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.gscv_jobs, verbose=args.gscv_verbose,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.gscv_verbose,
         )
     if args.datasets_tr and args.num_tr_combo:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_tr_combo)]
@@ -1240,7 +1240,7 @@ elif args.analysis == 3:
                             else:
                                 best_grid_idxs.append(grid_idx)
                     print('Fitting pipelines: ', end='', flush=True)
-                    pipes = Parallel(n_jobs=args.gscv_jobs)(
+                    pipes = Parallel(n_jobs=args.num_cores)(
                         delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr)
                         for params in map(lambda i: grid.cv_results_['params'][i], best_grid_idxs)
                     )
