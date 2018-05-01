@@ -66,20 +66,20 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                     }
                 }
                 if (args$load_only) next
-                for (bc_type in bc_types) {
-                    if (grepl("^(stica\\d+|svd)$", bc_type)) {
+                for (bc_meth in bc_methods) {
+                    if (grepl("^(stica\\d+|svd)$", bc_meth)) {
                         Xtr <- exprs(get(eset_tr_name))
                         ptr <- pData(get(eset_tr_name))
-                        eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_type, "_tr")
+                        eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_meth, "_tr")
                         cat("Creating:", eset_tr_bc_name, "\n")
-                        if (substr(bc_type, 1, 5) == "stica") {
+                        if (substr(bc_meth, 1, 5) == "stica") {
                             bc_obj <- normFact(
                                 "stICA", Xtr, ptr$Batch, "categorical",
                                 ref2=ptr$Class, refType2="categorical", k=matfact_k,
-                                alpha=as.numeric(sub("^0", "0.", regmatches(bc_type, regexpr("\\d+$", bc_type))))
+                                alpha=as.numeric(sub("^0", "0.", regmatches(bc_meth, regexpr("\\d+$", bc_meth))))
                             )
                         }
-                        else if (bc_type == "svd") {
+                        else if (bc_meth == "svd") {
                             bc_obj <- normFact(
                                 "SVD", Xtr, ptr$Batch, "categorical",
                                 ref2=ptr$Class, refType2="categorical", k=matfact_k
@@ -114,7 +114,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                         }
                         remove(list=c(eset_tr_bc_obj_name, eset_tr_bc_name))
                     }
-                    else if (bc_type %in% c("cbt", "ctr", "fab", "qnorm", "rta", "rtg", "std", "sva")) {
+                    else if (bc_meth %in% c("cbt", "ctr", "fab", "qnorm", "rta", "rtg", "std", "sva")) {
                         Xtr <- t(exprs(get(eset_tr_name)))
                         ptr <- pData(get(eset_tr_name))
                         ytr <- as.factor(ptr$Class + 1)
@@ -126,38 +126,38 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                             }
                         }
                         btr <- as.factor(btr)
-                        eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_type, "_tr")
+                        eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_meth, "_tr")
                         cat("Creating:", eset_tr_bc_name, "\n")
                         eset_tr_bc <- get(eset_tr_name)
-                        if (bc_type == "cbt") {
+                        if (bc_meth == "cbt") {
                             bc_obj <- combatba(Xtr, btr)
                             exprs(eset_tr_bc) <- t(bc_obj$xadj)
                         }
-                        else if (bc_type == "ctr") {
+                        else if (bc_meth == "ctr") {
                             bc_obj <- meancenter(Xtr, btr)
                             exprs(eset_tr_bc) <- t(bc_obj$xadj)
                         }
-                        else if (bc_type == "fab") {
+                        else if (bc_meth == "fab") {
                             bc_obj <- fabatch(Xtr, ytr, btr)
                             exprs(eset_tr_bc) <- t(bc_obj$xadj)
                         }
-                        else if (bc_type == "qnorm") {
+                        else if (bc_meth == "qnorm") {
                             bc_obj <- qunormtrain(Xtr)
                             exprs(eset_tr_bc) <- t(bc_obj$xnorm)
                         }
-                        else if (bc_type == "rta") {
+                        else if (bc_meth == "rta") {
                             bc_obj <- ratioa(Xtr, btr)
                             exprs(eset_tr_bc) <- t(bc_obj$xadj)
                         }
-                        else if (bc_type == "rtg") {
+                        else if (bc_meth == "rtg") {
                             bc_obj <- ratiog(Xtr, btr)
                             exprs(eset_tr_bc) <- t(bc_obj$xadj)
                         }
-                        else if (bc_type == "std") {
+                        else if (bc_meth == "std") {
                             bc_obj <- standardize(Xtr, btr)
                             exprs(eset_tr_bc) <- t(bc_obj$xadj)
                         }
-                        else if (bc_type == "sva") {
+                        else if (bc_meth == "sva") {
                             mod <- model.matrix(~as.factor(Class), data=ptr)
                             mod0 <- model.matrix(~1, data=ptr)
                             # ctrls <- as.numeric(grepl("^AFFX", rownames(t(Xtr))))
@@ -190,28 +190,28 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                             eset_te_bc_name <- paste0(c(eset_tr_bc_name, dataset_te_name, "te"), collapse="_")
                             cat("Creating:", eset_te_bc_name, "\n")
                             eset_te_bc <- get(eset_te_name)
-                            if (bc_type == "cbt") {
+                            if (bc_meth == "cbt") {
                                 exprs(eset_te_bc) <- t(combatbaaddon(bc_obj, Xte, bte))
                             }
-                            else if (bc_type == "ctr") {
+                            else if (bc_meth == "ctr") {
                                 exprs(eset_te_bc) <- t(meancenteraddon(bc_obj, Xte, bte))
                             }
-                            else if (bc_type == "fab") {
+                            else if (bc_meth == "fab") {
                                 exprs(eset_te_bc) <- t(fabatchaddon(bc_obj, Xte, bte))
                             }
-                            else if (bc_type == "qnorm") {
+                            else if (bc_meth == "qnorm") {
                                 exprs(eset_te_bc) <- t(qunormaddon(bc_obj, Xte))
                             }
-                            else if (bc_type == "rta") {
+                            else if (bc_meth == "rta") {
                                 exprs(eset_te_bc) <- t(ratioaaddon(bc_obj, Xte, bte))
                             }
-                            else if (bc_type == "rtg") {
+                            else if (bc_meth == "rtg") {
                                 exprs(eset_te_bc) <- t(ratiogaddon(bc_obj, Xte, bte))
                             }
-                            else if (bc_type == "std") {
+                            else if (bc_meth == "std") {
                                 exprs(eset_te_bc) <- t(standardizeaddon(bc_obj, Xte, bte))
                             }
-                            else if (bc_type == "sva") {
+                            else if (bc_meth == "sva") {
                                 exprs(eset_te_bc) <- t(svabaaddon(bc_obj, Xte))
                             }
                             assign(eset_te_bc_name, eset_te_bc)
