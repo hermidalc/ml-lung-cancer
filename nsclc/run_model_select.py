@@ -389,18 +389,18 @@ pipelines = {
         #         },
         #     ],
         # },
-        'Limma-KBest-FCBF': {
-            'steps': [
-                ('fs1', SelectKBest(limma_score_func)),
-                ('fs2', FCBF(memory=memory)),
-            ],
-            'param_grid': [
-                {
-                    'fs1__k': FS_PF_FCBF_K,
-                    'fs2__k': FS_SKB_K,
-                },
-            ],
-        },
+        # 'Limma-KBest-FCBF': {
+        #     'steps': [
+        #         ('fs1', SelectKBest(limma_score_func)),
+        #         ('fs2', FCBF(memory=memory)),
+        #     ],
+        #     'param_grid': [
+        #         {
+        #             'fs1__k': FS_PF_FCBF_K,
+        #             'fs2__k': FS_SKB_K,
+        #         },
+        #     ],
+        # },
         # 'Limma-KBest-ReliefF': {
         #     'steps': [
         #         ('fs1', SelectKBest(limma_score_func)),
