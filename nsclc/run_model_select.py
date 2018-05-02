@@ -205,7 +205,7 @@ else:
 if args.fs_sfm_svm_c:
     FS_SFM_SVM_C = sorted(args.fs_sfm_svm_c)
 else:
-    FS_SFM_SVM_C = np.logspace(-1, 3, 5)
+    FS_SFM_SVM_C = np.logspace(-3, 3, 7)
 if args.fs_rfe_svm_c:
     FS_RFE_SVM_C = sorted(args.fs_rfe_svm_c)
 else:
