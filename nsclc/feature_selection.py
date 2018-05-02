@@ -6,6 +6,7 @@ from rpy2.robjects.packages import importr
 from rpy2.robjects import numpy2ri
 from sklearn.base import BaseEstimator
 from sklearn.externals import six
+from sklearn.externals.joblib import Memory
 from sklearn.feature_selection.base import SelectorMixin
 from sklearn.utils import check_X_y
 from sklearn.utils.validation import check_is_fitted

@@ -392,7 +392,7 @@ pipelines = {
         'Limma-KBest-FCBF': {
             'steps': [
                 ('fs1', SelectKBest(limma_score_func)),
-                ('fs2', FCBF()),
+                ('fs2', FCBF(memory=memory)),
             ],
             'param_grid': [
                 {
@@ -404,7 +404,7 @@ pipelines = {
         # 'Limma-KBest-ReliefF': {
         #     'steps': [
         #         ('fs1', SelectKBest(limma_score_func)),
-        #         ('fs2', ReliefF()),
+        #         ('fs2', ReliefF(memory=memory)),
         #     ],
         #     'param_grid': [
         #         {
