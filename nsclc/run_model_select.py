@@ -17,7 +17,7 @@ from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
 from sklearn.feature_selection import mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
-from sklearn.model_selection import GridSearchCV, ParameterGrid, StratifiedShuffleSplit
+from sklearn.model_selection import GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
@@ -86,14 +86,17 @@ parser.add_argument('--clf-ext-d', type=int, nargs='+', help='clf ext max depth'
 parser.add_argument('--clf-ext-d-max', type=int, default=50, help='clf ext max depth max')
 parser.add_argument('--clf-ada-e', type=int, nargs='+', help='clf ada n estimators')
 parser.add_argument('--clf-ada-e-max', type=int, default=200, help='clf ada n estimators max')
+parser.add_argument('--clf-ada-lgr-c', type=float, nargs='+', help='clf ada lgr c')
 parser.add_argument('--clf-grb-e', type=int, nargs='+', help='clf grb n estimators')
 parser.add_argument('--clf-grb-e-max', type=int, default=300, help='clf grb n estimators max')
 parser.add_argument('--clf-grb-d', type=int, nargs='+', help='clf grb max depth')
 parser.add_argument('--clf-grb-d-max', type=int, default=50, help='clf grb max depth max')
-parser.add_argument('--gscv-splits', type=int, default=80, help='gscv splits')
-parser.add_argument('--gscv-size', type=float, default=0.3, help='gscv size')
-parser.add_argument('--gscv-verbose', type=int, default=1, help='gscv verbosity')
-parser.add_argument('--gscv-refit', type=str, default='roc_auc', help='gscv refit score function (roc_auc, bcr)')
+parser.add_argument('--scv-type', type=str, default='grid', help='scv type (grid or rand)')
+parser.add_argument('--scv-splits', type=int, default=80, help='scv splits')
+parser.add_argument('--scv-size', type=float, default=0.3, help='scv size')
+parser.add_argument('--scv-verbose', type=int, default=1, help='scv verbosity')
+parser.add_argument('--scv-refit', type=str, default='roc_auc', help='scv refit score function (roc_auc, bcr)')
+parser.add_argument('--scv-n-iter', type=int, default=100, help='randomized scv num iterations')
 parser.add_argument('--num-cores', type=int, default=-1, help='num parallel cores')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--save-plots', default=False, action='store_true', help='save figure plots')
@@ -162,7 +165,7 @@ def fit_pipeline(params, pipeline_order, X_tr, y_tr):
     pipe = Pipeline(pipe_steps, memory=memory)
     pipe.set_params(**{ k: v for k, v in params.items() if '__' in k })
     pipe.fit(X_tr, y_tr)
-    if args.gscv_verbose == 0: print('.', end='', flush=True)
+    if args.scv_verbose == 0: print('.', end='', flush=True)
     return pipe
 
 # config
@@ -179,7 +182,7 @@ else:
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, class_weight='balanced')
     sfm_ext_estimator = ExtraTreesClassifier(class_weight='balanced')
 
-gscv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
+scv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 if args.fs_skb_k:
@@ -213,7 +216,7 @@ else:
 if args.fs_pf_fcbf_k:
     FS_PF_FCBF_K = sorted(args.fs_pf_fcbf_k)
 else:
-    FS_PF_FCBF_K = list(range(1, args.fs_pf_fcbf_k_max + 1))
+    FS_PF_FCBF_K = list(range(1000, args.fs_pf_fcbf_k_max + 1, 1000))
 if args.fs_pf_rlf_k:
     FS_PF_RLF_K = sorted(args.fs_pf_rlf_k)
 else:
@@ -254,6 +257,10 @@ if args.clf_ada_e:
     CLF_ADA_E = sorted(args.clf_ada_e)
 else:
     CLF_ADA_E = list(range(10, args.clf_ada_e_max + 1, 10))
+if args.clf_ada_lgr_c:
+    CLF_ADA_LGR_C = sorted(args.clf_ada_lgr_c)
+else:
+    CLF_ADA_LGR_C = np.logspace(-7, 3, 11)
 if args.clf_grb_e:
     CLF_GRB_E = sorted(args.clf_grb_e)
 else:
@@ -389,18 +396,18 @@ pipelines = {
         #         },
         #     ],
         # },
-        # 'Limma-KBest-FCBF': {
-        #     'steps': [
-        #         ('fs1', SelectKBest(limma_score_func)),
-        #         ('fs2', FCBF(memory=memory)),
-        #     ],
-        #     'param_grid': [
-        #         {
-        #             'fs1__k': FS_PF_FCBF_K,
-        #             'fs2__k': FS_SKB_K,
-        #         },
-        #     ],
-        # },
+        'Limma-KBest-FCBF': {
+            'steps': [
+                ('fs1', SelectKBest(limma_score_func)),
+                ('fs2', FCBF(memory=memory)),
+            ],
+            'param_grid': [
+                {
+                    'fs1__k': FS_PF_FCBF_K,
+                    'fs2__k': FS_SKB_K,
+                },
+            ],
+        },
         # 'Limma-KBest-ReliefF': {
         #     'steps': [
         #         ('fs1', SelectKBest(limma_score_func)),
@@ -476,7 +483,7 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'clf__base_estimator__C': CLF_SVM_C,
+                    'clf__base_estimator__C': CLF_ADA_LGR_C,
                     'clf__n_estimators': CLF_ADA_E,
                 },
             ],
@@ -560,6 +567,27 @@ if args.analysis == 1:
     if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_methods.append(bc_meth)
+    args.fs_meth = args.fs_meth[0]
+    args.slr_meth = args.slr_meth[0]
+    args.clf_meth = args.clf_meth[0]
+    param_grid = {
+        **pipelines['fs'][args.fs_meth]['param_grid'][0],
+        **pipelines['slr'][args.slr_meth]['param_grid'][0],
+        **pipelines['clf'][args.clf_meth]['param_grid'][0],
+    }
+    search = GridSearchCV(
+        Pipeline(sorted(
+            pipelines['fs'][args.fs_meth]['steps'] +
+            pipelines['slr'][args.slr_meth]['steps'] +
+            pipelines['clf'][args.clf_meth]['steps'],
+            key=lambda s: pipeline_order.index(s[0])
+        ), memory=memory), param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
+        cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+    )
+    if args.verbose > 0:
+        print("Param grid:")
+        pprint(param_grid)
     args.datasets_tr = natsorted(args.datasets_tr)
     dataset_name = '_'.join(args.datasets_tr + prep_methods + ['tr'])
     print('Dataset:', dataset_name)
@@ -568,59 +596,38 @@ if args.analysis == 1:
     eset = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_name])
     X = np.array(base.t(biobase.exprs(eset)))
     y = np.array(r_eset_class_labels(eset), dtype=int)
-    args.fs_meth = args.fs_meth[0]
-    args.slr_meth = args.slr_meth[0]
-    args.clf_meth = args.clf_meth[0]
-    param_grid = []
-    for fs_params in pipelines['fs'][args.fs_meth]['param_grid']:
-        for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
-            for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
-                param_grid.append({ **fs_params, **slr_params, **clf_params })
-    if args.verbose > 0:
-        print("Param grid:")
-        pprint(param_grid)
-    grid = GridSearchCV(
-        Pipeline(sorted(
-            pipelines['fs'][args.fs_meth]['steps'] +
-            pipelines['slr'][args.slr_meth]['steps'] +
-            pipelines['clf'][args.clf_meth]['steps'],
-            key=lambda s: pipeline_order.index(s[0])
-        ), memory=memory), param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
-        cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.gscv_verbose,
-    )
     split_idx = 0
     split_results = []
     param_cv_scores = {}
     sss = StratifiedShuffleSplit(n_splits=args.splits, test_size=args.test_size)
     for tr_idxs, te_idxs in sss.split(X, y):
-        grid.fit(X[tr_idxs], y[tr_idxs])
+        search.fit(X[tr_idxs], y[tr_idxs])
         feature_idxs = np.arange(X[tr_idxs].shape[1])
-        for step in grid.best_estimator_.named_steps:
-            if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
-                feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
+        for step in search.best_estimator_.named_steps:
+            if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
+                feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
         feature_names = np.array(biobase.featureNames(eset), dtype=str)[feature_idxs]
         weights = np.array([], dtype=float)
-        if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
-            weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
-        elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
-            weights = grid.best_estimator_.named_steps['clf'].feature_importances_
-        roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
-        bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
-        if hasattr(grid, 'decision_function'):
-            y_score = grid.decision_function(X[te_idxs])
+        if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
+            weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
+        elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
+            weights = search.best_estimator_.named_steps['clf'].feature_importances_
+        roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search.best_index_]
+        bcr_cv = search.cv_results_['mean_test_bcr'][search.best_index_]
+        if hasattr(search, 'decision_function'):
+            y_score = search.decision_function(X[te_idxs])
         else:
-            y_score = grid.predict_proba(X[te_idxs])[:,1]
+            y_score = search.predict_proba(X[te_idxs])[:,1]
         roc_auc_te = roc_auc_score(y[te_idxs], y_score)
         fpr, tpr, thres = roc_curve(y[te_idxs], y_score, pos_label=1)
-        y_pred = grid.predict(X[te_idxs])
+        y_pred = search.predict(X[te_idxs])
         bcr_te = bcr_score(y[te_idxs], y_pred)
         print(
             'Split: %3s' % (split_idx + 1),
             ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
             ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
             ' Features: %3s' % feature_idxs.size,
-            ' Params:',  grid.best_params_,
+            ' Params:',  search.best_params_,
         )
         if weights.size > 0:
             feature_ranks = sorted(
@@ -636,27 +643,27 @@ if args.analysis == 1:
             )
             # print('Fearures:')
             # for _, feature, symbol in feature_ranks: print(feature, '\t', symbol)
-        for param_idx, param in enumerate(param_grid[0]):
-            if '__' in param and len(param_grid[0][param]) > 1:
+        for param_idx, param in enumerate(param_grid):
+            if '__' in param and len(param_grid[param]) > 1:
                 new_shape = (
-                    len(param_grid[0][param]),
-                    np.prod([len(v) for k,v in param_grid[0].items() if k != param])
+                    len(param_grid[param]),
+                    np.prod([len(v) for k,v in param_grid.items() if k != param])
                 )
                 if param in ('fs2__threshold', 'clf__weights'):
                     xaxis_group_sorted_idxs = np.argsort(
-                        np.ma.getdata(grid.cv_results_['param_' + param]).astype(str)
+                        np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
                     )
                 else:
                     xaxis_group_sorted_idxs = np.argsort(
-                        np.ma.getdata(grid.cv_results_['param_' + param])
+                        np.ma.getdata(search.cv_results_['param_' + param])
                     )
                 if not param in param_cv_scores: param_cv_scores[param] = {}
-                for metric in gscv_scoring.keys():
+                for metric in scv_scoring.keys():
                     mean_scores_cv = np.reshape(
-                        grid.cv_results_['mean_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                        search.cv_results_['mean_test_' + metric][xaxis_group_sorted_idxs], new_shape
                     )
                     std_scores_cv = np.reshape(
-                        grid.cv_results_['std_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                        search.cv_results_['std_test_' + metric][xaxis_group_sorted_idxs], new_shape
                     )
                     mean_scores_cv_max_idxs = np.argmax(mean_scores_cv, axis=1)
                     mean_scores_cv = mean_scores_cv[
@@ -672,7 +679,7 @@ if args.analysis == 1:
                             (param_cv_scores[param][metric], mean_scores_cv)
                         )
         split_results.append({
-            'grid': grid,
+            'search': search,
             'feature_idxs': feature_idxs,
             'feature_names': feature_names,
             'fprs': fpr,
@@ -687,7 +694,7 @@ if args.analysis == 1:
         })
         split_idx += 1
     # plot grid search parameters vs cv perf metrics
-    sns.set_palette(sns.color_palette('hls', len(gscv_scoring)))
+    sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
     for param_idx, param in enumerate(param_cv_scores):
         mean_roc_aucs_cv = np.mean(param_cv_scores[param]['roc_auc'], axis=0)
         mean_bcrs_cv = np.mean(param_cv_scores[param]['bcr'], axis=0)
@@ -700,15 +707,15 @@ if args.analysis == 1:
             'fs2__n_neighbors', 'fs2__sample_size', 'fs3__n_features_to_select', 'clf__n_neighbors',
             'clf__n_estimators', 'clf__max_depth',
         ):
-            x_axis = param_grid[0][param]
+            x_axis = param_grid[param]
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
         elif param in (
             'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'fs3__estimator__C', 'clf__C',
             'clf__weights', 'clf__base_estimator__C',
         ):
-            x_axis = range(len(param_grid[0][param]))
-            plt.xticks(x_axis, param_grid[0][param])
+            x_axis = range(len(param_grid[param]))
+            plt.xticks(x_axis, param_grid[param])
         plt.title(
             dataset_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
             'Effect of ' + param + ' on CV Performance Metrics'
@@ -797,6 +804,35 @@ elif args.analysis == 2:
     if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_methods.append(bc_meth)
+    args.fs_meth = args.fs_meth[0]
+    args.slr_meth = args.slr_meth[0]
+    args.clf_meth = args.clf_meth[0]
+    pipe = Pipeline(sorted(
+        pipelines['fs'][args.fs_meth]['steps'] +
+        pipelines['slr'][args.slr_meth]['steps'] +
+        pipelines['clf'][args.clf_meth]['steps'],
+        key=lambda s: pipeline_order.index(s[0])
+    ), memory=memory)
+    param_grid = {
+        **pipelines['fs'][args.fs_meth]['param_grid'][0],
+        **pipelines['slr'][args.slr_meth]['param_grid'][0],
+        **pipelines['clf'][args.clf_meth]['param_grid'][0],
+    }
+    if args.scv_type == 'grid':
+        search = GridSearchCV(
+            pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+        )
+    elif args.scv_type == 'rand':
+        search = RandomizedSearchCV(
+            pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+        )
+    if args.verbose > 0:
+        print("Param grid:")
+        pprint(param_grid)
     args.datasets_tr = natsorted(args.datasets_tr)
     dataset_tr_name = '_'.join(args.datasets_tr + prep_methods + ['tr'])
     print('Train:', dataset_tr_name)
@@ -805,48 +841,27 @@ elif args.analysis == 2:
     eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
     y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
-    args.fs_meth = args.fs_meth[0]
-    args.slr_meth = args.slr_meth[0]
-    args.clf_meth = args.clf_meth[0]
-    param_grid = []
-    for fs_params in pipelines['fs'][args.fs_meth]['param_grid']:
-        for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
-            for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
-                param_grid.append({ **fs_params, **slr_params, **clf_params })
-    if args.verbose > 0:
-        print("Param grid:")
-        pprint(param_grid)
-    grid = GridSearchCV(
-        Pipeline(sorted(
-            pipelines['fs'][args.fs_meth]['steps'] +
-            pipelines['slr'][args.slr_meth]['steps'] +
-            pipelines['clf'][args.clf_meth]['steps'],
-            key=lambda s: pipeline_order.index(s[0])
-        ), memory=memory), param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
-        cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.gscv_verbose,
-    )
-    grid.fit(X_tr, y_tr)
-    dump(grid, '_'.join([
-        'results/grid', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
+    search.fit(X_tr, y_tr)
+    dump(search, '_'.join([
+        'results/search', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
     ]) + '.pkl')
     feature_idxs = np.arange(X_tr.shape[1])
-    for step in grid.best_estimator_.named_steps:
-        if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
-            feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
+    for step in search.best_estimator_.named_steps:
+        if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
+            feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
     weights = np.array([], dtype=float)
-    if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
-        weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
-    elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
-        weights = grid.best_estimator_.named_steps['clf'].feature_importances_
-    roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
-    bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
+    if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
+        weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
+    elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
+        weights = search.best_estimator_.named_steps['clf'].feature_importances_
+    roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search.best_index_]
+    bcr_cv = search.cv_results_['mean_test_bcr'][search.best_index_]
     print(
         'ROC AUC (CV): %.4f' % roc_auc_cv,
         ' BCR (CV): %.4f' % bcr_cv,
         ' Features: %3s' % feature_idxs.size,
-        ' Params:',  grid.best_params_,
+        ' Params:',  search.best_params_,
     )
     if weights.size > 0:
         feature_ranks = sorted(
@@ -862,22 +877,23 @@ elif args.analysis == 2:
         )
         print('Features:')
         for _, feature, symbol in feature_ranks: print(feature, '\t', symbol)
-    # pprint(grid.cv_results_)
+    # pprint(search.cv_results_)
     # plot grid search parameters vs cv perf metrics
-    sns.set_palette(sns.color_palette('hls', len(gscv_scoring)))
-    for param_idx, param in enumerate(param_grid[0]):
-        if '__' in param and len(param_grid[0][param]) > 1:
+
+    sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
+    for param_idx, param in enumerate(param_grid):
+        if '__' in param and len(param_grid[param]) > 1:
             new_shape = (
-                len(param_grid[0][param]),
-                np.prod([len(v) for k,v in param_grid[0].items() if k != param])
+                len(param_grid[param]),
+                np.prod([len(v) for k,v in param_grid.items() if k != param])
             )
             if param in ('fs2__threshold', 'clf__weights'):
                 xaxis_group_sorted_idxs = np.argsort(
-                    np.ma.getdata(grid.cv_results_['param_' + param]).astype(str)
+                    np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
                 )
             else:
                 xaxis_group_sorted_idxs = np.argsort(
-                    np.ma.getdata(grid.cv_results_['param_' + param])
+                    np.ma.getdata(search.cv_results_['param_' + param])
                 )
             plt.figure('Figure 2-' + str(param_idx + 1))
             plt.rcParams['font.size'] = 14
@@ -886,27 +902,27 @@ elif args.analysis == 2:
                 'fs2__n_neighbors', 'fs2__sample_size', 'fs3__n_features_to_select', 'clf__n_neighbors',
                 'clf__n_estimators', 'clf__max_depth',
             ):
-                x_axis = param_grid[0][param]
+                x_axis = param_grid[param]
                 plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
                 plt.xticks(x_axis)
             elif param in (
                 'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'fs3__estimator__C', 'clf__C',
                 'clf__weights', 'clf__base_estimator__C',
             ):
-                x_axis = range(len(param_grid[0][param]))
-                plt.xticks(x_axis, param_grid[0][param])
+                x_axis = range(len(param_grid[param]))
+                plt.xticks(x_axis, param_grid[param])
             plt.title(
                 dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
                 'Effect of ' + param + ' on CV Performance Metrics'
             )
             plt.xlabel(param)
             plt.ylabel('CV Score')
-            for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
+            for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
                 mean_scores_cv = np.reshape(
-                    grid.cv_results_['mean_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                    search.cv_results_['mean_test_' + metric][xaxis_group_sorted_idxs], new_shape
                 )
                 std_scores_cv = np.reshape(
-                    grid.cv_results_['std_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                    search.cv_results_['std_test_' + metric][xaxis_group_sorted_idxs], new_shape
                 )
                 mean_scores_cv_max_idxs = np.argmax(mean_scores_cv, axis=1)
                 mean_scores_cv = mean_scores_cv[
@@ -955,7 +971,7 @@ elif args.analysis == 2:
         pipelines['clf'][args.clf_meth]['steps']
     )
     pipe.set_params(
-        **{ k: v for k, v in grid.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
+        **{ k: v for k, v in search.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
     )
     for dataset_te_basename in dataset_te_basenames:
         if args.no_addon_te:
@@ -1033,15 +1049,15 @@ elif args.analysis == 3:
         if args.verbose > 0:
             print("Param grid:")
             pprint(param_grid)
-        grid = GridSearchCV(
+        search = GridSearchCV(
             Pipeline(sorted(
                 pipelines['fs'][args.fs_meth]['steps'] +
                 pipelines['slr'][args.slr_meth]['steps'] +
                 pipelines['clf'][args.clf_meth]['steps'],
                 key=lambda s: pipeline_order.index(s[0])
-            ), memory=memory), param_grid=param_grid, scoring=gscv_scoring, refit=args.gscv_refit,
-            cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.gscv_verbose,
+            ), memory=memory), param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
         )
     else:
         analysis_type = 'all_methods'
@@ -1081,11 +1097,11 @@ elif args.analysis == 3:
             pprint(param_grid)
             print("Param grid data:")
             pprint(param_grid_data)
-        grid = GridSearchCV(
+        search = GridSearchCV(
             Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-            param_grid=param_grid, scoring=gscv_scoring, refit=False,
-            cv=StratifiedShuffleSplit(n_splits=args.gscv_splits, test_size=args.gscv_size), iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.gscv_verbose,
+            param_grid=param_grid, scoring=scv_scoring, refit=False,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
         )
     if args.datasets_tr and args.num_tr_combo:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_tr_combo)]
@@ -1191,36 +1207,36 @@ elif args.analysis == 3:
                 eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
                 X_te = np.array(base.t(biobase.exprs(eset_te)))
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-                grid.fit(X_tr, y_tr)
+                search.fit(X_tr, y_tr)
                 if analysis_type == 'prep_methods':
-                    dump(grid, '_'.join([
-                        'results/grid', dataset_tr_name, args.slr_meth.lower(),
+                    dump(search, '_'.join([
+                        'results/search', dataset_tr_name, args.slr_meth.lower(),
                          args.fs_meth.lower(), args.clf_meth.lower()
                     ]) + '.pkl')
                     feature_idxs = np.arange(X_tr.shape[1])
-                    for step in grid.best_estimator_.named_steps:
-                        if hasattr(grid.best_estimator_.named_steps[step], 'get_support'):
-                            feature_idxs = feature_idxs[grid.best_estimator_.named_steps[step].get_support(indices=True)]
+                    for step in search.best_estimator_.named_steps:
+                        if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
+                            feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
                     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
                     weights = np.array([], dtype=float)
-                    if hasattr(grid.best_estimator_.named_steps['clf'], 'coef_'):
-                        weights = np.square(grid.best_estimator_.named_steps['clf'].coef_[0])
-                    elif hasattr(grid.best_estimator_.named_steps['clf'], 'feature_importances_'):
-                        weights = grid.best_estimator_.named_steps['clf'].feature_importances_
-                    roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][grid.best_index_]
-                    bcr_cv = grid.cv_results_['mean_test_bcr'][grid.best_index_]
-                    if hasattr(grid, 'decision_function'):
-                        y_score = grid.decision_function(X_te)
+                    if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
+                        weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
+                    elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
+                        weights = search.best_estimator_.named_steps['clf'].feature_importances_
+                    roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search.best_index_]
+                    bcr_cv = search.cv_results_['mean_test_bcr'][search.best_index_]
+                    if hasattr(search, 'decision_function'):
+                        y_score = search.decision_function(X_te)
                     else:
-                        y_score = grid.predict_proba(X_te)[:,1]
+                        y_score = search.predict_proba(X_te)[:,1]
                     roc_auc_te = roc_auc_score(y_te, y_score)
-                    y_pred = grid.predict(X_te)
+                    y_pred = search.predict(X_te)
                     bcr_te = bcr_score(y_te, y_pred)
                     print(
                         'ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
                         ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
                         ' Features: %3s' % feature_idxs.size,
-                        ' Params:',  grid.best_params_,
+                        ' Params:',  search.best_params_,
                     )
                     # if weights.size > 0:
                     #     print('Rankings:')
@@ -1239,18 +1255,18 @@ elif args.analysis == 3:
                     for group_idx, param_grid_group in enumerate(param_grid_data):
                         for grid_idx in param_grid_group['grid_idxs']:
                             if group_idx < len(best_grid_idxs):
-                                if (grid.cv_results_['rank_test_' + args.gscv_refit][grid_idx] <
-                                    grid.cv_results_['rank_test_' + args.gscv_refit][best_grid_idxs[group_idx]]):
+                                if (search.cv_results_['rank_test_' + args.scv_refit][grid_idx] <
+                                    search.cv_results_['rank_test_' + args.scv_refit][best_grid_idxs[group_idx]]):
                                     best_grid_idxs[group_idx] = grid_idx
                             else:
                                 best_grid_idxs.append(grid_idx)
                     print('Fitting ' + str(len(best_grid_idxs)) + ' pipelines', end='', flush=True)
-                    if args.gscv_verbose > 0: print()
-                    pipes = Parallel(n_jobs=args.num_cores, verbose=args.gscv_verbose)(
+                    if args.scv_verbose > 0: print()
+                    pipes = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
                         delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr)
-                        for params in map(lambda i: grid.cv_results_['params'][i], best_grid_idxs)
+                        for params in map(lambda i: search.cv_results_['params'][i], best_grid_idxs)
                     )
-                    if args.gscv_verbose == 0: print('done')
+                    if args.scv_verbose == 0: print('done')
                     best_roc_auc_te = 0
                     best_bcr_te = 0
                     meth_scores, best_params_te = {}, {}
@@ -1268,13 +1284,13 @@ elif args.analysis == 3:
                                 meth_scores[meth_type] = []
                             if meth_idx >= len(meth_scores[meth_type]):
                                 meth_scores[meth_type].append({})
-                            for metric in gscv_scoring.keys():
+                            for metric in scv_scoring.keys():
                                 if metric + '_cv' not in meth_scores[meth_type][meth_idx]:
                                     meth_scores[meth_type][meth_idx][metric + '_cv'] = []
                                 if metric + '_te' not in meth_scores[meth_type][meth_idx]:
                                     meth_scores[meth_type][meth_idx][metric + '_te'] = []
                                 meth_scores[meth_type][meth_idx][metric + '_cv'].append(
-                                    grid.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
+                                    search.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
                                 )
                             meth_scores[meth_type][meth_idx]['roc_auc_te'].append(roc_auc_te)
                             meth_scores[meth_type][meth_idx]['bcr_te'].append(bcr_te)
@@ -1284,25 +1300,25 @@ elif args.analysis == 3:
                              meth_combo_scores['fs_clf'].append([])
                         if clf_idx >= len(meth_combo_scores['fs_clf'][fs_idx]):
                             meth_combo_scores['fs_clf'][fs_idx].append({})
-                        for metric in gscv_scoring.keys():
+                        for metric in scv_scoring.keys():
                             if metric + '_cv' not in meth_combo_scores['fs_clf'][fs_idx][clf_idx]:
                                 meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_cv'] = []
                             if metric + '_te' not in meth_combo_scores['fs_clf'][fs_idx][clf_idx]:
                                 meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_te'] = []
                             meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_cv'].append(
-                                grid.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
+                                search.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
                             )
                         meth_combo_scores['fs_clf'][fs_idx][clf_idx]['roc_auc_te'].append(roc_auc_te)
                         meth_combo_scores['fs_clf'][fs_idx][clf_idx]['bcr_te'].append(bcr_te)
-                        if ((args.gscv_refit == 'roc_auc' and roc_auc_te > best_roc_auc_te) or
-                            (args.gscv_refit == 'bcr' and bcr_te > best_bcr_te)):
+                        if ((args.scv_refit == 'roc_auc' and roc_auc_te > best_roc_auc_te) or
+                            (args.scv_refit == 'bcr' and bcr_te > best_bcr_te)):
                                 best_roc_auc_te = roc_auc_te
                                 best_bcr_te = bcr_te
                                 best_params_te = params
-                    best_idx_cv = np.argmin(grid.cv_results_['rank_test_' + args.gscv_refit])
-                    best_roc_auc_cv = grid.cv_results_['mean_test_roc_auc'][best_idx_cv]
-                    best_bcr_cv = grid.cv_results_['mean_test_bcr'][best_idx_cv]
-                    best_params_cv = grid.cv_results_['params'][best_idx_cv]
+                    best_idx_cv = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
+                    best_roc_auc_cv = search.cv_results_['mean_test_roc_auc'][best_idx_cv]
+                    best_bcr_cv = search.cv_results_['mean_test_bcr'][best_idx_cv]
+                    best_params_cv = search.cv_results_['params'][best_idx_cv]
                     print(
                         'ROC AUC (CV / Test): %.4f / %.4f' % (best_roc_auc_cv, best_roc_auc_te),
                         ' BCR (CV / Test): %.4f / %.4f' % (best_bcr_cv, best_bcr_te),
@@ -1559,7 +1575,7 @@ elif args.analysis == 3:
     for figure_idx, figure in enumerate(figures):
         figure_num = figure_idx + 4
         sns.set_palette(sns.color_palette('hls', len(figure['row_names'])))
-        for metric_idx, metric in enumerate(sorted(gscv_scoring.keys(), reverse=True)):
+        for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
             metric_title = metric.replace('_', ' ').upper()
             figure_name = 'Figure ' + str(figure_num) + '-' + str(metric_idx + 1)
             plt.figure(figure_name + 'A')
