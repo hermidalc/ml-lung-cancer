@@ -1173,13 +1173,7 @@ elif args.analysis == 3:
         'fs_clf': np.zeros((len(pipelines['fs']), len(pipelines['clf'])), dtype=[
             ('te_tr', [
                 ('pr', score_dtypes, (len(prep_groups),))
-            ], (len(dataset_te_basenames), len(dataset_tr_combos))),
-            ('pr_te', [
-                ('tr', score_dtypes, (len(dataset_tr_combos),))
-            ], (len(prep_groups), len(dataset_te_basenames))),
-            ('pr_tr', [
-                ('te', score_dtypes, (len(dataset_te_basenames),))
-            ], (len(prep_groups), len(dataset_tr_combos))),
+            ], (len(dataset_te_basenames), len(dataset_tr_combos)))
         ]),
     }
     dataset_pair_counter = 1
@@ -1356,10 +1350,6 @@ elif args.analysis == 3:
                                         mean_score = np.mean(metric_scores)
                                         (results['fs_clf'][fs_idx, clf_idx]['te_tr'][te_idx, tr_idx]
                                             ['pr'][pr_idx][metric]) = mean_score
-                                        (results['fs_clf'][fs_idx, clf_idx]['pr_te'][pr_idx, te_idx]
-                                            ['tr'][tr_idx][metric]) = mean_score
-                                        (results['fs_clf'][fs_idx, clf_idx]['pr_tr'][pr_idx, tr_idx]
-                                            ['te'][te_idx][metric]) = mean_score
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
                 dataset_pair_counter += 1
@@ -1556,8 +1546,8 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['fs_clf'],
             'row_names': list(pipelines['fs'].keys()),
-            'field_results_key': 'pr_te',
-            'sub_results_key': 'tr',
+            'field_results_key': 'te_tr',
+            'sub_results_key': 'pr',
         },
         {
             'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
@@ -1567,8 +1557,8 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['fs_clf'].T,
             'row_names': list(pipelines['clf'].keys()),
-            'field_results_key': 'pr_te',
-            'sub_results_key': 'tr',
+            'field_results_key': 'te_tr',
+            'sub_results_key': 'pr',
         },
     ]
     plt.rcParams['figure.max_open_warning'] = 0
