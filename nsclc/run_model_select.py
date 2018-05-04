@@ -16,6 +16,7 @@ from rpy2.robjects.packages import importr
 from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
+from sklearn.base import clone
 from sklearn.feature_selection import mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
 from sklearn.model_selection import GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsClassifier
@@ -1245,20 +1246,23 @@ elif args.analysis == 3:
                     results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['num_features'] = feature_idxs.size
                     results['tr_pr'][tr_idx, pr_idx]['te'][te_idx] = results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]
                 elif analysis_type == 'all_methods':
-                    best_grid_idxs = []
+                    group_best_grid_idx, group_best_params = [], []
                     for group_idx, param_grid_group in enumerate(param_grid_data):
                         for grid_idx in param_grid_group['grid_idxs']:
-                            if group_idx < len(best_grid_idxs):
+                            if group_idx < len(group_best_grid_idx):
                                 if (search.cv_results_['rank_test_' + args.scv_refit][grid_idx] <
-                                    search.cv_results_['rank_test_' + args.scv_refit][best_grid_idxs[group_idx]]):
-                                    best_grid_idxs[group_idx] = grid_idx
+                                    search.cv_results_['rank_test_' + args.scv_refit][group_best_grid_idx[group_idx]]):
+                                    group_best_grid_idx[group_idx] = grid_idx
                             else:
-                                best_grid_idxs.append(grid_idx)
-                    print('Fitting ' + str(len(best_grid_idxs)) + ' pipelines', end='', flush=True)
+                                group_best_grid_idx.append(grid_idx)
+                        group_best_params.append({
+                            k: clone(v) if k in pipeline_order else v
+                            for k, v in search.cv_results_['params'][group_best_grid_idx[group_idx]].items()
+                        })
+                    print('Fitting ' + str(len(group_best_grid_idx)) + ' pipelines', end='', flush=True)
                     if args.scv_verbose > 0: print()
                     pipes = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
-                        delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr)
-                        for params in map(lambda i: search.cv_results_['params'][i], best_grid_idxs)
+                        delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
                     )
                     if args.scv_verbose == 0: print('done')
                     best_roc_auc_te = 0
@@ -1284,7 +1288,7 @@ elif args.analysis == 3:
                                 if metric + '_te' not in meth_scores[meth_type][meth_idx]:
                                     meth_scores[meth_type][meth_idx][metric + '_te'] = []
                                 meth_scores[meth_type][meth_idx][metric + '_cv'].append(
-                                    search.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
+                                    search.cv_results_['mean_test_' + metric][group_best_grid_idx[group_idx]]
                                 )
                             meth_scores[meth_type][meth_idx]['roc_auc_te'].append(roc_auc_te)
                             meth_scores[meth_type][meth_idx]['bcr_te'].append(bcr_te)
@@ -1300,7 +1304,7 @@ elif args.analysis == 3:
                             if metric + '_te' not in meth_combo_scores['fs_clf'][fs_idx][clf_idx]:
                                 meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_te'] = []
                             meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_cv'].append(
-                                search.cv_results_['mean_test_' + metric][best_grid_idxs[group_idx]]
+                                search.cv_results_['mean_test_' + metric][group_best_grid_idx[group_idx]]
                             )
                         meth_combo_scores['fs_clf'][fs_idx][clf_idx]['roc_auc_te'].append(roc_auc_te)
                         meth_combo_scores['fs_clf'][fs_idx][clf_idx]['bcr_te'].append(bcr_te)
