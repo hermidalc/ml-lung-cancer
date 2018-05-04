@@ -1268,8 +1268,8 @@ elif args.analysis == 3:
                     if args.scv_verbose == 0: print('done')
                     best_roc_auc_te = 0
                     best_bcr_te = 0
-                    meth_scores, best_params_te = {}, {}
-                    meth_combo_scores = { 'fs_clf': [] }
+                    best_params_te = {}
+                    meth_scores, meth_combo_scores = {}, { 'fs_clf': [] }
                     for group_idx, param_grid_group in enumerate(param_grid_data):
                         if hasattr(pipes[group_idx], 'decision_function'):
                             y_score = pipes[group_idx].decision_function(X_te)
@@ -1311,13 +1311,13 @@ elif args.analysis == 3:
                         meth_combo_scores['fs_clf'][fs_idx][clf_idx]['bcr_te'].append(bcr_te)
                         if ((args.scv_refit == 'roc_auc' and roc_auc_te > best_roc_auc_te) or
                             (args.scv_refit == 'bcr' and bcr_te > best_bcr_te)):
-                                best_roc_auc_te = roc_auc_te
-                                best_bcr_te = bcr_te
-                                best_params_te = params
-                    best_idx_cv = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
-                    best_roc_auc_cv = search.cv_results_['mean_test_roc_auc'][best_idx_cv]
-                    best_bcr_cv = search.cv_results_['mean_test_bcr'][best_idx_cv]
-                    best_params_cv = search.cv_results_['params'][best_idx_cv]
+                            best_roc_auc_te = roc_auc_te
+                            best_bcr_te = bcr_te
+                            best_params_te = params
+                    best_grid_idx_cv = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
+                    best_roc_auc_cv = search.cv_results_['mean_test_roc_auc'][best_grid_idx_cv]
+                    best_bcr_cv = search.cv_results_['mean_test_bcr'][best_grid_idx_cv]
+                    best_params_cv = search.cv_results_['params'][best_grid_idx_cv]
                     print(
                         'ROC AUC (CV / Test): %.4f / %.4f' % (best_roc_auc_cv, best_roc_auc_te),
                         ' BCR (CV / Test): %.4f / %.4f' % (best_bcr_cv, best_bcr_te),
