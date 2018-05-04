@@ -1,4 +1,4 @@
-# NCI LHC NSCLC Research and Data Analysis Repository
+# ML Prediction of Prognosis in Early-Stage Lung Cancer
 
 ## Environment and Analysis Pipeline Setup
 
