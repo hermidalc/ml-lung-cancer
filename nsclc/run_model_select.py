@@ -1313,7 +1313,7 @@ elif args.analysis == 3:
                             (args.scv_refit == 'bcr' and bcr_te > best_bcr_te)):
                             best_roc_auc_te = roc_auc_te
                             best_bcr_te = bcr_te
-                            best_params_te = params
+                            best_params_te = group_best_params[group_idx]
                     best_grid_idx_cv = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
                     best_roc_auc_cv = search.cv_results_['mean_test_roc_auc'][best_grid_idx_cv]
                     best_bcr_cv = search.cv_results_['mean_test_bcr'][best_grid_idx_cv]
