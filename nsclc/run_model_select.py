@@ -1260,7 +1260,7 @@ elif args.analysis == 3:
                             k: clone(v) if k in pipeline_order else v
                             for k, v in search.cv_results_['params'][group_best_grid_idx[group_idx]].items()
                         })
-                    print('Fitting ' + str(len(group_best_grid_idx)) + ' pipelines', end='', flush=True)
+                    print('Fitting ' + str(len(group_best_params)) + ' pipelines', end='', flush=True)
                     if args.scv_verbose > 0: print()
                     pipes = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
                         delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
