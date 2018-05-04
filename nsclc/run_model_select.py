@@ -1379,7 +1379,7 @@ elif args.analysis == 3:
             'lines_title': 'Test Dataset',
             'title_sub': title_sub,
             'results': results['te_pr'],
-            'row_names': dataset_te_basenames,
+            'line_names': dataset_te_basenames,
             'field_results_key': 'tr',
         },
         {
@@ -1389,7 +1389,7 @@ elif args.analysis == 3:
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
             'results': results['te_pr'].T,
-            'row_names': prep_methods,
+            'line_names': prep_methods,
             'field_results_key': 'tr',
         },
         # plot results['tr_pr']
@@ -1401,7 +1401,7 @@ elif args.analysis == 3:
             'lines_title': 'Train Dataset',
             'title_sub': title_sub,
             'results': results['tr_pr'],
-            'row_names': dataset_tr_basenames,
+            'line_names': dataset_tr_basenames,
             'field_results_key': 'te',
         },
         {
@@ -1411,7 +1411,7 @@ elif args.analysis == 3:
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
             'results': results['tr_pr'].T,
-            'row_names': prep_methods,
+            'line_names': prep_methods,
             'field_results_key': 'te',
         },
         # plot results['te_fs']
@@ -1422,7 +1422,7 @@ elif args.analysis == 3:
             'lines_title': 'Test Dataset',
             'title_sub': title_sub,
             'results': results['te_fs'],
-            'row_names': dataset_te_basenames,
+            'line_names': dataset_te_basenames,
             'field_results_key': 'tr_pr',
         },
         {
@@ -1432,7 +1432,7 @@ elif args.analysis == 3:
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
             'results': results['te_fs'].T,
-            'row_names': list(pipelines['fs'].keys()),
+            'line_names': list(pipelines['fs'].keys()),
             'field_results_key': 'tr_pr',
         },
         # plot results['tr_fs']
@@ -1443,7 +1443,7 @@ elif args.analysis == 3:
             'lines_title': 'Train Dataset',
             'title_sub': title_sub,
             'results': results['tr_fs'],
-            'row_names': dataset_tr_basenames,
+            'line_names': dataset_tr_basenames,
             'field_results_key': 'te_pr',
         },
         {
@@ -1453,7 +1453,7 @@ elif args.analysis == 3:
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
             'results': results['tr_fs'].T,
-            'row_names': list(pipelines['fs'].keys()),
+            'line_names': list(pipelines['fs'].keys()),
             'field_results_key': 'te_pr',
         },
         # plot results['te_clf']
@@ -1464,7 +1464,7 @@ elif args.analysis == 3:
             'lines_title': 'Test Dataset',
             'title_sub': title_sub,
             'results': results['te_clf'],
-            'row_names': dataset_te_basenames,
+            'line_names': dataset_te_basenames,
             'field_results_key': 'tr_pr',
         },
         {
@@ -1474,7 +1474,7 @@ elif args.analysis == 3:
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
             'results': results['te_clf'].T,
-            'row_names': list(pipelines['clf'].keys()),
+            'line_names': list(pipelines['clf'].keys()),
             'field_results_key': 'tr_pr',
         },
         # plot results['tr_clf']
@@ -1485,7 +1485,7 @@ elif args.analysis == 3:
             'lines_title': 'Train Dataset',
             'title_sub': title_sub,
             'results': results['tr_clf'],
-            'row_names': dataset_tr_basenames,
+            'line_names': dataset_tr_basenames,
             'field_results_key': 'te_pr',
         },
         {
@@ -1495,7 +1495,7 @@ elif args.analysis == 3:
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
             'results': results['tr_clf'].T,
-            'row_names': list(pipelines['clf'].keys()),
+            'line_names': list(pipelines['clf'].keys()),
             'field_results_key': 'te_pr',
         },
         # plot results['pr_fs']
@@ -1506,7 +1506,7 @@ elif args.analysis == 3:
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
             'results': results['pr_fs'],
-            'row_names': prep_methods,
+            'line_names': prep_methods,
             'field_results_key': 'te_tr',
         },
         {
@@ -1517,7 +1517,7 @@ elif args.analysis == 3:
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
             'results': results['pr_fs'].T,
-            'row_names': list(pipelines['fs'].keys()),
+            'line_names': list(pipelines['fs'].keys()),
             'field_results_key': 'te_tr',
         },
         # plot results['pr_clf']
@@ -1528,7 +1528,7 @@ elif args.analysis == 3:
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
             'results': results['pr_clf'],
-            'row_names': prep_methods,
+            'line_names': prep_methods,
             'field_results_key': 'te_tr',
         },
         {
@@ -1539,7 +1539,7 @@ elif args.analysis == 3:
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
             'results': results['pr_clf'].T,
-            'row_names': list(pipelines['clf'].keys()),
+            'line_names': list(pipelines['clf'].keys()),
             'field_results_key': 'te_tr',
         },
         # plot results['fs_clf']
@@ -1550,7 +1550,7 @@ elif args.analysis == 3:
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
             'results': results['fs_clf'],
-            'row_names': list(pipelines['fs'].keys()),
+            'line_names': list(pipelines['fs'].keys()),
             'field_results_key': 'te_tr',
             'sub_results_key': 'pr',
         },
@@ -1561,7 +1561,7 @@ elif args.analysis == 3:
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
             'results': results['fs_clf'].T,
-            'row_names': list(pipelines['clf'].keys()),
+            'line_names': list(pipelines['clf'].keys()),
             'field_results_key': 'te_tr',
             'sub_results_key': 'pr',
         },
@@ -1570,7 +1570,7 @@ elif args.analysis == 3:
     for figure_idx, figure in enumerate(figures):
         if figure['results'].size == 0: continue
         figure_num = figure_idx + 4
-        sns.set_palette(sns.color_palette('hls', len(figure['row_names'])))
+        sns.set_palette(sns.color_palette('hls', len(figure['line_names'])))
         for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
             metric_title = metric.replace('_', ' ').upper()
             figure_name = 'Figure ' + str(figure_num) + '-' + str(metric_idx + 1)
@@ -1634,12 +1634,12 @@ elif args.analysis == 3:
                         range_scores_te[1][col_idx] = np.max(scores_te) - np.mean(scores_te)
                 if not np.all(np.isnan(mean_scores_cv)):
                     label_values_cv = (
-                        figure['row_names'][row_idx], 'CV',
+                        figure['line_names'][row_idx], 'CV',
                         np.mean(mean_scores_cv[~np.isnan(mean_scores_cv)]),
                         np.std(mean_scores_cv[~np.isnan(mean_scores_cv)]),
                     )
                     label_values_te = (
-                        figure['row_names'][row_idx], 'Test',
+                        figure['line_names'][row_idx], 'Test',
                         np.mean(mean_scores_te[~np.isnan(mean_scores_te)]),
                         np.std(mean_scores_te[~np.isnan(mean_scores_te)]),
                     )
@@ -1666,11 +1666,15 @@ elif args.analysis == 3:
                         capsize=10, elinewidth=2, markeredgewidth=2, marker='s',
                         label=label % label_values_te,
                     )
+            if len(figure['line_names']) > 8:
+                legend_fontsize = 'xx-small'
+            else:
+                legend_fontsize = 'x-small'
             plt.figure(figure_name + 'A')
-            plt.legend(loc='best', fontsize='x-small')
+            plt.legend(loc='best', fontsize=legend_fontsize)
             plt.grid('on')
             plt.figure(figure_name + 'B')
-            plt.legend(loc='best', fontsize='x-small')
+            plt.legend(loc='best', fontsize=legend_fontsize)
             plt.grid('on')
 plt.show()
 if args.pipe_memory: rmtree(cachedir)
