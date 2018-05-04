@@ -1211,7 +1211,8 @@ elif args.analysis == 3:
                     feature_idxs = np.arange(X_tr.shape[1])
                     for step in search.best_estimator_.named_steps:
                         if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
-                            feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
+                            feature_idxs = (feature_idxs
+                                [search.best_estimator_.named_steps[step].get_support(indices=True)])
                     feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
                     weights = np.array([], dtype=float)
                     if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
