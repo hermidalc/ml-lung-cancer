@@ -1568,6 +1568,7 @@ elif args.analysis == 3:
     ]
     plt.rcParams['figure.max_open_warning'] = 0
     for figure_idx, figure in enumerate(figures):
+        if figure['results'].size == 0: continue
         figure_num = figure_idx + 4
         sns.set_palette(sns.color_palette('hls', len(figure['row_names'])))
         for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
