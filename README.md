@@ -8,10 +8,9 @@
 sudo dnf install -y libxml-devel libxml2-devel mesa-libGL-devel mesa-libGLU-devel
 ```
 
-2. Install Anaconda3
+2. Install Anaconda3 5.0.1
 
 https://www.anaconda.com/download/
-
 https://docs.anaconda.com/anaconda/install/linux
 
 2. Setup Conda Environment and Install R, Rpy2, Bioconductor, Limma, etc.
@@ -50,7 +49,7 @@ bioconductor-gcrma \
 bioconductor-impute
 ```
 
-3. Setup for rJava (used by some R packages)
+3. Setup for rJava (used by Biocomb and FSelector R packages)
 
 In .bashrc/.bash_profile:
 ```bash
