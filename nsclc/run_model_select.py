@@ -100,7 +100,8 @@ parser.add_argument('--scv-refit', type=str, default='roc_auc', help='scv refit 
 parser.add_argument('--scv-n-iter', type=int, default=100, help='randomized scv num iterations')
 parser.add_argument('--num-cores', type=int, default=-1, help='num parallel cores')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
-parser.add_argument('--save-plots', default=False, action='store_true', help='save figure plots')
+parser.add_argument('--save-model', default=False, action='store_true', help='save model')
+parser.add_argument('--save-figures', default=False, action='store_true', help='save figures')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--verbose', type=int, default=1, help='program verbosity')
 args = parser.parse_args()
@@ -843,9 +844,10 @@ elif args.analysis == 2:
     X_tr = np.array(base.t(biobase.exprs(eset_tr)))
     y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
     search.fit(X_tr, y_tr)
-    dump(search, '_'.join([
-        'results/search', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
-    ]) + '.pkl')
+    if args.save_model:
+        dump(search, '_'.join([
+            'results/search', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
+        ]) + '.pkl')
     feature_idxs = np.arange(X_tr.shape[1])
     for step in search.best_estimator_.named_steps:
         if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
@@ -1204,10 +1206,11 @@ elif args.analysis == 3:
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
                 search.fit(X_tr, y_tr)
                 if analysis_type == 'prep_methods':
-                    dump(search, '_'.join([
-                        'results/search', dataset_tr_name, args.slr_meth.lower(),
-                         args.fs_meth.lower(), args.clf_meth.lower()
-                    ]) + '.pkl')
+                    if args.save_model:
+                        dump(search, '_'.join([
+                            'results/search', dataset_tr_name, args.slr_meth.lower(),
+                             args.fs_meth.lower(), args.clf_meth.lower()
+                        ]) + '.pkl')
                     feature_idxs = np.arange(X_tr.shape[1])
                     for step in search.best_estimator_.named_steps:
                         if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
