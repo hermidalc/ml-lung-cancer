@@ -1655,12 +1655,12 @@ elif args.analysis == 3:
                         label = r'%s (%s = %0.4f $\pm$ %0.2f)'
                     elif np.std(num_features) == 0:
                         label = r'%s (%s = %0.4f $\pm$ %0.2f, Features = %d)'
-                        label_values_cv = (label_values_cv, np.mean(num_features))
-                        label_values_te = (label_values_te, np.mean(num_features))
+                        label_values_cv = label_values_cv + (np.mean(num_features),)
+                        label_values_te = label_values_te + (np.mean(num_features),)
                     else:
                         label = r'%s (%s = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)'
-                        label_values_cv = (label_values_cv, np.mean(num_features), np.std(num_features))
-                        label_values_te = (label_values_te, np.mean(num_features), np.std(num_features))
+                        label_values_cv = label_values_cv + (np.mean(num_features), np.std(num_features))
+                        label_values_te = label_values_te + (np.mean(num_features), np.std(num_features))
                     plt.figure(figure_name + 'A')
                     # color = next(plt.gca()._get_lines.prop_cycler)['color']
                     plt.errorbar(
