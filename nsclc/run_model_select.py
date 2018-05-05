@@ -273,7 +273,7 @@ if args.clf_grb_d:
 else:
     CLF_GRB_D = list(range(1, args.clf_grb_d_max + 1, 1))
 if args.clf_grb_f:
-    CLF_GRB_F = sorted(args.clf_grb_f)
+    CLF_GRB_F = [None if a in ('None', 'none') else a for a in args.clf_grb_f ]
 else:
     CLF_GRB_F = ['auto', 'sqrt', 'log2', None]
 
