@@ -92,6 +92,7 @@ parser.add_argument('--clf-grb-e', type=int, nargs='+', help='clf grb n estimato
 parser.add_argument('--clf-grb-e-max', type=int, default=300, help='clf grb n estimators max')
 parser.add_argument('--clf-grb-d', type=int, nargs='+', help='clf grb max depth')
 parser.add_argument('--clf-grb-d-max', type=int, default=50, help='clf grb max depth max')
+parser.add_argument('--clf-grb-f', type=str, nargs='+', help='clf grb max features')
 parser.add_argument('--scv-type', type=str, default='grid', help='scv type (grid or rand)')
 parser.add_argument('--scv-splits', type=int, default=80, help='scv splits')
 parser.add_argument('--scv-size', type=float, default=0.3, help='scv size')
@@ -271,6 +272,10 @@ if args.clf_grb_d:
     CLF_GRB_D = sorted(args.clf_grb_d)
 else:
     CLF_GRB_D = list(range(1, args.clf_grb_d_max + 1, 1))
+if args.clf_grb_f:
+    CLF_GRB_F = sorted(args.clf_grb_f)
+else:
+    CLF_GRB_F = ['auto', 'sqrt', 'log2', None]
 
 pipeline_order = [
     'fs1',
@@ -498,6 +503,7 @@ pipelines = {
                 {
                     'clf__n_estimators': CLF_GRB_E,
                     'clf__max_depth': CLF_GRB_D,
+                    'clf__max_features': CLF_GRB_F,
                 },
             ],
         },
