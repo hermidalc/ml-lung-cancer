@@ -1142,7 +1142,7 @@ elif args.analysis == 3:
                 eset_tr_file = 'data/' + eset_tr_name + '.Rda'
                 eset_te_file = 'data/' + eset_te_name + '.Rda'
                 if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
-                print(dataset_tr_name, '->', dataset_te_name)
+                # print(dataset_tr_name, '->', dataset_te_name)
                 dataset_tr_combos_subset.append(dataset_tr_combo)
                 dataset_te_basenames_subset.append(dataset_te_basename)
                 prep_groups_subset.append(prep_steps)
