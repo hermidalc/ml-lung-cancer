@@ -1126,12 +1126,15 @@ elif args.analysis == 3:
     dataset_tr_combos_subset, dataset_te_basenames_subset, prep_groups_subset = [], [], []
     for dataset_tr_combo in dataset_tr_combos:
         dataset_tr_basename = '_'.join(dataset_tr_combo)
-        for dataset_te_basename in dataset_te_basenames:
+        for dataset_te_basename in list(set(dataset_te_basenames) - set(dataset_tr_combo)):
             for prep_steps in prep_groups:
                 prep_method = '_'.join(prep_steps)
                 dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
-                if args.no_addon_te:
-                    dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0]])
+                if prep_steps[-1] == 'merged' or args.no_addon_te:
+                    if prep_steps[1] in id_types:
+                        dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0], prep_steps[1]])
+                    else:
+                        dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0]])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
@@ -1139,7 +1142,7 @@ elif args.analysis == 3:
                 eset_tr_file = 'data/' + eset_tr_name + '.Rda'
                 eset_te_file = 'data/' + eset_te_name + '.Rda'
                 if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
-                # print(dataset_tr_name, '->', dataset_te_name)
+                print(dataset_tr_name, '->', dataset_te_name)
                 dataset_tr_combos_subset.append(dataset_tr_combo)
                 dataset_te_basenames_subset.append(dataset_te_basename)
                 prep_groups_subset.append(prep_steps)
@@ -1382,7 +1385,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
-            'x_ticks_rotation': 10,
+            'x_ticks_rotation': 15,
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Test Dataset',
             'title_sub': title_sub,
@@ -1404,7 +1407,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
-            'x_ticks_rotation': 10,
+            'x_ticks_rotation': 15,
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Train Dataset',
             'title_sub': title_sub,
@@ -1520,7 +1523,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
-            'x_ticks_rotation': 10,
+            'x_ticks_rotation': 15,
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
@@ -1542,7 +1545,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(prep_methods) + 1),
             'x_axis_labels': prep_methods,
-            'x_ticks_rotation': 10,
+            'x_ticks_rotation': 15,
             'x_axis_title': 'Preprocessing Method',
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
@@ -1576,8 +1579,19 @@ elif args.analysis == 3:
     ]
     plt.rcParams['figure.max_open_warning'] = 0
     for figure_idx, figure in enumerate(figures):
-        if figure['results'].size == 0: continue
+        if analysis_type == 'prep_methods' and figure_idx > 3: continue
         figure_num = figure_idx + 4
+        if len(figure['line_names']) > 10:
+            legend_kwargs = {
+                'bbox_to_anchor': (1.04, 1),
+                'loc': 'upper left',
+                'fontsize': 'xx-small',
+            }
+        else:
+            legend_kwargs = {
+                'loc': 'best',
+                'fontsize': 'x-small',
+            }
         sns.set_palette(sns.color_palette('hls', len(figure['line_names'])))
         for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
             metric_title = metric.replace('_', ' ').upper()
@@ -1591,13 +1605,14 @@ elif args.analysis == 3:
             )
             plt.xlabel(figure['x_axis_title'])
             plt.ylabel(metric_title)
-            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 8:
+            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 10:
                 plt.xticks(
                     figure['x_axis'], figure['x_axis_labels'],
                     fontsize='x-small', rotation=figure['x_ticks_rotation'],
                 )
             else:
                 plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
+            plt.xlim([ min(figure['x_axis']) - 1, max(figure['x_axis']) + 1 ])
             plt.figure(figure_name + 'B')
             plt.rcParams['font.size'] = 14
             plt.title(
@@ -1607,13 +1622,14 @@ elif args.analysis == 3:
             )
             plt.xlabel(figure['x_axis_title'])
             plt.ylabel(metric_title)
-            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 8:
+            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 10:
                 plt.xticks(
                     figure['x_axis'], figure['x_axis_labels'],
                     fontsize='x-small', rotation=figure['x_ticks_rotation'],
                 )
             else:
                 plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
+            plt.xlim([ min(figure['x_axis']) - 1, max(figure['x_axis']) + 1 ])
             for row_idx, row_results in enumerate(figure['results']):
                 mean_scores_cv = np.full((figure['results'].shape[1],), np.nan, dtype=float)
                 range_scores_cv = np.full((2, figure['results'].shape[1]), np.nan, dtype=float)
@@ -1661,8 +1677,8 @@ elif args.analysis == 3:
                         label = r'%s (%s = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)'
                         label_values_cv = label_values_cv + (np.mean(num_features), np.std(num_features))
                         label_values_te = label_values_te + (np.mean(num_features), np.std(num_features))
-                    plt.figure(figure_name + 'A')
                     # color = next(plt.gca()._get_lines.prop_cycler)['color']
+                    plt.figure(figure_name + 'A')
                     plt.errorbar(
                         figure['x_axis'], mean_scores_cv, yerr=range_scores_cv, lw=2, alpha=0.8,
                         capsize=10, elinewidth=2, markeredgewidth=2, marker='s',
@@ -1674,15 +1690,11 @@ elif args.analysis == 3:
                         capsize=10, elinewidth=2, markeredgewidth=2, marker='s',
                         label=label % label_values_te,
                     )
-            if len(figure['line_names']) > 8:
-                legend_fontsize = 'xx-small'
-            else:
-                legend_fontsize = 'x-small'
             plt.figure(figure_name + 'A')
-            plt.legend(loc='best', fontsize=legend_fontsize)
+            plt.legend(**legend_kwargs)
             plt.grid('on')
             plt.figure(figure_name + 'B')
-            plt.legend(loc='best', fontsize=legend_fontsize)
+            plt.legend(**legend_kwargs)
             plt.grid('on')
 plt.show()
 if args.pipe_memory: rmtree(cachedir)
