@@ -657,7 +657,7 @@ if args.analysis == 1:
                     len(param_grid[param]),
                     np.prod([len(v) for k,v in param_grid.items() if k != param])
                 )
-                if param in ('fs2__threshold', 'clf__weights'):
+                if param in ('fs2__threshold', 'clf__weights', 'clf__max_features'):
                     xaxis_group_sorted_idxs = np.argsort(
                         np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
                     )
@@ -720,7 +720,7 @@ if args.analysis == 1:
             plt.xticks(x_axis)
         elif param in (
             'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'fs3__estimator__C', 'clf__C',
-            'clf__weights', 'clf__base_estimator__C',
+            'clf__weights', 'clf__base_estimator__C', 'clf__max_features',
         ):
             x_axis = range(len(param_grid[param]))
             plt.xticks(x_axis, param_grid[param])
@@ -895,7 +895,7 @@ elif args.analysis == 2:
                 len(param_grid[param]),
                 np.prod([len(v) for k,v in param_grid.items() if k != param])
             )
-            if param in ('fs2__threshold', 'clf__weights'):
+            if param in ('fs2__threshold', 'clf__weights', 'clf__max_features'):
                 xaxis_group_sorted_idxs = np.argsort(
                     np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
                 )
@@ -915,7 +915,7 @@ elif args.analysis == 2:
                 plt.xticks(x_axis)
             elif param in (
                 'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'fs3__estimator__C', 'clf__C',
-                'clf__weights', 'clf__base_estimator__C',
+                'clf__weights', 'clf__base_estimator__C', 'clf__max_features',
             ):
                 x_axis = range(len(param_grid[param]))
                 plt.xticks(x_axis, param_grid[param])
