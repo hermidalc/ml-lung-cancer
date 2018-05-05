@@ -882,7 +882,6 @@ elif args.analysis == 2:
         for _, feature, symbol in feature_ranks: print(feature, '\t', symbol)
     # pprint(search.cv_results_)
     # plot grid search parameters vs cv perf metrics
-
     sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
     for param_idx, param in enumerate(param_grid):
         if '__' in param and len(param_grid[param]) > 1:
