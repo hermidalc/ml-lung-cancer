@@ -1194,8 +1194,11 @@ elif args.analysis == 3:
             for pr_idx, prep_steps in enumerate(prep_groups):
                 prep_method = '_'.join(prep_steps)
                 dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
-                if args.no_addon_te:
-                    dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0]])
+                if prep_steps[-1] == 'merged' or args.no_addon_te:
+                    if prep_steps[1] in id_types:
+                        dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0], prep_steps[1]])
+                    else:
+                        dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0]])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
@@ -1581,17 +1584,14 @@ elif args.analysis == 3:
     for figure_idx, figure in enumerate(figures):
         if analysis_type == 'prep_methods' and figure_idx > 3: continue
         figure_num = figure_idx + 4
+        legend_kwargs = {
+            'loc': 'lower left',
+            'ncol': max(1, len(figure['line_names']) // 12),
+        }
         if len(figure['line_names']) > 10:
-            legend_kwargs = {
-                'bbox_to_anchor': (1.04, 1),
-                'loc': 'upper left',
-                'fontsize': 'xx-small',
-            }
+            legend_kwargs['fontsize'] = 'xx-small'
         else:
-            legend_kwargs = {
-                'loc': 'best',
-                'fontsize': 'x-small',
-            }
+            legend_kwargs['fontsize'] = 'x-small'
         sns.set_palette(sns.color_palette('hls', len(figure['line_names'])))
         for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
             metric_title = metric.replace('_', ' ').upper()
@@ -1612,7 +1612,8 @@ elif args.analysis == 3:
                 )
             else:
                 plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
-            plt.xlim([ min(figure['x_axis']) - 1, max(figure['x_axis']) + 1 ])
+            if len(figure['x_axis']) > 20:
+                plt.xlim([ min(figure['x_axis']) - 1, max(figure['x_axis']) + 1 ])
             plt.figure(figure_name + 'B')
             plt.rcParams['font.size'] = 14
             plt.title(
@@ -1629,7 +1630,8 @@ elif args.analysis == 3:
                 )
             else:
                 plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
-            plt.xlim([ min(figure['x_axis']) - 1, max(figure['x_axis']) + 1 ])
+            if len(figure['x_axis']) > 20:
+                plt.xlim([ min(figure['x_axis']) - 1, max(figure['x_axis']) + 1 ])
             for row_idx, row_results in enumerate(figure['results']):
                 mean_scores_cv = np.full((figure['results'].shape[1],), np.nan, dtype=float)
                 range_scores_cv = np.full((2, figure['results'].shape[1]), np.nan, dtype=float)
