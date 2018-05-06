@@ -1126,7 +1126,8 @@ elif args.analysis == 3:
     dataset_tr_combos_subset, dataset_te_basenames_subset, prep_groups_subset = [], [], []
     for dataset_tr_combo in dataset_tr_combos:
         dataset_tr_basename = '_'.join(dataset_tr_combo)
-        for dataset_te_basename in list(set(dataset_te_basenames) - set(dataset_tr_combo)):
+        for dataset_te_basename in dataset_te_basenames:
+            if dataset_te_basename in dataset_tr_combo: continue
             for prep_steps in prep_groups:
                 prep_method = '_'.join(prep_steps)
                 dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
@@ -1191,6 +1192,7 @@ elif args.analysis == 3:
     for tr_idx, dataset_tr_combo in enumerate(dataset_tr_combos):
         dataset_tr_basename = '_'.join(dataset_tr_combo)
         for te_idx, dataset_te_basename in enumerate(dataset_te_basenames):
+            if dataset_te_basename in dataset_tr_combo: continue
             for pr_idx, prep_steps in enumerate(prep_groups):
                 prep_method = '_'.join(prep_steps)
                 dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
