@@ -56,17 +56,20 @@ parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=50, help='fs skb k max')
 parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
-parser.add_argument('--fs-sfm-thres', type=float, nargs='+', help='fs sfm threshold')
+parser.add_argument('--fs-sfm-ext-thres', type=float, nargs='+', help='fs sfm ext threshold')
 parser.add_argument('--fs-sfm-ext-e', type=int, nargs='+', help='fs sfm ext n estimators')
 parser.add_argument('--fs-sfm-ext-e-max', type=int, default=100, help='fs sfm ext n estimators max')
 parser.add_argument('--fs-sfm-ext-d', type=int, nargs='+', help='fs sfm ext max depth')
 parser.add_argument('--fs-sfm-ext-d-max', type=int, default=50, help='fs sfm ext max depth max')
+parser.add_argument('--fs-sfm-svm-thres', type=float, nargs='+', help='fs sfm svm threshold')
 parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
 parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
 parser.add_argument('--fs-rfe-step', type=float, default=0.1, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-pf-rfe-k', type=int, nargs='+', help='fs pf rfe k select')
 parser.add_argument('--fs-pf-rfe-k-max', type=int, default=15000, help='fs pf rfe k max')
+parser.add_argument('--fs-pf-sfm-k', type=int, nargs='+', help='fs pf sfm k select')
+parser.add_argument('--fs-pf-sfm-k-max', type=int, default=15000, help='fs pf sfm k max')
 parser.add_argument('--fs-pf-fcbf-k', type=int, nargs='+', help='fs pf fcbf k select')
 parser.add_argument('--fs-pf-fcbf-k-max', type=int, default=5000, help='fs pf fcbf k max')
 parser.add_argument('--fs-pf-rlf-k', type=int, nargs='+', help='fs pf rlf k select')
@@ -198,10 +201,10 @@ if args.fs_sfp_p:
     FS_SFP_P = sorted(args.fs_sfp_p)
 else:
     FS_SFP_P = np.logspace(-3, -2, 2)
-if args.fs_sfm_thres:
-    FS_SFM_THRES = sorted(args.fs_sfm_thres)
+if args.fs_sfm_ext_thres:
+    FS_SFM_EXT_THRES = sorted(args.fs_sfm_ext_thres)
 else:
-    FS_SFM_THRES = np.logspace(-11, -5, 7)
+    FS_SFM_EXT_THRES = np.logspace(-11, -5, 7)
 if args.fs_sfm_ext_e:
     FS_SFM_EXT_E = sorted(args.fs_sfm_ext_e)
 else:
@@ -210,6 +213,10 @@ if args.fs_sfm_ext_d:
     FS_SFM_EXT_D = sorted(args.fs_sfm_ext_d)
 else:
     FS_SFM_EXT_D = list(range(1, args.fs_sfm_ext_d_max + 1, 1)) + [None]
+if args.fs_sfm_svm_thres:
+    FS_SFM_SVM_THRES = sorted(args.fs_sfm_svm_thres)
+else:
+    FS_SFM_SVM_THRES = np.logspace(-11, -5, 7)
 if args.fs_sfm_svm_c:
     FS_SFM_SVM_C = sorted(args.fs_sfm_svm_c)
 else:
@@ -222,6 +229,10 @@ if args.fs_pf_rfe_k:
     FS_PF_RFE_K = sorted(args.fs_pf_rfe_k)
 else:
     FS_PF_RFE_K = list(range(1000, args.fs_pf_rfe_k_max + 1, 1000))
+if args.fs_pf_sfm_k:
+    FS_PF_SFM_K = sorted(args.fs_pf_sfm_k)
+else:
+    FS_PF_SFM_K = list(range(1000, args.fs_pf_sfm_k_max + 1, 1000))
 if args.fs_pf_fcbf_k:
     FS_PF_FCBF_K = sorted(args.fs_pf_fcbf_k)
 else:
@@ -345,7 +356,7 @@ pipelines = {
                 },
             ],
         },
-        'Limma-KBest-SVM-RFE': {
+        'Limma-KBest-RFE': {
             'steps': [
                 ('fs1', SelectKBest(limma_score_func)),
                 ('fs3', RFE(rfe_svm_estimator, step=args.fs_rfe_step, verbose=args.fs_rfe_verbose)),
@@ -358,7 +369,7 @@ pipelines = {
                 },
             ],
         },
-        'SVM-SFM-RFE': {
+        'SVM-SFM-KBest-RFE': {
             'steps': [
                 ('fs2', SelectFromModel(sfm_svm_estimator)),
                 ('fs3', RFE(rfe_svm_estimator, step=args.fs_rfe_step, verbose=args.fs_rfe_verbose)),
@@ -366,7 +377,7 @@ pipelines = {
             'param_grid': [
                 {
                     'fs2__estimator__C': FS_SFM_SVM_C,
-                    'fs2__threshold': FS_SFM_THRES,
+                    'fs2__k': FS_PF_SFM_K,
                     'fs3__estimator__C': FS_RFE_SVM_C,
                     'fs3__n_features_to_select': FS_SKB_K,
                 },
@@ -381,7 +392,7 @@ pipelines = {
                 {
                     'fs2__estimator__n_estimators': FS_SFM_EXT_E,
                     'fs2__estimator__max_depth': FS_SFM_EXT_D,
-                    'fs2__threshold': FS_SFM_THRES,
+                    'fs2__threshold': FS_SFM_EXT_THRES,
                     'fs3__estimator__C': FS_RFE_SVM_C,
                     'fs3__n_features_to_select': FS_SKB_K,
                 },
@@ -394,7 +405,7 @@ pipelines = {
         #     'param_grid': [
         #         {
         #             'fs2__estimator__C': FS_SFM_SVM_C,
-        #             'fs2__threshold': FS_SFM_THRES,
+        #             'fs2__threshold': FS_SFM_SVM_THRES,
         #         },
         #     ],
         # },
