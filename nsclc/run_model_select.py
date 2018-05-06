@@ -65,6 +65,8 @@ parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c'
 parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
 parser.add_argument('--fs-rfe-step', type=float, default=0.1, help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
+parser.add_argument('--fs-pf-rfe-k', type=int, nargs='+', help='fs pf rfe k select')
+parser.add_argument('--fs-pf-rfe-k-max', type=int, default=15000, help='fs pf rfe k max')
 parser.add_argument('--fs-pf-fcbf-k', type=int, nargs='+', help='fs pf fcbf k select')
 parser.add_argument('--fs-pf-fcbf-k-max', type=int, default=5000, help='fs pf fcbf k max')
 parser.add_argument('--fs-pf-rlf-k', type=int, nargs='+', help='fs pf rlf k select')
@@ -216,6 +218,10 @@ if args.fs_rfe_svm_c:
     FS_RFE_SVM_C = sorted(args.fs_rfe_svm_c)
 else:
     FS_RFE_SVM_C = np.logspace(-7, 2, 10)
+if args.fs_pf_rfe_k:
+    FS_PF_RFE_K = sorted(args.fs_pf_rfe_k)
+else:
+    FS_PF_RFE_K = list(range(1000, args.fs_pf_rfe_k_max + 1, 1000))
 if args.fs_pf_fcbf_k:
     FS_PF_FCBF_K = sorted(args.fs_pf_fcbf_k)
 else:
@@ -339,14 +345,14 @@ pipelines = {
                 },
             ],
         },
-        'Limma-Fpr-SVM-RFE': {
+        'Limma-KBest-SVM-RFE': {
             'steps': [
-                ('fs1', SelectFpr(limma_score_func)),
+                ('fs1', SelectKBest(limma_score_func)),
                 ('fs3', RFE(rfe_svm_estimator, step=args.fs_rfe_step, verbose=args.fs_rfe_verbose)),
             ],
             'param_grid': [
                 {
-                    'fs1__alpha': FS_SFP_P,
+                    'fs1__k': FS_PF_RFE_K,
                     'fs3__estimator__C': FS_RFE_SVM_C,
                     'fs3__n_features_to_select': FS_SKB_K,
                 },
