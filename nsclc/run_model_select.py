@@ -108,6 +108,7 @@ parser.add_argument('--num-cores', type=int, default=-1, help='num parallel core
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--save-model', default=False, action='store_true', help='save model')
 parser.add_argument('--save-figs', default=False, action='store_true', help='save figures')
+parser.add_argument('--show-figs', default=False, action='store_true', help='show figures')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--verbose', type=int, default=1, help='program verbosity')
 args = parser.parse_args()
@@ -1721,5 +1722,5 @@ elif args.analysis == 3:
                     "results/" + (figure_name + 'A').replace(' ', '_').lower() + '.pkl')
                 dump(plt.figure(figure_name + 'B'),
                     "results/" + (figure_name + 'B').replace(' ', '_').lower() + '.pkl')
-plt.show()
+if args.show_figs or not args.save_figs: plt.show()
 if args.pipe_memory: rmtree(cachedir)
