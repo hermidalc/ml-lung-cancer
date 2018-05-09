@@ -1353,10 +1353,10 @@ elif args.analysis == 3:
                     best_bcr_cv = search.cv_results_['mean_test_bcr'][best_grid_idx_cv]
                     best_params_cv = search.cv_results_['params'][best_grid_idx_cv]
                     print(
+                        'Best Params (Train):',  best_params_cv, '\n',
+                        'Best Params (Test):', best_params_te, '\n',
                         'ROC AUC (CV / Test): %.4f / %.4f' % (best_roc_auc_cv, best_roc_auc_te),
                         ' BCR (CV / Test): %.4f / %.4f' % (best_bcr_cv, best_bcr_te),
-                        '\nBest Params (Train):',  best_params_cv,
-                        '\nBest Params (Test):', best_params_te,
                     )
                     for meth_type, meth_type_scores in meth_scores.items():
                         for meth_idx, meth_metric_scores in enumerate(meth_type_scores):
