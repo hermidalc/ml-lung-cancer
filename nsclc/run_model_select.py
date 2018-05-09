@@ -107,7 +107,7 @@ parser.add_argument('--scv-n-iter', type=int, default=100, help='randomized scv 
 parser.add_argument('--num-cores', type=int, default=-1, help='num parallel cores')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--save-model', default=False, action='store_true', help='save model')
-parser.add_argument('--save-figures', default=False, action='store_true', help='save figures')
+parser.add_argument('--save-figs', default=False, action='store_true', help='save figures')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--verbose', type=int, default=1, help='program verbosity')
 args = parser.parse_args()
@@ -1602,7 +1602,6 @@ elif args.analysis == 3:
     plt.rcParams['figure.max_open_warning'] = 0
     for figure_idx, figure in enumerate(figures):
         if analysis_type == 'prep_methods' and figure_idx > 3: continue
-        figure_num = figure_idx + 4
         legend_kwargs = {
             'loc': 'lower left',
             'ncol': max(1, len(figure['line_names']) // 12),
@@ -1614,7 +1613,7 @@ elif args.analysis == 3:
         sns.set_palette(sns.color_palette('hls', len(figure['line_names'])))
         for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
             metric_title = metric.replace('_', ' ').upper()
-            figure_name = 'Figure ' + str(figure_num) + '-' + str(metric_idx + 1)
+            figure_name = 'Figure ' + str(args.analysis) + '-' + str(figure_idx + 1) + '-' + str(metric_idx + 1)
             plt.figure(figure_name + 'A')
             plt.rcParams['font.size'] = 14
             plt.title(
@@ -1717,5 +1716,10 @@ elif args.analysis == 3:
             plt.figure(figure_name + 'B')
             plt.legend(**legend_kwargs)
             plt.grid('on')
+            if args.save_figs:
+                dump(plt.figure(figure_name + 'A'),
+                    "results/" + (figure_name + 'A').replace(' ', '_').lower() + '.pkl')
+                dump(plt.figure(figure_name + 'B'),
+                    "results/" + (figure_name + 'B').replace(' ', '_').lower() + '.pkl')
 plt.show()
 if args.pipe_memory: rmtree(cachedir)
