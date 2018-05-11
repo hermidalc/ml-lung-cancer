@@ -14,6 +14,7 @@ parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocess
 parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
 parser$add_argument("--num-cores", type="integer", default=detectCores(), help="num parallel cores")
 parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
+parser$add_argument("--save-obj", action="store_true", default=FALSE, help="save add-on param obj")
 args <- parser$parse_args()
 
 num_tr_combo <- as.integer(args$num_tr_combo)
@@ -136,7 +137,9 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             save(list=eset_tr_norm_name, file=paste0("data/", eset_tr_norm_name, ".Rda"))
             eset_tr_norm_obj_name <- paste0(eset_tr_norm_name, "_obj")
             assign(eset_tr_norm_obj_name, norm_obj)
-            save(list=eset_tr_norm_obj_name, file=paste0("data/", eset_tr_norm_obj_name, ".Rda"))
+            if (args$save_obj) {
+                save(list=eset_tr_norm_obj_name, file=paste0("data/", eset_tr_norm_obj_name, ".Rda"))
+            }
             for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
                 cel_te_dir <- paste0("data/raw/", dataset_te_name)
                 if (!dir.exists(cel_te_dir)) next
