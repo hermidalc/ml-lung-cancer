@@ -14,6 +14,7 @@ parser$add_argument("--id-type", type="character", nargs="+", help="dataset id t
 parser$add_argument("--merge-type", type="character", nargs="+", help="dataset merge type")
 parser$add_argument("--bc-meth", type="character", nargs="+", help="dataset batch correct method")
 parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
+parser$add_argument("--save-obj", action="store_true", default=FALSE, help="save add-on param obj")
 args <- parser$parse_args()
 
 num_tr_combo <- as.integer(args$num_tr_combo)
@@ -168,7 +169,9 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                         save(list=eset_tr_bc_name, file=paste0("data/", eset_tr_bc_name, ".Rda"))
                         eset_tr_bc_obj_name <- paste0(eset_tr_bc_name, "_obj")
                         assign(eset_tr_bc_obj_name, bc_obj)
-                        save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
+                        if (args$save_obj) {
+                            save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
+                        }
                         for (dataset_te_name in setdiff(dataset_names, dataset_tr_name_combos[,col])) {
                             if (merge_type == "none") {
                                 eset_te_name <- paste0(c(eset_tr_name, dataset_te_name, "te"), collapse="_")
