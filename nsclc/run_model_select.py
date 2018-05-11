@@ -1622,7 +1622,7 @@ elif args.analysis == 3:
             )
             plt.xlabel(figure['x_axis_title'])
             plt.ylabel(metric_title)
-            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 10:
+            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 7:
                 plt.xticks(
                     figure['x_axis'], figure['x_axis_labels'],
                     fontsize='x-small', rotation=figure['x_ticks_rotation'],
@@ -1640,7 +1640,7 @@ elif args.analysis == 3:
             )
             plt.xlabel(figure['x_axis_title'])
             plt.ylabel(metric_title)
-            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 10:
+            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 7:
                 plt.xticks(
                     figure['x_axis'], figure['x_axis_labels'],
                     fontsize='x-small', rotation=figure['x_ticks_rotation'],
