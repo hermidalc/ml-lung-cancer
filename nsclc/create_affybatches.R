@@ -25,7 +25,7 @@ if ("gene" %in% id_types) {
 } else {
     cdfname <- "hgu133plus2"
 }
-if ("gcrma" %in% norm_methods) {
+if ("gcrma" %in% norm_methods & !args$load_only) {
     cat("Loading CDF:", cdfname, "\n")
     affinities <- compute.affinities(cdfname, verbose=TRUE)
 }
@@ -50,8 +50,8 @@ for (norm_meth in norm_methods) {
                 if (id_type != "none") suffixes <- c(suffixes, id_type)
                 affybatch_name <- paste0(c("affybatch", dataset_tr_name_combos[,col], suffixes), collapse="_")
                 cat("Creating AffyBatch:", affybatch_name, "\n")
-                if (args$load_only) next
                 affybatch <- ReadAffy(filenames=cel_files, cdfname=cdfname, verbose=TRUE)
+                if (args$load_only) next
                 affybatch <- bg.adjust.gcrma(
                     affybatch, affinity.info=affinities, type="fullmodel", verbose=TRUE, fast=FALSE
                 )
@@ -69,8 +69,8 @@ for (norm_meth in norm_methods) {
                 if (id_type != "none") suffixes <- c(suffixes, id_type)
                 affybatch_name <- paste0(c("affybatch", dataset_name, suffixes), collapse="_")
                 cat("Creating AffyBatch:", affybatch_name, "\n")
-                if (args$load_only) next
                 affybatch <- ReadAffy(celfile.path=paste0("data/raw/", dataset_name), cdfname=cdfname, verbose=TRUE)
+                if (args$load_only) next
                 cat("Performing background correction\n")
                 affybatch <- bg.correct.rma(affybatch)
                 assign(affybatch_name, affybatch)
