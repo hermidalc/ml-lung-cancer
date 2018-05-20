@@ -3,8 +3,8 @@ dataset_names <- c(
     "gse8894",
     "gse30219",
     "gse31210",
-    "gse37745",
-    "gse50081"
+    "gse37745"
+    # "gse50081"
 )
 norm_methods <- c(
     "gcrma",
@@ -28,7 +28,7 @@ bc_methods <- c(
     "qnorm",
     "cbt",
     # "fab",
-    "sva",
+    # "sva",
     "stica0",
     "stica025",
     "stica05",
