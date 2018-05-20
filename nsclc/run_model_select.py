@@ -548,7 +548,7 @@ dataset_names = [
     'gse30219',
     'gse31210',
     'gse37745',
-    'gse50081'
+    # 'gse50081'
 ]
 norm_methods = [
     'gcrma',
@@ -572,7 +572,7 @@ bc_methods = [
     'qnorm',
     'cbt',
     # 'fab',
-    'sva',
+    # 'sva',
     'stica0',
     'stica025',
     'stica05',
@@ -1060,75 +1060,48 @@ elif args.analysis == 3:
                     prep_groups.append([
                         x for x in [norm_meth, id_type, merge_type, bc_meth] if x != 'none'
                     ])
-    if (args.fs_meth and len(args.fs_meth) == 1 and
-        args.slr_meth and len(args.slr_meth) == 1 and
-        args.clf_meth and len(args.clf_meth) == 1):
-        analysis_type = 'prep_methods'
-        args.slr_meth = args.slr_meth[0]
-        args.fs_meth = args.fs_meth[0]
-        args.clf_meth = args.clf_meth[0]
-        param_grid = []
-        for fs_params in pipelines['fs'][args.fs_meth]['param_grid']:
-            for slr_params in pipelines['slr'][args.slr_meth]['param_grid']:
-                for clf_params in pipelines['clf'][args.clf_meth]['param_grid']:
-                    param_grid.append({ **fs_params, **slr_params, **clf_params })
-        if args.verbose > 0:
-            print("Param grid:")
-            pprint(param_grid)
-        search = GridSearchCV(
-            Pipeline(sorted(
-                pipelines['fs'][args.fs_meth]['steps'] +
-                pipelines['slr'][args.slr_meth]['steps'] +
-                pipelines['clf'][args.clf_meth]['steps'],
-                key=lambda s: pipeline_order.index(s[0])
-            ), memory=memory), param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-        )
-    else:
-        analysis_type = 'all_methods'
-        if args.fs_meth:
-            pipelines['fs'] = { k: v for k, v in pipelines['fs'].items() if k in args.fs_meth }
-        if args.slr_meth:
-            pipelines['slr'] = { k: v for k, v in pipelines['slr'].items() if k in args.slr_meth }
-        if args.clf_meth:
-            pipelines['clf'] = { k: v for k, v in pipelines['clf'].items() if k in args.clf_meth }
-        param_grid_idx = 0
-        param_grid, param_grid_data = [], []
-        for fs_idx, fs_meth in enumerate(pipelines['fs']):
-            for fs_params in pipelines['fs'][fs_meth]['param_grid']:
-                for slr_idx, slr_meth in enumerate(pipelines['slr']):
-                    for slr_params in pipelines['slr'][slr_meth]['param_grid']:
-                        for clf_idx, clf_meth in enumerate(pipelines['clf']):
-                            for clf_params in pipelines['clf'][clf_meth]['param_grid']:
-                                params = { **fs_params, **slr_params, **clf_params }
-                                for (step, object) in \
-                                    pipelines['fs'][fs_meth]['steps'] + \
-                                    pipelines['slr'][slr_meth]['steps'] + \
-                                    pipelines['clf'][clf_meth]['steps'] \
-                                : params[step] = [ object ]
-                                param_grid.append(params)
-                                params_data = {
-                                    'meth_idxs': {
-                                        'fs': fs_idx, 'slr': slr_idx, 'clf': clf_idx, 'pr': 0
-                                    },
-                                    'grid_idxs': [],
-                                }
-                                for param_combo in ParameterGrid(params):
-                                    params_data['grid_idxs'].append(param_grid_idx)
-                                    param_grid_idx += 1
-                                param_grid_data.append(params_data)
-        if args.verbose > 0:
-            print("Param grid:")
-            pprint(param_grid)
-            print("Param grid data:")
-            pprint(param_grid_data)
-        search = GridSearchCV(
-            Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-            param_grid=param_grid, scoring=scv_scoring, refit=False,
-            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-        )
+    if args.fs_meth:
+        pipelines['fs'] = { k: v for k, v in pipelines['fs'].items() if k in args.fs_meth }
+    if args.slr_meth:
+        pipelines['slr'] = { k: v for k, v in pipelines['slr'].items() if k in args.slr_meth }
+    if args.clf_meth:
+        pipelines['clf'] = { k: v for k, v in pipelines['clf'].items() if k in args.clf_meth }
+    param_grid_idx = 0
+    param_grid, param_grid_data = [], []
+    for fs_idx, fs_meth in enumerate(pipelines['fs']):
+        for fs_params in pipelines['fs'][fs_meth]['param_grid']:
+            for slr_idx, slr_meth in enumerate(pipelines['slr']):
+                for slr_params in pipelines['slr'][slr_meth]['param_grid']:
+                    for clf_idx, clf_meth in enumerate(pipelines['clf']):
+                        for clf_params in pipelines['clf'][clf_meth]['param_grid']:
+                            params = { **fs_params, **slr_params, **clf_params }
+                            for (step, object) in \
+                                pipelines['fs'][fs_meth]['steps'] + \
+                                pipelines['slr'][slr_meth]['steps'] + \
+                                pipelines['clf'][clf_meth]['steps'] \
+                            : params[step] = [ object ]
+                            param_grid.append(params)
+                            params_data = {
+                                'meth_idxs': {
+                                    'fs': fs_idx, 'slr': slr_idx, 'clf': clf_idx, 'pr': 0
+                                },
+                                'grid_idxs': [],
+                            }
+                            for param_combo in ParameterGrid(params):
+                                params_data['grid_idxs'].append(param_grid_idx)
+                                param_grid_idx += 1
+                            param_grid_data.append(params_data)
+    if args.verbose > 0:
+        print("Param grid:")
+        pprint(param_grid)
+        print("Param grid data:")
+        pprint(param_grid_data)
+    search = GridSearchCV(
+        Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
+        param_grid=param_grid, scoring=scv_scoring, refit=False,
+        cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+    )
     if args.datasets_tr and args.num_tr_combo:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_tr_combo)]
     elif args.datasets_tr:
@@ -1177,32 +1150,48 @@ elif args.analysis == 3:
     ]
     results = {
         'te_pr': np.zeros((len(dataset_te_basenames), len(prep_groups)), dtype=[
-            ('tr', score_dtypes, (len(dataset_tr_combos),))
+            ('tr_fs', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_tr_combos), len(pipelines['fs'])))
         ]),
         'tr_pr': np.zeros((len(dataset_tr_combos), len(prep_groups)), dtype=[
-            ('te', score_dtypes, (len(dataset_te_basenames),))
+            ('te_fs', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(pipelines['fs'])))
         ]),
         'te_fs': np.zeros((len(dataset_te_basenames), len(pipelines['fs'])), dtype=[
-            ('tr_pr', score_dtypes, (len(dataset_tr_combos), len(prep_groups)))
+            ('tr_pr', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_tr_combos), len(prep_groups)))
         ]),
         'tr_fs': np.zeros((len(dataset_tr_combos), len(pipelines['fs'])), dtype=[
-            ('te_pr', score_dtypes, (len(dataset_te_basenames), len(prep_groups)))
+            ('te_pr', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(prep_groups)))
         ]),
         'te_clf': np.zeros((len(dataset_te_basenames), len(pipelines['clf'])), dtype=[
-            ('tr_pr', score_dtypes, (len(dataset_tr_combos), len(prep_groups)))
+            ('tr_pr', [
+                ('fs_slr', score_dtypes, (len(pipelines['fs']), len(pipelines['slr'])))
+            ], (len(dataset_tr_combos), len(prep_groups)))
         ]),
         'tr_clf': np.zeros((len(dataset_tr_combos), len(pipelines['clf'])), dtype=[
-            ('te_pr', score_dtypes, (len(dataset_te_basenames), len(prep_groups)))
+            ('te_pr', [
+                ('fs_slr', score_dtypes, (len(pipelines['fs']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(prep_groups)))
         ]),
         'pr_fs': np.zeros((len(prep_groups), len(pipelines['fs'])), dtype=[
-            ('te_tr', score_dtypes, (len(dataset_te_basenames), len(dataset_tr_combos)))
+            ('te_tr', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(dataset_tr_combos)))
         ]),
         'pr_clf': np.zeros((len(prep_groups), len(pipelines['clf'])), dtype=[
-            ('te_tr', score_dtypes, (len(dataset_te_basenames), len(dataset_tr_combos)))
+            ('te_tr', [
+                ('fs_slr', score_dtypes, (len(pipelines['fs']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(dataset_tr_combos)))
         ]),
         'fs_clf': np.zeros((len(pipelines['fs']), len(pipelines['clf'])), dtype=[
             ('te_tr', [
-                ('pr', score_dtypes, (len(prep_groups),))
+                ('pr_slr', score_dtypes, (len(prep_groups), len(pipelines['slr'])))
             ], (len(dataset_te_basenames), len(dataset_tr_combos)))
         ]),
     }
@@ -1236,157 +1225,93 @@ elif args.analysis == 3:
                 X_te = np.array(base.t(biobase.exprs(eset_te)))
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
                 search.fit(X_tr, y_tr)
-                if analysis_type == 'prep_methods':
-                    if args.save_model:
-                        dump(search, '_'.join([
-                            'results/search', dataset_tr_name, args.slr_meth.lower(),
-                             args.fs_meth.lower(), args.clf_meth.lower()
-                        ]) + '.pkl')
-                    feature_idxs = np.arange(X_tr.shape[1])
-                    for step in search.best_estimator_.named_steps:
-                        if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
-                            feature_idxs = (feature_idxs
-                                [search.best_estimator_.named_steps[step].get_support(indices=True)])
-                    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
-                    weights = np.array([], dtype=float)
-                    if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
-                        weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
-                    elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
-                        weights = search.best_estimator_.named_steps['clf'].feature_importances_
-                    roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search.best_index_]
-                    bcr_cv = search.cv_results_['mean_test_bcr'][search.best_index_]
-                    if hasattr(search, 'decision_function'):
-                        y_score = search.decision_function(X_te)
-                    else:
-                        y_score = search.predict_proba(X_te)[:,1]
-                    roc_auc_te = roc_auc_score(y_te, y_score)
-                    y_pred = search.predict(X_te)
-                    bcr_te = bcr_score(y_te, y_pred)
-                    print(
-                        'ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
-                        ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
-                        ' Features: %3s' % feature_idxs.size,
-                        ' Params:',  search.best_params_,
-                    )
-                    # if weights.size > 0:
-                    #     print('Rankings:')
-                    #     for rank, feature, symbol in sorted(
-                    #         zip(weights, feature_names, r_eset_gene_symbols(eset_tr, feature_idxs + 1)),
-                    #         reverse=True,
-                    #     ): print(feature, '\t', symbol, '\t', rank)
-                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['roc_auc_cv'] = roc_auc_cv
-                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['roc_auc_te'] = roc_auc_te
-                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['bcr_cv'] = bcr_cv
-                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['bcr_te'] = bcr_te
-                    results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]['num_features'] = feature_idxs.size
-                    results['tr_pr'][tr_idx, pr_idx]['te'][te_idx] = results['te_pr'][te_idx, pr_idx]['tr'][tr_idx]
-                elif analysis_type == 'all_methods':
-                    group_best_grid_idx, group_best_params = [], []
-                    for group_idx, param_grid_group in enumerate(param_grid_data):
-                        for grid_idx in param_grid_group['grid_idxs']:
-                            if group_idx < len(group_best_grid_idx):
-                                if (search.cv_results_['rank_test_' + args.scv_refit][grid_idx] <
-                                    search.cv_results_['rank_test_' + args.scv_refit][group_best_grid_idx[group_idx]]):
-                                    group_best_grid_idx[group_idx] = grid_idx
-                            else:
-                                group_best_grid_idx.append(grid_idx)
-                        group_best_params.append({
-                            k: clone(v) if k in pipeline_order else v
-                            for k, v in search.cv_results_['params'][group_best_grid_idx[group_idx]].items()
-                        })
-                    print('Fitting ' + str(len(group_best_params)) + ' pipelines', end='', flush=True)
-                    if args.scv_verbose > 0: print()
-                    pipes = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
-                        delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
-                    )
-                    if args.scv_verbose == 0: print('done')
-                    best_roc_auc_te = 0
-                    best_bcr_te = 0
-                    best_params_te = {}
-                    meth_scores, meth_combo_scores = {}, { 'fs_clf': [] }
-                    for group_idx, param_grid_group in enumerate(param_grid_data):
-                        if hasattr(pipes[group_idx], 'decision_function'):
-                            y_score = pipes[group_idx].decision_function(X_te)
+                group_best_grid_idx, group_best_params = [], []
+                for group_idx, param_grid_group in enumerate(param_grid_data):
+                    for grid_idx in param_grid_group['grid_idxs']:
+                        if group_idx < len(group_best_grid_idx):
+                            if (search.cv_results_['rank_test_' + args.scv_refit][grid_idx] <
+                                search.cv_results_['rank_test_' + args.scv_refit][group_best_grid_idx[group_idx]]):
+                                group_best_grid_idx[group_idx] = grid_idx
                         else:
-                            y_score = pipes[group_idx].predict_proba(X_te)[:,1]
-                        roc_auc_te = roc_auc_score(y_te, y_score)
-                        y_pred = pipes[group_idx].predict(X_te)
-                        bcr_te = bcr_score(y_te, y_pred)
-                        for meth_type, meth_idx in param_grid_group['meth_idxs'].items():
-                            if meth_type not in meth_scores:
-                                meth_scores[meth_type] = []
-                            if meth_idx >= len(meth_scores[meth_type]):
-                                meth_scores[meth_type].append({})
-                            for metric in scv_scoring.keys():
-                                if metric + '_cv' not in meth_scores[meth_type][meth_idx]:
-                                    meth_scores[meth_type][meth_idx][metric + '_cv'] = []
-                                if metric + '_te' not in meth_scores[meth_type][meth_idx]:
-                                    meth_scores[meth_type][meth_idx][metric + '_te'] = []
-                                meth_scores[meth_type][meth_idx][metric + '_cv'].append(
-                                    search.cv_results_['mean_test_' + metric][group_best_grid_idx[group_idx]]
-                                )
-                            meth_scores[meth_type][meth_idx]['roc_auc_te'].append(roc_auc_te)
-                            meth_scores[meth_type][meth_idx]['bcr_te'].append(bcr_te)
-                        fs_idx = param_grid_group['meth_idxs']['fs']
-                        clf_idx = param_grid_group['meth_idxs']['clf']
-                        if fs_idx >= len(meth_combo_scores['fs_clf']):
-                             meth_combo_scores['fs_clf'].append([])
-                        if clf_idx >= len(meth_combo_scores['fs_clf'][fs_idx]):
-                            meth_combo_scores['fs_clf'][fs_idx].append({})
-                        for metric in scv_scoring.keys():
-                            if metric + '_cv' not in meth_combo_scores['fs_clf'][fs_idx][clf_idx]:
-                                meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_cv'] = []
-                            if metric + '_te' not in meth_combo_scores['fs_clf'][fs_idx][clf_idx]:
-                                meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_te'] = []
-                            meth_combo_scores['fs_clf'][fs_idx][clf_idx][metric + '_cv'].append(
-                                search.cv_results_['mean_test_' + metric][group_best_grid_idx[group_idx]]
-                            )
-                        meth_combo_scores['fs_clf'][fs_idx][clf_idx]['roc_auc_te'].append(roc_auc_te)
-                        meth_combo_scores['fs_clf'][fs_idx][clf_idx]['bcr_te'].append(bcr_te)
-                        if ((args.scv_refit == 'roc_auc' and roc_auc_te > best_roc_auc_te) or
-                            (args.scv_refit == 'bcr' and bcr_te > best_bcr_te)):
-                            best_roc_auc_te = roc_auc_te
-                            best_bcr_te = bcr_te
-                            best_params_te = group_best_params[group_idx]
-                    best_grid_idx_cv = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
-                    best_roc_auc_cv = search.cv_results_['mean_test_roc_auc'][best_grid_idx_cv]
-                    best_bcr_cv = search.cv_results_['mean_test_bcr'][best_grid_idx_cv]
-                    best_params_cv = search.cv_results_['params'][best_grid_idx_cv]
-                    print('Best Params (Train):', best_params_cv)
-                    print('Best Params (Test):', best_params_te)
-                    print('ROC AUC (CV / Test): %.4f / %.4f' % (best_roc_auc_cv, best_roc_auc_te),
-                        ' BCR (CV / Test): %.4f / %.4f' % (best_bcr_cv, best_bcr_te))
-                    for meth_type, meth_type_scores in meth_scores.items():
-                        for meth_idx, meth_metric_scores in enumerate(meth_type_scores):
-                            for metric, metric_scores in meth_metric_scores.items():
-                                mean_score = np.mean(metric_scores)
-                                if meth_type == 'fs':
-                                    (results['te_fs'][te_idx, meth_idx]
-                                        ['tr_pr'][tr_idx, pr_idx][metric]) = mean_score
-                                    (results['tr_fs'][tr_idx, meth_idx]
-                                        ['te_pr'][te_idx, pr_idx][metric]) = mean_score
-                                    (results['pr_fs'][pr_idx, meth_idx]
-                                        ['te_tr'][te_idx, tr_idx][metric]) = mean_score
-                                elif meth_type == 'clf':
-                                    (results['te_clf'][te_idx, meth_idx]
-                                        ['tr_pr'][tr_idx, pr_idx][metric]) = mean_score
-                                    (results['tr_clf'][tr_idx, meth_idx]
-                                        ['te_pr'][te_idx, pr_idx][metric]) = mean_score
-                                    (results['pr_clf'][pr_idx, meth_idx]
-                                        ['te_tr'][te_idx, tr_idx][metric]) = mean_score
-                                elif meth_type == 'pr':
-                                    (results['te_pr'][te_idx, pr_idx]
-                                        ['tr'][tr_idx][metric]) = mean_score
-                                    (results['tr_pr'][tr_idx, pr_idx]
-                                        ['te'][te_idx][metric]) = mean_score
-                    for meth_type_combo, meth_type_combo_scores in meth_combo_scores.items():
-                        if meth_type_combo == 'fs_clf':
-                            for fs_idx, fs_scores in enumerate(meth_type_combo_scores):
-                                for clf_idx, fs_clf_scores in enumerate(fs_scores):
-                                    for metric, metric_scores in fs_clf_scores.items():
-                                        mean_score = np.mean(metric_scores)
-                                        (results['fs_clf'][fs_idx, clf_idx]['te_tr'][te_idx, tr_idx]
-                                            ['pr'][pr_idx][metric]) = mean_score
+                            group_best_grid_idx.append(grid_idx)
+                    group_best_params.append({
+                        k: clone(v) if k in pipeline_order else v
+                        for k, v in search.cv_results_['params'][group_best_grid_idx[group_idx]].items()
+                    })
+                print('Fitting ' + str(len(group_best_params)) + ' pipelines', end='', flush=True)
+                if args.scv_verbose > 0: print()
+                pipes = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
+                    delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
+                )
+                if args.scv_verbose == 0: print('done')
+                best_roc_auc_te = 0
+                best_bcr_te = 0
+                best_params_te = {}
+                for group_idx, param_grid_group in enumerate(param_grid_data):
+                    if hasattr(pipes[group_idx], 'decision_function'):
+                        y_score = pipes[group_idx].decision_function(X_te)
+                    else:
+                        y_score = pipes[group_idx].predict_proba(X_te)[:,1]
+                    roc_auc_te = roc_auc_score(y_te, y_score)
+                    y_pred = pipes[group_idx].predict(X_te)
+                    bcr_te = bcr_score(y_te, y_pred)
+                    metric_scores_te = { 'roc_auc_te': roc_auc_te, 'bcr_te': bcr_te }
+                    fs_idx = param_grid_group['meth_idxs']['fs']
+                    clf_idx = param_grid_group['meth_idxs']['clf']
+                    slr_idx = param_grid_group['meth_idxs']['slr']
+                    for metric in scv_scoring.keys():
+                        metric_cv = metric + '_cv'
+                        metric_te = metric + '_te'
+                        metric_score_cv = search.cv_results_['mean_test_' + metric][group_best_grid_idx[group_idx]]
+                        (results['te_pr'][te_idx, pr_idx]['tr_fs'][tr_idx, fs_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['te_pr'][te_idx, pr_idx]['tr_fs'][tr_idx, fs_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['tr_pr'][tr_idx, pr_idx]['te_fs'][te_idx, fs_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['tr_pr'][tr_idx, pr_idx]['te_fs'][te_idx, fs_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['te_fs'][te_idx, fs_idx]['tr_pr'][tr_idx, pr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['te_fs'][te_idx, fs_idx]['tr_pr'][tr_idx, pr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['tr_fs'][tr_idx, fs_idx]['te_pr'][te_idx, pr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['tr_fs'][tr_idx, fs_idx]['te_pr'][te_idx, pr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['te_clf'][te_idx, clf_idx]['tr_pr'][tr_idx, pr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['te_clf'][te_idx, clf_idx]['tr_pr'][tr_idx, pr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['tr_clf'][tr_idx, clf_idx]['te_pr'][te_idx, pr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['tr_clf'][tr_idx, clf_idx]['te_pr'][te_idx, pr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['pr_fs'][pr_idx, fs_idx]['te_tr'][te_idx, tr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['pr_fs'][pr_idx, fs_idx]['te_tr'][te_idx, tr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['pr_clf'][pr_idx, clf_idx]['te_tr'][te_idx, tr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['pr_clf'][pr_idx, clf_idx]['te_tr'][te_idx, tr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['fs_clf'][fs_idx, clf_idx]['te_tr'][te_idx, tr_idx]
+                            ['pr_slr'][pr_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['fs_clf'][fs_idx, clf_idx]['te_tr'][te_idx, tr_idx]
+                            ['pr_slr'][pr_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                    if ((args.scv_refit == 'roc_auc' and roc_auc_te > best_roc_auc_te) or
+                        (args.scv_refit == 'bcr' and bcr_te > best_bcr_te)):
+                        best_roc_auc_te = roc_auc_te
+                        best_bcr_te = bcr_te
+                        best_params_te = group_best_params[group_idx]
+                best_grid_idx_cv = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
+                best_roc_auc_cv = search.cv_results_['mean_test_roc_auc'][best_grid_idx_cv]
+                best_bcr_cv = search.cv_results_['mean_test_bcr'][best_grid_idx_cv]
+                best_params_cv = search.cv_results_['params'][best_grid_idx_cv]
+                print('Best Params (Train):', best_params_cv)
+                print('Best Params (Test):', best_params_te)
+                print('ROC AUC (CV / Test): %.4f / %.4f' % (best_roc_auc_cv, best_roc_auc_te),
+                    ' BCR (CV / Test): %.4f / %.4f' % (best_bcr_cv, best_bcr_te))
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
                 dataset_pair_counter += 1
@@ -1412,7 +1337,8 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['te_pr'],
             'line_names': dataset_te_basenames,
-            'field_results_key': 'tr',
+            'field_results_key': 'tr_fs',
+            'sub_results_key': 'clf_slr',
         },
         {
             'x_axis': range(1, len(dataset_te_basenames) + 1),
@@ -1422,7 +1348,8 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['te_pr'].T,
             'line_names': prep_methods,
-            'field_results_key': 'tr',
+            'field_results_key': 'tr_fs',
+            'sub_results_key': 'clf_slr',
         },
         # plot results['tr_pr']
         {
@@ -1434,7 +1361,8 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['tr_pr'],
             'line_names': dataset_tr_basenames,
-            'field_results_key': 'te',
+            'field_results_key': 'te_fs',
+            'sub_results_key': 'clf_slr',
         },
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
@@ -1444,7 +1372,8 @@ elif args.analysis == 3:
             'title_sub': title_sub,
             'results': results['tr_pr'].T,
             'line_names': prep_methods,
-            'field_results_key': 'te',
+            'field_results_key': 'te_fs',
+            'sub_results_key': 'clf_slr',
         },
         # plot results['te_fs']
         {
@@ -1456,6 +1385,7 @@ elif args.analysis == 3:
             'results': results['te_fs'],
             'line_names': dataset_te_basenames,
             'field_results_key': 'tr_pr',
+            'sub_results_key': 'clf_slr',
         },
         {
             'x_axis': range(1, len(dataset_te_basenames) + 1),
@@ -1466,6 +1396,7 @@ elif args.analysis == 3:
             'results': results['te_fs'].T,
             'line_names': list(pipelines['fs'].keys()),
             'field_results_key': 'tr_pr',
+            'sub_results_key': 'clf_slr',
         },
         # plot results['tr_fs']
         {
@@ -1477,6 +1408,7 @@ elif args.analysis == 3:
             'results': results['tr_fs'],
             'line_names': dataset_tr_basenames,
             'field_results_key': 'te_pr',
+            'sub_results_key': 'clf_slr',
         },
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
@@ -1487,6 +1419,7 @@ elif args.analysis == 3:
             'results': results['tr_fs'].T,
             'line_names': list(pipelines['fs'].keys()),
             'field_results_key': 'te_pr',
+            'sub_results_key': 'clf_slr',
         },
         # plot results['te_clf']
         {
@@ -1498,6 +1431,7 @@ elif args.analysis == 3:
             'results': results['te_clf'],
             'line_names': dataset_te_basenames,
             'field_results_key': 'tr_pr',
+            'sub_results_key': 'fs_slr',
         },
         {
             'x_axis': range(1, len(dataset_te_basenames) + 1),
@@ -1508,6 +1442,7 @@ elif args.analysis == 3:
             'results': results['te_clf'].T,
             'line_names': list(pipelines['clf'].keys()),
             'field_results_key': 'tr_pr',
+            'sub_results_key': 'fs_slr',
         },
         # plot results['tr_clf']
         {
@@ -1519,6 +1454,7 @@ elif args.analysis == 3:
             'results': results['tr_clf'],
             'line_names': dataset_tr_basenames,
             'field_results_key': 'te_pr',
+            'sub_results_key': 'fs_slr',
         },
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
@@ -1529,6 +1465,7 @@ elif args.analysis == 3:
             'results': results['tr_clf'].T,
             'line_names': list(pipelines['clf'].keys()),
             'field_results_key': 'te_pr',
+            'sub_results_key': 'fs_slr',
         },
         # plot results['pr_fs']
         {
@@ -1540,6 +1477,7 @@ elif args.analysis == 3:
             'results': results['pr_fs'],
             'line_names': prep_methods,
             'field_results_key': 'te_tr',
+            'sub_results_key': 'clf_slr',
         },
         {
             'x_axis': range(1, len(prep_methods) + 1),
@@ -1551,6 +1489,7 @@ elif args.analysis == 3:
             'results': results['pr_fs'].T,
             'line_names': list(pipelines['fs'].keys()),
             'field_results_key': 'te_tr',
+            'sub_results_key': 'clf_slr',
         },
         # plot results['pr_clf']
         {
@@ -1562,6 +1501,7 @@ elif args.analysis == 3:
             'results': results['pr_clf'],
             'line_names': prep_methods,
             'field_results_key': 'te_tr',
+            'sub_results_key': 'fs_slr',
         },
         {
             'x_axis': range(1, len(prep_methods) + 1),
@@ -1573,6 +1513,7 @@ elif args.analysis == 3:
             'results': results['pr_clf'].T,
             'line_names': list(pipelines['clf'].keys()),
             'field_results_key': 'te_tr',
+            'sub_results_key': 'fs_slr',
         },
         # plot results['fs_clf']
         {
@@ -1584,7 +1525,7 @@ elif args.analysis == 3:
             'results': results['fs_clf'],
             'line_names': list(pipelines['fs'].keys()),
             'field_results_key': 'te_tr',
-            'sub_results_key': 'pr',
+            'sub_results_key': 'pr_slr',
         },
         {
             'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
@@ -1595,12 +1536,15 @@ elif args.analysis == 3:
             'results': results['fs_clf'].T,
             'line_names': list(pipelines['clf'].keys()),
             'field_results_key': 'te_tr',
-            'sub_results_key': 'pr',
+            'sub_results_key': 'pr_slr',
         },
     ]
     plt.rcParams['figure.max_open_warning'] = 0
     for figure_idx, figure in enumerate(figures):
-        if analysis_type == 'prep_methods' and figure_idx > 3: continue
+        if (args.fs_meth and len(args.fs_meth) == 1 and
+            args.slr_meth and len(args.slr_meth) == 1 and
+            args.clf_meth and len(args.clf_meth) == 1 and
+            figure_idx > 3): continue
         legend_kwargs = {
             'loc': 'lower left',
             'ncol': max(1, len(figure['line_names']) // 12),
