@@ -1083,7 +1083,7 @@ elif args.analysis == 3:
                             param_grid.append(params)
                             params_data = {
                                 'meth_idxs': {
-                                    'fs': fs_idx, 'slr': slr_idx, 'clf': clf_idx, 'pr': 0
+                                    'fs': fs_idx, 'slr': slr_idx, 'clf': clf_idx,
                                 },
                                 'grid_idxs': [],
                             }
