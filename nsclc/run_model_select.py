@@ -150,7 +150,7 @@ def limma(X, y):
     f, pv = r_limma_feature_score(X, y)
     return np.array(f), np.array(pv)
 
-# bcr performance metrics scoring function
+# bcr performance metric scoring function
 def bcr_score(y_true, y_pred):
     tp = np.sum(np.logical_and(y_pred == 1, y_true == 1))
     tn = np.sum(np.logical_and(y_pred == 0, y_true == 0))
@@ -291,7 +291,7 @@ if args.clf_grb_d:
 else:
     CLF_GRB_D = list(range(1, args.clf_grb_d_max + 1, 1))
 if args.clf_grb_f:
-    CLF_GRB_F = [None if a in ('None', 'none') else a for a in args.clf_grb_f]
+    CLF_GRB_F = [None if a in ('None', 'none') else a for a in sorted(args.clf_grb_f)]
 else:
     CLF_GRB_F = ['auto', 'sqrt', 'log2', None]
 
@@ -781,7 +781,7 @@ if args.analysis == 1:
         num_features.append(split_result['feature_idxs'].size)
     print(
         'Mean ROC AUC (CV / Test): %.4f / %.4f' % (np.mean(roc_aucs_cv), np.mean(roc_aucs_te)),
-        ' Mean BCR (CV / Test): %.4f / %.4f' % (np.mean(roc_aucs_cv), np.mean(roc_aucs_te)),
+        ' Mean BCR (CV / Test): %.4f / %.4f' % (np.mean(bcrs_cv), np.mean(bcrs_te)),
         ' Mean Features: %3d' % np.mean(num_features),
     )
     # calculate overall best ranked features
