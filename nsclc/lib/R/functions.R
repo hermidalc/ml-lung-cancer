@@ -83,6 +83,19 @@ limmaFeatureScore <- function(X, y) {
     return(list(results$F, results$adj.P.Val))
 }
 
+limmaRpkmFeatureScore <- function(X, y) {
+    suppressPackageStartupMessages(require("limma"))
+    design <- model.matrix(~0 + factor(y))
+    colnames(design) <- c("Class0", "Class1")
+    fit <- lmFit(t(X), design)
+    contrast.matrix <- makeContrasts(Class1VsClass0=Class1-Class0, levels=design)
+    fit.contrasts <- contrasts.fit(fit, contrast.matrix)
+    fit.b <- eBayes(fit.contrasts, trend=TRUE)
+    results <- topTableF(fit.b, number=Inf, adjust.method="BH")
+    results <- results[order(as.integer(row.names(results))),]
+    return(list(results$F, results$adj.P.Val))
+}
+
 fcbfFeatureIdxs <- function(X, y, threshold=0) {
     results <- Biocomb::select.fast.filter(cbind(X, as.factor(y)), disc.method="MDL", threshold=threshold)
     results <- results[order(results$Information.Gain, decreasing=TRUE), , drop=FALSE]
