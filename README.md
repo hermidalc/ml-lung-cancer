@@ -5,7 +5,7 @@
 1. Install System Dependencies
 
 ```bash
-sudo dnf install -y libxml-devel libxml2-devel mesa-libGL-devel mesa-libGLU-devel
+sudo dnf install -y libxml-devel libxml2-devel mesa-libGL-devel mesa-libGLU-devel gcc-gfortran
 ```
 
 2. Install Anaconda3 5.0.1
@@ -73,6 +73,7 @@ install.packages("rJava", type="source")
 install.packages("Biocomb")
 install.packages("FSelectorRcpp")
 install.packages("bapred")
+install.packages("WGCNA")
 ```
 
 5. Install Bioconductor Packages (not available via Conda)
@@ -82,6 +83,7 @@ source("https://bioconductor.org/biocLite.R")
 biocLite("hgu133plus2.db", suppressUpdates=TRUE)
 biocLite("hgu133plus2cdf", suppressUpdates=TRUE)
 biocLite("hgu133plus2probe", suppressUpdates=TRUE)
+biocLite("GO.db", suppressUpdates=TRUE)
 biocLite("pvca", suppressUpdates=TRUE)
 biocLite("JADE", suppressUpdates=TRUE)
 ```
