@@ -13,7 +13,7 @@ sudo dnf install -y libxml-devel libxml2-devel mesa-libGL-devel mesa-libGLU-deve
 https://www.anaconda.com/download/
 https://docs.anaconda.com/anaconda/install/linux
 
-2. Setup Conda Environment and Install R, Rpy2, Bioconductor, Limma, etc.
+3. Setup Conda Environment and Install R, Rpy2, Bioconductor, Limma, etc.
 
 ```bash
 conda config --add channels conda-forge
@@ -49,7 +49,7 @@ bioconductor-gcrma \
 bioconductor-impute
 ```
 
-3. Setup for rJava (used by Biocomb and FSelector R packages)
+4. Setup for rJava (used by Biocomb and FSelector R packages)
 
 In .bashrc/.bash_profile:
 ```bash
@@ -65,7 +65,7 @@ source .bashrc
 R CMD javareconf
 ```
 
-4. Install CRAN Packages (not available via Conda)
+5. Install CRAN Packages (not available via Conda)
 
 ```R
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
@@ -76,7 +76,7 @@ install.packages("bapred")
 install.packages("WGCNA")
 ```
 
-5. Install Bioconductor Packages (not available via Conda)
+6. Install Bioconductor Packages (not available via Conda)
 
 ```R
 source("https://bioconductor.org/biocLite.R")
@@ -88,7 +88,7 @@ biocLite("pvca", suppressUpdates=TRUE)
 biocLite("JADE", suppressUpdates=TRUE)
 ```
 
-6. Install Brainarray Custom Microarray Annotation DBs and CDFs
+7. Install Brainarray Custom Microarray Annotation DBs and CDFs
 
 ```R
 library(devtools)
