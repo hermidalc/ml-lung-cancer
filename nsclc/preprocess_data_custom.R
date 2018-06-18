@@ -28,6 +28,7 @@ if (id_type == "gene" & "mas5" %in% arg_norm_methods) {
     eset_gse67639_name <- "eset_gse67639_mas5_gene"
     cat("Loading:", eset_gse67639_name, "\n")
     load(paste0("data/", eset_gse67639_name, ".Rda"))
+    eset_gse67639_filtered_name <- paste0(c(eset_gse67639_name, "filtered"), collapse="_")
 }
 for (dataset_name in dataset_names) {
     if (!dir.exists(paste0("data/raw/", dataset_name))) next
@@ -91,8 +92,8 @@ for (dataset_name in dataset_names) {
     }
 }
 if (exists(eset_gse67639_name) & exists(common_feature_names) {
-    eset_gse67639_gene_filtered <- get(eset_gse67639_name)
-    eset_gse67639_gene_filtered <- eset_gse67639_gene_filtered[common_feature_names,]
-    assign(eset_gse67639_name, eset_gse67639_gene_filtered)
-    save(list=eset_gse67639_name, file=paste0("data/", eset_gse67639_name, ".Rda"))
+    eset_gse67639_filtered <- get(eset_gse67639_name)
+    eset_gse67639_filtered <- eset_gse67639_filtered[common_feature_names,]
+    assign(eset_gse67639_filtered_name, eset_gse67639_filtered)
+    save(list=eset_gse67639_filtered_name, file=paste0("data/", eset_gse67639_filtered_name, ".Rda"))
 }
