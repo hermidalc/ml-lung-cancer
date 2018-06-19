@@ -28,7 +28,7 @@ if (id_type == "gene" & "mas5" %in% arg_norm_methods) {
     eset_gse67639_name <- "eset_gse67639_mas5_gene"
     cat("Loading:", eset_gse67639_name, "\n")
     load(paste0("data/", eset_gse67639_name, ".Rda"))
-    eset_gse67639_filtered_name <- paste0(c(eset_gse67639_name, "filtered"), collapse="_")
+    eset_gse67639_filtered_name <- paste0(c(eset_gse67639_name, "filtered", "tr"), collapse="_")
 }
 for (dataset_name in dataset_names) {
     if (!dir.exists(paste0("data/raw/", dataset_name))) next
