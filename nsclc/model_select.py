@@ -46,8 +46,9 @@ parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
 parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
 parser.add_argument('--num-tr-combo', type=int, help='dataset tr num combos')
 parser.add_argument('--no-addon-te', default=False, action='store_true', help='dataset te no addon')
-parser.add_argument('--merge-type', type=str, nargs='+', help='dataset merge type')
 parser.add_argument('--id-type', type=str, nargs='+', help='dataset ID type')
+parser.add_argument('--filter-type', type=str, nargs='+', help='dataset filter type')
+parser.add_argument('--merge-type', type=str, nargs='+', help='dataset merge type')
 parser.add_argument('--norm-meth', type=str, nargs='+', help='preprocess/normalization method')
 parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
@@ -109,6 +110,7 @@ parser.add_argument('--pipe-memory', default=False, action='store_true', help='t
 parser.add_argument('--save-model', default=False, action='store_true', help='save model')
 parser.add_argument('--save-figs', default=False, action='store_true', help='save figures')
 parser.add_argument('--show-figs', default=False, action='store_true', help='show figures')
+parser.add_argument('--load-only', default=False, action='store_true', help='show dataset loads only')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--verbose', type=int, default=1, help='program verbosity')
 args = parser.parse_args()
@@ -548,7 +550,11 @@ dataset_names = [
     'gse30219',
     'gse31210',
     'gse37745',
-    # 'gse50081'
+    'gse50081',
+    'gse67639',
+]
+multi_dataset_names = [
+    'gse67639',
 ]
 norm_methods = [
     'gcrma',
@@ -558,6 +564,10 @@ norm_methods = [
 id_types = [
     'none',
     'gene',
+]
+filter_types = [
+    'none',
+    'filtered',
 ]
 merge_types = [
     'none',
@@ -587,6 +597,9 @@ if args.analysis == 1:
     if args.id_type and args.id_type[0] != 'none':
         id_type = [x for x in id_types if x in args.id_type][0]
         prep_methods.append(id_type)
+    if args.filter_type and args.filter_type[0] != 'none':
+        filter_type = [x for x in filter_types if x in args.filter_type][0]
+        prep_methods.append(filter_type)
     if args.merge_type and args.merge_type[0] != 'none':
         merge_type = [x for x in merge_types if x in args.merge_type][0]
         prep_methods.append(merge_type)
@@ -824,6 +837,9 @@ elif args.analysis == 2:
     if args.id_type and args.id_type[0] != 'none':
         id_type = [x for x in id_types if x in args.id_type][0]
         prep_methods.append(id_type)
+    if args.filter_type and args.filter_type[0] != 'none':
+        filter_type = [x for x in filter_types if x in args.filter_type][0]
+        prep_methods.append(filter_type)
     if args.merge_type and args.merge_type[0] != 'none':
         merge_type = [x for x in merge_types if x in args.merge_type][0]
         prep_methods.append(merge_type)
@@ -1049,17 +1065,20 @@ elif args.analysis == 3:
         norm_methods = [x for x in norm_methods if x in args.norm_meth]
     if args.id_type:
         id_types = [x for x in id_types if x in args.id_type]
+    if args.filter_type:
+        filter_types = [x for x in filter_types if x in args.filter_type]
     if args.merge_type:
         merge_types = [x for x in merge_types if x in args.merge_type]
     if args.bc_meth:
         bc_methods = [x for x in bc_methods if x in args.bc_meth]
     for norm_meth in norm_methods:
         for id_type in id_types:
-            for merge_type in merge_types:
-                for bc_meth in bc_methods:
-                    prep_groups.append([
-                        x for x in [norm_meth, id_type, merge_type, bc_meth] if x != 'none'
-                    ])
+            for filter_type in filter_types:
+                for merge_type in merge_types:
+                    for bc_meth in bc_methods:
+                        prep_groups.append([
+                            x for x in [norm_meth, id_type, filter_type, merge_type, bc_meth] if x != 'none'
+                        ])
     if args.fs_meth:
         pipelines['fs'] = { k: v for k, v in pipelines['fs'].items() if k in args.fs_meth }
     if args.slr_meth:
@@ -1105,7 +1124,7 @@ elif args.analysis == 3:
     if args.datasets_tr and args.num_tr_combo:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_tr_combo)]
     elif args.datasets_tr:
-        dataset_tr_combos = [x for x in natsorted(dataset_names) if x in args.datasets_tr]
+        dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), len(args.datasets_tr))]
     else:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(dataset_names), args.num_tr_combo)]
     if args.datasets_te:
@@ -1122,11 +1141,8 @@ elif args.analysis == 3:
             for prep_steps in prep_groups:
                 prep_method = '_'.join(prep_steps)
                 dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
-                if prep_steps[-1] == 'merged' or args.no_addon_te:
-                    if prep_steps[1] in id_types:
-                        dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0], prep_steps[1]])
-                    else:
-                        dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0]])
+                if prep_steps[-1] in ['filtered', 'merged'] or args.no_addon_te:
+                    dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'merged'])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
@@ -1134,7 +1150,7 @@ elif args.analysis == 3:
                 eset_tr_file = 'data/' + eset_tr_name + '.Rda'
                 eset_te_file = 'data/' + eset_te_name + '.Rda'
                 if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
-                # print(dataset_tr_name, '->', dataset_te_name)
+                if args.load_only: print(dataset_tr_name, '->', dataset_te_name)
                 dataset_tr_combos_subset.append(dataset_tr_combo)
                 dataset_te_basenames_subset.append(dataset_te_basename)
                 prep_groups_subset.append(prep_steps)
@@ -1143,6 +1159,7 @@ elif args.analysis == 3:
     dataset_te_basenames = [x for x in dataset_te_basenames if x in dataset_te_basenames_subset]
     prep_groups = [x for x in prep_groups if x in prep_groups_subset]
     print("Num dataset pairs:", num_dataset_pairs)
+    if args.load_only: quit()
     score_dtypes = [
         ('roc_auc_cv', float), ('bcr_cv', float),
         ('roc_auc_te', float), ('bcr_te', float),
@@ -1317,6 +1334,7 @@ elif args.analysis == 3:
                 dataset_pair_counter += 1
                 # flush cache with each tr/te pair run (can grow too big if not)
                 if args.pipe_memory: memory.clear(warn=False)
+    dump(results, '_'.join(['results/', 'results', 'analysis', args.analysis]) + '.pkl')
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
         title_sub = 'Classifier: ' + args.clf_meth
