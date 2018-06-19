@@ -1220,11 +1220,8 @@ elif args.analysis == 3:
             for pr_idx, prep_steps in enumerate(prep_groups):
                 prep_method = '_'.join(prep_steps)
                 dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
-                if prep_steps[-1] == 'merged' or args.no_addon_te:
-                    if prep_steps[1] in id_types:
-                        dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0], prep_steps[1]])
-                    else:
-                        dataset_te_name = '_'.join([dataset_te_basename, prep_steps[0]])
+                if prep_steps[-1] in ['filtered', 'merged'] or args.no_addon_te:
+                    dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'merged'])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
