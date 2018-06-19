@@ -3,8 +3,12 @@ dataset_names <- c(
     "gse8894",
     "gse30219",
     "gse31210",
-    "gse37745"
-    # "gse50081"
+    "gse37745",
+    "gse50081",
+    "gse67639"
+)
+multi_dataset_names <- c(
+    "gse67639"
 )
 norm_methods <- c(
     "gcrma",
@@ -14,6 +18,10 @@ norm_methods <- c(
 id_types <- c(
     "none",
     "gene"
+)
+filter_types <- c(
+    "none",
+    "filtered"
 )
 merge_types <- c(
     "none",
