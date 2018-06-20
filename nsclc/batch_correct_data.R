@@ -11,7 +11,7 @@ source("config.R")
 parser <- ArgumentParser()
 parser$add_argument("--datasets-tr", type="character", nargs="+", help="datasets tr")
 parser$add_argument("--datasets-te", type="character", nargs="+", help="datasets te")
-parser$add_argument("--num-tr-combo", type="integer", default=1, help="num datasets to combine")
+parser$add_argument("--num-tr-combo", type="integer", help="num datasets to combine")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="preprocessing/normalization method")
 parser$add_argument("--id-type", type="character", nargs="+", help="dataset id type")
 parser$add_argument("--filter-type", type="character", nargs="+", help="dataset filter type")
@@ -21,11 +21,12 @@ parser$add_argument("--load-only", action="store_true", default=FALSE, help="sho
 parser$add_argument("--save-obj", action="store_true", default=FALSE, help="save add-on param obj")
 args <- parser$parse_args()
 
-num_tr_combo <- as.integer(args$num_tr_combo)
-if (!is.null(args$datasets_tr)) {
-    dataset_tr_name_combos <- combn(intersect(dataset_names, args$datasets_tr), num_tr_combo)
+if (!is.null(args$datasets_tr) && !is.null(args$num_tr_combo)) {
+    dataset_tr_name_combos <- combn(intersect(dataset_names, args$datasets_tr), as.integer(args$num_tr_combo))
+} else if (!is.null(args$datasets_tr)) {
+    dataset_tr_name_combos <- combn(intersect(dataset_names, args$datasets_tr), length(args$datasets_tr))
 } else {
-    dataset_tr_name_combos <- combn(dataset_names, num_tr_combo)
+    dataset_tr_name_combos <- combn(dataset_names, as.integer(args$num_tr_combo))
 }
 if (!is.null(args$datasets_te)) {
     dataset_te_names <- intersect(dataset_names, args$datasets_te)
