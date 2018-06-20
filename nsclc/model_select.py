@@ -593,19 +593,19 @@ bc_methods = [
 # analyses
 if args.analysis == 1:
     norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
-    prep_methods = [norm_meth]
+    prep_steps = [norm_meth]
     if args.id_type and args.id_type[0] != 'none':
         id_type = [x for x in id_types if x in args.id_type][0]
-        prep_methods.append(id_type)
+        prep_steps.append(id_type)
     if args.filter_type and args.filter_type[0] != 'none':
         filter_type = [x for x in filter_types if x in args.filter_type][0]
-        prep_methods.append(filter_type)
+        prep_steps.append(filter_type)
     if args.merge_type and args.merge_type[0] != 'none':
         merge_type = [x for x in merge_types if x in args.merge_type][0]
-        prep_methods.append(merge_type)
+        prep_steps.append(merge_type)
     if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
-        prep_methods.append(bc_meth)
+        prep_steps.append(bc_meth)
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
@@ -628,7 +628,7 @@ if args.analysis == 1:
         print("Param grid:")
         pprint(param_grid)
     args.datasets_tr = natsorted(args.datasets_tr)
-    dataset_name = '_'.join(args.datasets_tr + prep_methods + ['tr'])
+    dataset_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
     print('Dataset:', dataset_name)
     eset_name = 'eset_' + dataset_name
     base.load('data/' + eset_name + '.Rda')
@@ -833,19 +833,19 @@ if args.analysis == 1:
     ): print(feature, '\t', symbol, '\t', rank)
 elif args.analysis == 2:
     norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
-    prep_methods = [norm_meth]
+    prep_steps = [norm_meth]
     if args.id_type and args.id_type[0] != 'none':
         id_type = [x for x in id_types if x in args.id_type][0]
-        prep_methods.append(id_type)
+        prep_steps.append(id_type)
     if args.filter_type and args.filter_type[0] != 'none':
         filter_type = [x for x in filter_types if x in args.filter_type][0]
-        prep_methods.append(filter_type)
+        prep_steps.append(filter_type)
     if args.merge_type and args.merge_type[0] != 'none':
         merge_type = [x for x in merge_types if x in args.merge_type][0]
-        prep_methods.append(merge_type)
+        prep_steps.append(merge_type)
     if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
-        prep_methods.append(bc_meth)
+        prep_steps.append(bc_meth)
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
@@ -876,7 +876,7 @@ elif args.analysis == 2:
         print("Param grid:")
         pprint(param_grid)
     args.datasets_tr = natsorted(args.datasets_tr)
-    dataset_tr_name = '_'.join(args.datasets_tr + prep_methods + ['tr'])
+    dataset_tr_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
     print('Train:', dataset_tr_name)
     eset_tr_name = 'eset_' + dataset_tr_name
     base.load('data/' + eset_tr_name + '.Rda')
@@ -991,13 +991,16 @@ elif args.analysis == 2:
             plt.legend(loc='lower right', fontsize='small')
             plt.grid('on')
     # plot num top-ranked features selected vs test dataset perf metrics
-    dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.datasets_tr)))
+    if args.datasets_te:
+        dataset_te_basenames = natsorted(list(set(args.datasets_te) - set(args.datasets_tr)))
+    else:
+        dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.datasets_tr)))
     sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames)))
     plt.figure('Figure 3')
     plt.rcParams['font.size'] = 14
     plt.title(
         dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
-        'Effect of Number of Top-Ranked Features Selected Performance Metrics'
+        'Effect of Number of Top-Ranked Features Selected on Test Performance Metrics'
     )
     plt.xlabel('Number of top-ranked features selected')
     plt.ylabel('Test Score')
@@ -1016,8 +1019,8 @@ elif args.analysis == 2:
         **{ k: v for k, v in search.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
     )
     for dataset_te_basename in dataset_te_basenames:
-        if args.no_addon_te:
-            dataset_te_name = '_'.join([dataset_te_basename, prep_methods[0]])
+        if prep_steps[-1] in ['filtered', 'merged'] or args.no_addon_te:
+            dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'merged'])
         else:
             dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
         eset_te_name = 'eset_' + dataset_te_name
