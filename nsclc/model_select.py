@@ -1331,7 +1331,7 @@ elif args.analysis == 3:
                 dataset_pair_counter += 1
                 # flush cache with each tr/te pair run (can grow too big if not)
                 if args.pipe_memory: memory.clear(warn=False)
-    dump(results, '_'.join(['results/', 'results', 'analysis', args.analysis]) + '.pkl')
+    dump(results, 'results/results_analysis_' + str(args.analysis) + '.pkl')
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
         title_sub = 'Classifier: ' + args.clf_meth
