@@ -61,7 +61,7 @@ parser.add_argument('--fs-sfm-ext-thres', type=float, nargs='+', help='fs sfm ex
 parser.add_argument('--fs-sfm-ext-e', type=int, nargs='+', help='fs sfm ext n estimators')
 parser.add_argument('--fs-sfm-ext-e-max', type=int, default=100, help='fs sfm ext n estimators max')
 parser.add_argument('--fs-sfm-ext-d', type=int, nargs='+', help='fs sfm ext max depth')
-parser.add_argument('--fs-sfm-ext-d-max', type=int, default=50, help='fs sfm ext max depth max')
+parser.add_argument('--fs-sfm-ext-d-max', type=int, default=20, help='fs sfm ext max depth max')
 parser.add_argument('--fs-sfm-svm-thres', type=float, nargs='+', help='fs sfm svm threshold')
 parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
 parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
@@ -90,14 +90,14 @@ parser.add_argument('--clf-knn-w', type=str, nargs='+', help='clf knn weights')
 parser.add_argument('--clf-ext-e', type=int, nargs='+', help='clf ext n estimators')
 parser.add_argument('--clf-ext-e-max', type=int, default=100, help='clf ext n estimators max')
 parser.add_argument('--clf-ext-d', type=int, nargs='+', help='clf ext max depth')
-parser.add_argument('--clf-ext-d-max', type=int, default=50, help='clf ext max depth max')
+parser.add_argument('--clf-ext-d-max', type=int, default=20, help='clf ext max depth max')
 parser.add_argument('--clf-ada-e', type=int, nargs='+', help='clf ada n estimators')
 parser.add_argument('--clf-ada-e-max', type=int, default=200, help='clf ada n estimators max')
 parser.add_argument('--clf-ada-lgr-c', type=float, nargs='+', help='clf ada lgr c')
 parser.add_argument('--clf-grb-e', type=int, nargs='+', help='clf grb n estimators')
 parser.add_argument('--clf-grb-e-max', type=int, default=300, help='clf grb n estimators max')
 parser.add_argument('--clf-grb-d', type=int, nargs='+', help='clf grb max depth')
-parser.add_argument('--clf-grb-d-max', type=int, default=50, help='clf grb max depth max')
+parser.add_argument('--clf-grb-d-max', type=int, default=20, help='clf grb max depth max')
 parser.add_argument('--clf-grb-f', type=str, nargs='+', help='clf grb max features')
 parser.add_argument('--scv-type', type=str, default='grid', help='scv type (grid or rand)')
 parser.add_argument('--scv-splits', type=int, default=80, help='scv splits')
@@ -688,7 +688,10 @@ if args.analysis == 1:
                     len(param_grid[param]),
                     np.prod([len(v) for k,v in param_grid.items() if k != param])
                 )
-                if param in ('fs2__threshold', 'clf__weights', 'clf__max_features'):
+                if param in (
+                    'fs2__estimator__max_depth', 'fs2__threshold', 'clf__weights',
+                    'clf__max_depth', 'clf__max_features',
+                ):
                     xaxis_group_sorted_idxs = np.argsort(
                         np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
                     )
@@ -929,7 +932,10 @@ elif args.analysis == 2:
                 len(param_grid[param]),
                 np.prod([len(v) for k,v in param_grid.items() if k != param])
             )
-            if param in ('fs2__threshold', 'clf__weights', 'clf__max_features'):
+            if param in (
+                'fs2__estimator__max_depth', 'fs2__threshold', 'clf__weights',
+                'clf__max_depth', 'clf__max_features',
+            ):
                 xaxis_group_sorted_idxs = np.argsort(
                     np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
                 )
