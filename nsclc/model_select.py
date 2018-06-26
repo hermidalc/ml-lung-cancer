@@ -111,6 +111,7 @@ parser.add_argument('--save-model', default=False, action='store_true', help='sa
 parser.add_argument('--save-figs', default=False, action='store_true', help='save figures')
 parser.add_argument('--show-figs', default=False, action='store_true', help='show figures')
 parser.add_argument('--load-only', default=False, action='store_true', help='show dataset loads only')
+parser.add_argument('--results-dir', type=str, default='results', help='results dir')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--verbose', type=int, default=1, help='program verbosity')
 args = parser.parse_args()
@@ -889,7 +890,7 @@ elif args.analysis == 2:
     search.fit(X_tr, y_tr)
     if args.save_model:
         dump(search, '_'.join([
-            'results/search', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
+            args.results_dir, '/search', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
         ]) + '.pkl')
     feature_idxs = np.arange(X_tr.shape[1])
     for step in search.best_estimator_.named_steps:
@@ -1340,7 +1341,7 @@ elif args.analysis == 3:
                 dataset_pair_counter += 1
                 # flush cache with each tr/te pair run (can grow too big if not)
                 if args.pipe_memory: memory.clear(warn=False)
-    dump(results, 'results/results_analysis_' + str(args.analysis) + '.pkl')
+    dump(results, args.results_dir + '/results_analysis_' + str(args.analysis) + '.pkl')
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
         title_sub = 'Classifier: ' + args.clf_meth
@@ -1685,8 +1686,8 @@ elif args.analysis == 3:
             plt.grid('on')
             if args.save_figs:
                 dump(plt.figure(figure_name + 'A'),
-                    "results/" + (figure_name + 'A').replace(' ', '_').lower() + '.pkl')
+                    args.results_dir + '/' + (figure_name + 'A').replace(' ', '_').lower() + '.pkl')
                 dump(plt.figure(figure_name + 'B'),
-                    "results/" + (figure_name + 'B').replace(' ', '_').lower() + '.pkl')
+                    args.results_dir + '/' + (figure_name + 'B').replace(' ', '_').lower() + '.pkl')
 if args.show_figs or not args.save_figs: plt.show()
 if args.pipe_memory: rmtree(cachedir)
