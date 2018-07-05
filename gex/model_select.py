@@ -1054,10 +1054,12 @@ elif args.analysis == 2:
             bcrs_te.append(bcr_te)
         plt.plot(
             x_axis, roc_aucs_te, lw=2, alpha=0.8,
-            label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, BCR = %0.4f $\pm$ %0.2f)' % (
+            # label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, BCR = %0.4f $\pm$ %0.2f)' % (
+            label=r'%s (ROC AUC = %0.4f, BCR = %0.4f)' % (
                 dataset_te_name,
-                np.mean(roc_aucs_te), np.std(roc_aucs_te),
-                np.mean(bcrs_te), np.std(bcrs_te),
+                np.max(roc_aucs_te), np.max(bcrs_te),
+                #np.mean(roc_aucs_te), np.std(roc_aucs_te),
+                #np.mean(bcrs_te), np.std(bcrs_te),
             ),
         )
         # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
