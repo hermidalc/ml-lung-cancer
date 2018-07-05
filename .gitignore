@@ -104,6 +104,6 @@ ENV/
 *.Rda
 
 # custom dirs and file types
-/nsclc/data
-/nsclc/results
+/gex/data
+/gex/results
 test*
