@@ -1,4 +1,4 @@
-# ML Prediction of Prognosis in Early-Stage Lung Cancer
+# ML Prediction in Lung Cancer
 
 ## Environment and Analysis Pipeline Setup
 
