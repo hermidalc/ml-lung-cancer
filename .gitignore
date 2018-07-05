@@ -104,6 +104,8 @@ ENV/
 *.Rda
 
 # custom dirs and file types
-/gex/data
-/gex/results
+/px-gex/data
+/px-gex/results
+/dx-met/data
+/dx-met/results
 test*
