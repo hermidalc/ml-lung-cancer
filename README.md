@@ -30,6 +30,8 @@ r-rcppeigen \
 r-lme4 \
 r-corpcor \
 r-rgl \
+r-statmod \
+r-mlr \
 autopep8 \
 rpy2 \
 libiconv \
@@ -46,7 +48,8 @@ bioconductor-limma \
 bioconductor-sva \
 bioconductor-vsn \
 bioconductor-gcrma \
-bioconductor-impute
+bioconductor-impute \
+bioconductor-edger
 ```
 
 4. Setup for rJava (used by Biocomb and FSelector R packages)
@@ -86,6 +89,7 @@ biocLite("hgu133plus2probe", suppressUpdates=TRUE)
 biocLite("GO.db", suppressUpdates=TRUE)
 biocLite("pvca", suppressUpdates=TRUE)
 biocLite("JADE", suppressUpdates=TRUE)
+biocLite("MLSeq", suppressUpdates=TRUE)
 ```
 
 7. Install Brainarray Custom Microarray Annotation DBs and CDFs
