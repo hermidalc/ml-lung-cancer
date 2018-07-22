@@ -189,11 +189,13 @@ class RFE(BaseEstimator, MetaEstimatorMixin, SelectorMixin):
             # for sparse case ranks is matrix
             ranks = np.ravel(ranks)
 
-            if 0.0 < self.step < 1.0:
-                if np.sum(support_) > 200:
+            if np.sum(support_) > 200:
+                if 0.0 < self.step < 1.0:
                     step = int(min(np.sum(support_) - 200, self.step * np.sum(support_)))
                 else:
-                    step = 1
+                    step = min(np.sum(support_) - 200, step)
+            else:
+                step = 1
             # Eliminate the worse features
             threshold = min(step, np.sum(support_) - n_features_to_select)
 
