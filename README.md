@@ -32,6 +32,7 @@ r-corpcor \
 r-rgl \
 r-statmod \
 r-mlr \
+r-caret \
 autopep8 \
 rpy2 \
 libiconv \
