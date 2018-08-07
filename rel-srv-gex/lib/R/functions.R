@@ -87,7 +87,7 @@ limmaFpkmFeatureScore <- function(X, y) {
     suppressPackageStartupMessages(require("limma"))
     design <- model.matrix(~0 + factor(y))
     colnames(design) <- c("Class0", "Class1")
-    fit <- lmFit(t(X), design)
+    fit <- lmFit(t(log2(X + 1)), design)
     contrast.matrix <- makeContrasts(Class1VsClass0=Class1-Class0, levels=design)
     fit.contrasts <- contrasts.fit(fit, contrast.matrix)
     fit.b <- eBayes(fit.contrasts, trend=TRUE)
