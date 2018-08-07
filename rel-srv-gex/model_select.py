@@ -115,6 +115,8 @@ parser.add_argument('--results-dir', type=str, default='results', help='results 
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--verbose', type=int, default=1, help='program verbosity')
 args = parser.parse_args()
+if args.test_size > 1.0: args.test_size = int(args.test_size)
+if args.scv_size > 1.0: args.scv_size = int(args.scv_size)
 
 base = importr('base')
 biobase = importr('Biobase')
