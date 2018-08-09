@@ -54,6 +54,8 @@ parser.add_argument('--no-addon-te', default=False, action='store_true', help='d
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
 parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
+parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr min')
+parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=1000, help='fs skb k select max')
 parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
@@ -123,12 +125,12 @@ if args.scv_size > 1.0: args.scv_size = int(args.scv_size)
 
 base = importr('base')
 base.source('functions.R')
-r_dataset_x = robjects.globalenv['datasetX']
+# r_dataset_x = robjects.globalenv['datasetX']
 r_dataset_y = robjects.globalenv['datasetY']
-r_dataset_nstd_idxs = robjects.globalenv['datasetNonZeroStdIdxs']
-r_dataset_corr_idxs = robjects.globalenv['datasetCorrIdxs']
-r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
-r_limma_fpkm_feature_score = robjects.globalenv['limmaFpkmFeatureScore']
+# r_dataset_nstd_idxs = robjects.globalenv['datasetNonZeroStdIdxs']
+# r_dataset_corr_idxs = robjects.globalenv['datasetCorrIdxs']
+# r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
+# r_limma_fpkm_feature_score = robjects.globalenv['limmaFpkmFeatureScore']
 numpy2ri.activate()
 
 if args.pipe_memory:
@@ -208,6 +210,10 @@ else:
 scv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
+if args.slr_mms_fr_min and args.slr_mms_fr_max:
+    SLR_MMS_FR = list(zip(args.slr_mms_fr_min, args.slr_mms_fr_max))
+else:
+    SLR_MMS_FR = [(0,1)]
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
 else:
@@ -374,7 +380,9 @@ pipelines = {
                 ('slr', MinMaxScaler()),
             ],
             'param_grid': [
-                { },
+                {
+                    'slr__feature_range': SLR_MMS_FR,
+                },
             ],
         },
         'StandardScaler': {
