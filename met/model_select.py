@@ -668,7 +668,7 @@ pipelines = {
 }
 
 dataset_names = [
-    'met_lung_dx',
+    'lhc_nsclc_met',
 ]
 norm_methods = [
     'none',

@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library("argparse"))
 # parser <- ArgumentParser()
 # args <- parser$parse_args()
 
-dataset_tr_name <- "met_lung_dx"
+dataset_tr_name <- "lhc_nsclc_met"
 suffixes <- c()
 df_x_tr_name <- paste0(c("df", "X", dataset_tr_name, suffixes), collapse="_")
 df_p_tr_name <- paste0(c("df", "p", dataset_tr_name, suffixes), collapse="_")
