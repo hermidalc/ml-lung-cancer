@@ -817,8 +817,8 @@ if args.analysis == 1:
     for split_idx, split_result in enumerate(split_results):
         for idx, feature_idx in enumerate(split_result['feature_idxs']):
             weight_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['weights'][idx]
-            roc_auc_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['roc_auc_te']
-            bcr_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['bcr_te']
+            roc_auc_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['roc_auc_cv']
+            bcr_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['bcr_cv']
     feature_mean_weights, feature_mean_roc_aucs, feature_mean_bcrs = [], [], []
     for idx in range(len(feature_idxs)):
         feature_mean_weights.append(np.mean(weight_mx[idx]))
