@@ -50,7 +50,6 @@ parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
 parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
 parser.add_argument('--num-tr-combo', type=int, default=1, help='dataset tr num combos')
 parser.add_argument('--corr-cutoff', type=float, help='correlation filter cutoff')
-parser.add_argument('--norm-meth', type=str, nargs='+', help='normalization method')
 parser.add_argument('--no-addon-te', default=False, action='store_true', help='dataset te no addon')
 parser.add_argument('--feat-type', type=str, nargs='+', help='dataset feature type')
 parser.add_argument('--filter-type', type=str, nargs='+', help='dataset filter type')
@@ -133,6 +132,7 @@ if args.test_size > 1.0: args.test_size = int(args.test_size)
 if args.scv_size > 1.0: args.scv_size = int(args.scv_size)
 
 base = importr('base')
+biobase = importr('Biobase')
 base.source('functions.R')
 r_eset_class_labels = robjects.globalenv['esetClassLabels']
 r_eset_feature_descs = robjects.globalenv['esetFeatureDescs']
@@ -697,8 +697,10 @@ bc_methods = [
 
 # analyses
 if args.analysis == 1:
-    norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
-    prep_steps = [norm_meth]
+    prep_steps = []
+    if args.norm_meth and args.norm_meth[0] != 'none':
+        norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
+        prep_steps.append(norm_meth)
     if args.feat_type and args.feat_type[0] != 'none':
         feat_type = [x for x in feat_types if x in args.feat_type][0]
         prep_steps.append(feat_type)
@@ -714,6 +716,13 @@ if args.analysis == 1:
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
+    args.datasets_tr = natsorted(args.datasets_tr)
+    dataset_name = '_'.join(args.datasets_tr + prep_steps)
+    eset_name = 'eset_' + dataset_name
+    base.load('data/' + eset_name + '.Rda')
+    eset = robjects.globalenv[eset_name]
+    X = np.array(base.t(biobase.exprs(eset)))
+    y = np.array(r_eset_class_labels(eset), dtype=int)
     pipe = Pipeline(sorted(
         pipelines['slr'][args.slr_meth]['steps'] +
         pipelines['fs'][args.fs_meth]['steps'] +
@@ -750,14 +759,7 @@ if args.analysis == 1:
         pprint(vars(pipe))
         print('Param grid:')
         pprint(param_grid)
-    args.datasets_tr = natsorted(args.datasets_tr)
-    dataset_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
-    print('Dataset:', dataset_name)
-    eset_name = 'eset_' + dataset_name
-    base.load('data/' + eset_name + '.Rda')
-    eset = robjects.globalenv[eset_name]
-    X = np.array(base.t(biobase.exprs(eset)))
-    y = np.array(r_eset_class_labels(eset), dtype=int)
+    print('Dataset:', dataset_name, X.shape, y.shape)
     split_num = 1
     split_results = []
     param_cv_scores = {}
@@ -968,8 +970,10 @@ if args.analysis == 1:
     for rank, feature in sorted(zip(feature_ranks, feature_names), reverse=True):
         print(feature, '\t', rank)
 elif args.analysis == 2:
-    norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
-    prep_steps = [norm_meth]
+    prep_steps = []
+    if args.norm_meth and args.norm_meth[0] != 'none':
+        norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
+        prep_steps.append(norm_meth)
     if args.feat_type and args.feat_type[0] != 'none':
         feat_type = [x for x in feat_types if x in args.feat_type][0]
         prep_steps.append(feat_type)
@@ -985,6 +989,13 @@ elif args.analysis == 2:
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
+    args.datasets_tr = natsorted(args.datasets_tr)
+    dataset_tr_name = '_'.join(args.datasets_tr + prep_steps)
+    eset_tr_name = 'eset_' + dataset_tr_name
+    base.load('data/' + eset_tr_name + '.Rda')
+    eset_tr = robjects.globalenv[eset_tr_name]
+    X_tr = np.array(base.t(biobase.exprs(eset_tr)))
+    y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
     pipe = Pipeline(sorted(
         pipelines['slr'][args.slr_meth]['steps'] +
         pipelines['fs'][args.fs_meth]['steps'] +
@@ -1021,14 +1032,7 @@ elif args.analysis == 2:
         pprint(vars(pipe))
         print('Param grid:')
         pprint(param_grid)
-    args.datasets_tr = natsorted(args.datasets_tr)
-    dataset_tr_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
-    print('Train:', dataset_tr_name)
-    eset_tr_name = 'eset_' + dataset_tr_name
-    base.load('data/' + eset_tr_name + '.Rda')
-    eset_tr = robjects.globalenv[eset_tr_name]
-    X_tr = np.array(base.t(biobase.exprs(eset_tr)))
-    y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
+    print('Train:', dataset_tr_name, X_tr.shape, y_tr.shape)
     search.fit(X_tr, y_tr)
     if args.save_model:
         dump(search, '_'.join([
