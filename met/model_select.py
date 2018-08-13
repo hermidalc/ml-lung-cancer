@@ -807,14 +807,16 @@ if args.analysis == 1:
         if args.verbose > 1:
             if weights.size > 0:
                 feature_ranks = sorted(
-                    zip(weights, feature_idxs, feature_names, r_eset_feature_descs(eset, feature_idxs + 1)),
+                    # zip(weights, feature_idxs, feature_names, r_eset_feature_descs(eset, feature_idxs + 1)),
+                    zip(weights, feature_idxs, feature_names),
                     reverse=True,
                 )
                 print('Feature Rankings:')
                 for weight, _, feature in feature_ranks: print(feature, '\t', weight)
             else:
                 feature_ranks = sorted(
-                    zip(feature_idxs, feature_names, r_eset_feature_descs(eset, feature_idxs + 1)),
+                    # zip(feature_idxs, feature_names, r_eset_feature_descs(eset, feature_idxs + 1)),
+                    zip(feature_idxs, feature_names),
                     reverse=True,
                 )
                 print('Features:')
@@ -1068,14 +1070,16 @@ elif args.analysis == 2:
     print('Best Params:', search.best_params_)
     if weights.size > 0:
         feature_ranks = sorted(
-            zip(weights, feature_idxs, feature_names, r_eset_feature_descs(eset_tr, feature_idxs + 1)),
+            # zip(weights, feature_idxs, feature_names, r_eset_feature_descs(eset_tr, feature_idxs + 1)),
+            zip(weights, feature_idxs, feature_names),
             reverse=True,
         )
         print('Feature Rankings:')
         for weight, _, feature in feature_ranks: print(feature, '\t', weight)
     else:
         feature_ranks = sorted(
-            zip(feature_idxs, feature_names, r_eset_feature_descs(eset_tr, feature_idxs + 1)),
+            # zip(feature_idxs, feature_names, r_eset_feature_descs(eset_tr, feature_idxs + 1)),
+            zip(feature_idxs, feature_names),
             reverse=True,
         )
         print('Features:')
