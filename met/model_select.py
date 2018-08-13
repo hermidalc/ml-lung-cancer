@@ -717,7 +717,10 @@ if args.analysis == 1:
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
     args.datasets_tr = natsorted(args.datasets_tr)
-    dataset_name = '_'.join(args.datasets_tr + prep_steps)
+    if len(args.datasets_tr) > 1:
+        dataset_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
+    else:
+        dataset_name = '_'.join(args.datasets_tr + prep_steps)
     eset_name = 'eset_' + dataset_name
     base.load('data/' + eset_name + '.Rda')
     eset = robjects.globalenv[eset_name]
@@ -990,7 +993,10 @@ elif args.analysis == 2:
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
     args.datasets_tr = natsorted(args.datasets_tr)
-    dataset_tr_name = '_'.join(args.datasets_tr + prep_steps)
+    if len(args.datasets_tr) > 1:
+        dataset_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
+    else:
+        dataset_name = '_'.join(args.datasets_tr + prep_steps)
     eset_tr_name = 'eset_' + dataset_tr_name
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = robjects.globalenv[eset_tr_name]
