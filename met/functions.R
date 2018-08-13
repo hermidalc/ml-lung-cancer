@@ -1,44 +1,39 @@
 suppressPackageStartupMessages(library("Biobase"))
 set.seed(1982)
 
-datasetX <- function(X_df, p_df, batch=NULL) {
-    if (!is.null(batch)) {
-        return(as.matrix(X_df[!is.na(p_df$Class) & p_df$Batch %in% c(batch),]))
-    } else {
-        return(as.matrix(X_df[!is.na(p_df$Class),]))
+filterEset <- function(eset, features=NULL, samples=NULL) {
+    if (!is.null(features) & !is.null(samples)) {
+        return(eset[c(features),c(samples)])
+    }
+    else if (!is.null(features)) {
+        return(eset[c(features),])
+    }
+    else if (!is.null(samples)) {
+        return(eset[,c(samples)])
+    }
+    else {
+        return(eset)
     }
 }
 
-datasetY <- function(p_df, batch=NULL) {
-    if (!is.null(batch)) {
-        return(as.integer(p_df[!is.na(p_df$Class) & p_df$Batch %in% c(batch), "Class"]))
-    } else {
-        return(as.integer(p_df[!is.na(p_df$Class), "Class"]))
+esetClassLabels <- function(eset, samples=NULL) {
+    if (!is.null(samples)) {
+        return(eset$Class[c(samples)])
+    }
+    else {
+        return(eset$Class)
     }
 }
 
-datasetNonZeroStdIdxs <- function(X, samples=FALSE) {
-    if (samples) {
-        return(as.integer(which(sapply(as.data.frame(t(X)), function(c) sd(c) != 0))) - 1)
-    } else {
-        return(as.integer(which(sapply(as.data.frame(X), function(c) sd(c) != 0))) - 1)
+esetFeatureDescs <- function(eset, features=NULL) {
+    if (!is.null(features)) {
+        symbols <- as.character(featureData(eset)[c(features)]$Description)
     }
-}
-
-datasetCorrIdxs <- function(X, cutoff=0.5, samples=FALSE) {
-    if (samples) {
-        return(sort(caret::findCorrelation(cor(t(X)), cutoff=cutoff)) - 1)
-    } else {
-        return(sort(caret::findCorrelation(cor(X), cutoff=cutoff)) - 1)
+    else {
+        symbols <- as.character(featureData(eset)$Description)
     }
-}
-
-datasetIdxs <- function(X_df, p_df, batch=NULL) {
-    if (!is.null(batch)) {
-        return(which(!is.na(p_df$Class) & p_df$Batch %in% c(batch)) - 1)
-    } else {
-        return(which(!is.na(p_df$Class)) - 1)
-    }
+    symbols[is.na(symbols)] <- ""
+    return(symbols)
 }
 
 limmaFeatureScore <- function(X, y) {

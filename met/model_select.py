@@ -32,7 +32,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, RobustScaler, StandardScaler
 from sklearn.svm import LinearSVC, SVC
 from sklearn.metrics import roc_auc_score, roc_curve, make_scorer
-from sklearn.externals.joblib import dump, Memory
+from sklearn.externals.joblib import delayed, dump, Memory, Parallel
 from feature_selection import CFS, FCBF, ReliefF
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -52,6 +52,11 @@ parser.add_argument('--num-tr-combo', type=int, default=1, help='dataset tr num 
 parser.add_argument('--corr-cutoff', type=float, help='correlation filter cutoff')
 parser.add_argument('--norm-meth', type=str, nargs='+', help='normalization method')
 parser.add_argument('--no-addon-te', default=False, action='store_true', help='dataset te no addon')
+parser.add_argument('--feat-type', type=str, nargs='+', help='dataset feature type')
+parser.add_argument('--filter-type', type=str, nargs='+', help='dataset filter type')
+parser.add_argument('--merge-type', type=str, nargs='+', help='dataset merge type')
+parser.add_argument('--norm-meth', type=str, nargs='+', help='preprocess/normalization method')
+parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correction method')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
 parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
@@ -129,12 +134,9 @@ if args.scv_size > 1.0: args.scv_size = int(args.scv_size)
 
 base = importr('base')
 base.source('functions.R')
-# r_dataset_x = robjects.globalenv['datasetX']
-r_dataset_y = robjects.globalenv['datasetY']
-# r_dataset_nstd_idxs = robjects.globalenv['datasetNonZeroStdIdxs']
-# r_dataset_corr_idxs = robjects.globalenv['datasetCorrIdxs']
-# r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
-# r_limma_fpkm_feature_score = robjects.globalenv['limmaFpkmFeatureScore']
+r_eset_class_labels = robjects.globalenv['esetClassLabels']
+r_eset_feature_descs = robjects.globalenv['esetFeatureDescs']
+r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
 numpy2ri.activate()
 
 if args.pipe_memory:
@@ -160,14 +162,6 @@ class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
 class CachedLogisticRegression(CachedFitMixin, LogisticRegression):
     pass
 
-# def filter_constant_features(X):
-#     keep_cols = []
-#     for col in range(X.shape[1]):
-#         _, count = np.unique(X[:,col], return_counts=True)
-#         if count.size > 1: keep_cols.append(col)
-#     # print(X[:,keep_cols].shape)
-#     return X[:,keep_cols]
-
 # limma feature selection scoring function
 def limma(X, y):
     f, pv = r_limma_feature_score(X, y)
@@ -192,6 +186,17 @@ def bcr_score(y_true, y_pred):
         return tn / mes2
     else:
         return (tp / mes1 + tn / mes2) / 2
+
+# parallel pipeline fit function
+def fit_pipeline(params, pipeline_order, X_tr, y_tr):
+    pipe_steps = sorted([
+        (k, v) for k, v in params.items() if k in pipeline_order
+    ], key=lambda s: pipeline_order.index(s[0]))
+    pipe = Pipeline(pipe_steps, memory=memory)
+    pipe.set_params(**{ k: v for k, v in params.items() if '__' in k })
+    pipe.fit(X_tr, y_tr)
+    if args.scv_verbose == 0: print('.', end='', flush=True)
+    return pipe
 
 # config
 if args.pipe_memory:
@@ -646,14 +651,14 @@ pipelines = {
                 { },
             ],
         },
-        # 'QDA': {
-        #     'steps': [
-        #         ('clf', QuadraticDiscriminantAnalysis()),
-        #     ],
-        #     'param_grid': [
-        #         { },
-        #     ],
-        # },
+        'QDA': {
+            'steps': [
+                ('clf', QuadraticDiscriminantAnalysis()),
+            ],
+            'param_grid': [
+                { },
+            ],
+        },
         'MLP': {
             'steps': [
                 ('clf', MLPClassifier()),
@@ -677,219 +682,414 @@ dataset_names = [
 norm_methods = [
     'none',
 ]
+feat_types = [
+    'none',
+]
+filter_types = [
+    'none',
+]
+merge_types = [
+    'none',
+]
+bc_methods = [
+    'none',
+]
 
 # analyses
 if args.analysis == 1:
-    if args.norm_meth and args.norm_meth != 'none':
-        norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
-    if args.fs_meth:
-        pipelines['fs'] = { k: v for k, v in pipelines['fs'].items() if k in args.fs_meth }
-    if args.slr_meth:
-        pipelines['slr'] = { k: v for k, v in pipelines['slr'].items() if k in args.slr_meth }
-    if args.clf_meth:
-        pipelines['clf'] = { k: v for k, v in pipelines['clf'].items() if k in args.clf_meth }
-    if args.datasets_tr and args.num_tr_combo:
-        dataset_tr_combos = [list(x) for x in combinations(
-            [x for x in dataset_names if x in args.datasets_tr], args.num_tr_combo
-        )]
-    elif args.datasets_tr:
-        dataset_tr_combos = [x for x in dataset_names if x in args.datasets_tr]
-    else:
-        dataset_tr_combos = [list(x) for x in combinations(dataset_names, args.num_tr_combo)]
-    if args.datasets_te:
-        dataset_te_names = [x for x in dataset_names if x in args.datasets_te]
-    else:
-        dataset_te_names = dataset_names
+    norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
+    prep_steps = [norm_meth]
+    if args.feat_type and args.feat_type[0] != 'none':
+        feat_type = [x for x in feat_types if x in args.feat_type][0]
+        prep_steps.append(feat_type)
+    if args.filter_type and args.filter_type[0] != 'none':
+        filter_type = [x for x in filter_types if x in args.filter_type][0]
+        prep_steps.append(filter_type)
+    if args.merge_type and args.merge_type[0] != 'none':
+        merge_type = [x for x in merge_types if x in args.merge_type][0]
+        prep_steps.append(merge_type)
+    if args.bc_meth and args.bc_meth[0] != 'none':
+        bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
+        prep_steps.append(bc_meth)
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
-    for dataset_tr_combo in dataset_tr_combos:
-        dataset_tr_nums = np.array(
-            [i for i,d in enumerate(dataset_names) if d in dataset_tr_combo]
-        ) + 1
-        dataset_tr_basename = '_'.join(dataset_tr_combo)
-        if args.norm_meth and args.norm_meth != 'none':
-            dataset_tr_name = '_'.join([dataset_tr_basename, norm_meth, 'tr'])
-            df_X_tr_name = '_'.join(['df', 'X', dataset_tr_name])
-            if len(dataset_tr_combo) > 1:
-                df_p_tr_name = '_'.join(['df', 'p', dataset_tr_basename, 'tr'])
-            else:
-                df_p_tr_name = '_'.join(['df', 'p', dataset_tr_basename])
-        elif len(dataset_tr_combo) > 1:
-            dataset_tr_name = '_'.join([dataset_tr_basename, 'tr'])
-            df_X_tr_name = '_'.join(['df', 'X', dataset_tr_name])
-            df_p_tr_name = '_'.join(['df', 'p', dataset_tr_name])
+    pipe = Pipeline(sorted(
+        pipelines['slr'][args.slr_meth]['steps'] +
+        pipelines['fs'][args.fs_meth]['steps'] +
+        pipelines['clf'][args.clf_meth]['steps'],
+        key=lambda s: pipeline_order.index(s[0])
+    ), memory=memory)
+    param_grid = {
+        **pipelines['slr'][args.slr_meth]['param_grid'][0],
+        **pipelines['fs'][args.fs_meth]['param_grid'][0],
+        **pipelines['clf'][args.clf_meth]['param_grid'][0],
+    }
+    if args.fs_meth == 'Limma-KBest':
+        if dataset_tr_basename in rna_seq_fpkm_dataset_names:
+            pipe.set_params(fs1__score_func=limma_fpkm_score_func)
         else:
-            dataset_tr_name = dataset_tr_basename
-            df_X_tr_name = '_'.join(['df', 'X', dataset_tr_name])
-            df_p_tr_name = '_'.join(['df', 'p', dataset_tr_name])
-        if (np.array(base.exists(df_X_tr_name), dtype=bool)[0] == False):
-            base.load('data/' + df_X_tr_name + '.Rda')
-        if (np.array(base.exists(df_p_tr_name), dtype=bool)[0] == False):
-            base.load('data/' + df_p_tr_name + '.Rda')
-        df_X_tr = robjects.globalenv[df_X_tr_name]
-        df_p_tr = robjects.globalenv[df_p_tr_name]
-        X = np.array(base.as_matrix(df_X_tr))
-        y = np.array(r_dataset_y(df_p_tr), dtype=int)
-        # nstd_feature_idxs = np.array(r_dataset_nstd_idxs(X, samples=False), dtype=int)
-        # nstd_sample_idxs = np.array(r_dataset_nstd_idxs(X, samples=True), dtype=int)
-        # X = X[np.ix_(nstd_sample_idxs, nstd_feature_idxs)]
-        # y = y[nstd_sample_idxs]
-        # if args.corr_cutoff:
-        #     corr_feature_idxs = np.array(r_dataset_corr_idxs(X, cutoff=args.corr_cutoff, samples=False), dtype=int)
-        #     corr_sample_idxs = np.array(r_dataset_corr_idxs(X, cutoff=args.corr_cutoff, samples=True), dtype=int)
-        #     X = X[np.ix_(corr_sample_idxs, corr_feature_idxs)]
-        #     y = y[corr_sample_idxs]
-        print('Dataset:', dataset_tr_name, X.shape, y.shape)
-        pipe = Pipeline(sorted(
-            pipelines['slr'][args.slr_meth]['steps'] +
-            pipelines['fs'][args.fs_meth]['steps'] +
-            pipelines['clf'][args.clf_meth]['steps'],
-            key=lambda s: pipeline_order.index(s[0])
-        ), memory=memory)
-        param_grid = {
-            **pipelines['slr'][args.slr_meth]['param_grid'][0],
-            **pipelines['fs'][args.fs_meth]['param_grid'][0],
-            **pipelines['clf'][args.clf_meth]['param_grid'][0],
-        }
-        if args.fs_meth == 'Limma-KBest':
-            if dataset_tr_basename in rna_seq_fpkm_dataset_names:
-                pipe.set_params(fs1__score_func=limma_fpkm_score_func)
-            else:
-                pipe.set_params(fs1__score_func=limma_score_func)
-        for param in param_grid:
-            if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
-                param_grid[param] = list(filter(lambda x: x <= min(X.shape[1], y.shape[0]), param_grid[param]))
-        if args.scv_type == 'grid':
-            search = GridSearchCV(
-                pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-                error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-            )
-        elif args.scv_type == 'rand':
-            search = RandomizedSearchCV(
-                pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-                error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-            )
+            pipe.set_params(fs1__score_func=limma_score_func)
+    for param in param_grid:
+        if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
+            param_grid[param] = list(filter(lambda x: x <= min(X.shape[1], y.shape[0]), param_grid[param]))
+    if args.scv_type == 'grid':
+        search = GridSearchCV(
+            pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+        )
+    elif args.scv_type == 'rand':
+        search = RandomizedSearchCV(
+            pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+        )
+    if args.verbose > 1:
+        print('Pipeline:')
+        pprint(vars(pipe))
+        print('Param grid:')
+        pprint(param_grid)
+    args.datasets_tr = natsorted(args.datasets_tr)
+    dataset_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
+    print('Dataset:', dataset_name)
+    eset_name = 'eset_' + dataset_name
+    base.load('data/' + eset_name + '.Rda')
+    eset = robjects.globalenv[eset_name]
+    X = np.array(base.t(biobase.exprs(eset)))
+    y = np.array(r_eset_class_labels(eset), dtype=int)
+    split_num = 1
+    split_results = []
+    param_cv_scores = {}
+    sss = StratifiedShuffleSplit(n_splits=args.splits, test_size=args.test_size)
+    for tr_idxs, te_idxs in sss.split(X, y):
+        search.fit(X[tr_idxs], y[tr_idxs])
+        feature_idxs = np.arange(X[tr_idxs].shape[1])
+        for step in search.best_estimator_.named_steps:
+            if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
+                feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
+        feature_names = np.array(biobase.featureNames(eset), dtype=str)[feature_idxs]
+        weights = np.array([], dtype=float)
+        if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
+            weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
+        elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
+            weights = search.best_estimator_.named_steps['clf'].feature_importances_
+        elif (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
+            hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
+            weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
+        elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
+            weights = search.best_estimator_.named_steps['fs2'].scores_
+        elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
+            weights = search.best_estimator_.named_steps['fs2'].feature_importances_
+        roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search.best_index_]
+        bcr_cv = search.cv_results_['mean_test_bcr'][search.best_index_]
+        if hasattr(search, 'decision_function'):
+            y_score = search.decision_function(X[te_idxs])
+        else:
+            y_score = search.predict_proba(X[te_idxs])[:,1]
+        roc_auc_te = roc_auc_score(y[te_idxs], y_score)
+        fpr, tpr, thres = roc_curve(y[te_idxs], y_score, pos_label=1)
+        y_pred = search.predict(X[te_idxs])
+        bcr_te = bcr_score(y[te_idxs], y_pred)
+        print(
+            'Dataset:', dataset_tr_name,
+            ' Split: %2s' % split_num,
+            ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
+            ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
+            ' Features: %3s' % feature_idxs.size,
+            ' Params:', search.best_params_,
+        )
         if args.verbose > 1:
-            print('Pipeline:')
-            pprint(vars(pipe))
-            print('Param grid:')
-            pprint(param_grid)
-        split_num = 1
-        split_results = []
-        param_cv_scores = {}
-        sss = StratifiedShuffleSplit(n_splits=args.splits, test_size=args.test_size)
-        for tr_idxs, te_idxs in sss.split(X, y):
-            search.fit(X[tr_idxs], y[tr_idxs])
-            feature_idxs = np.arange(X[tr_idxs].shape[1])
-            for step in search.best_estimator_.named_steps:
-                if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
-                    feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
-            feature_names = np.array(base.colnames(df_X_tr), dtype=str)[feature_idxs]
-            weights = np.array([], dtype=float)
-            if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
-                weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
-            elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
-                weights = search.best_estimator_.named_steps['clf'].feature_importances_
-            elif (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
-                hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
-                weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
-            elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
-                weights = search.best_estimator_.named_steps['fs2'].scores_
-            elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
-                weights = search.best_estimator_.named_steps['fs2'].feature_importances_
-            roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search.best_index_]
-            bcr_cv = search.cv_results_['mean_test_bcr'][search.best_index_]
-            if hasattr(search, 'decision_function'):
-                y_score = search.decision_function(X[te_idxs])
+            if weights.size > 0:
+                feature_ranks = sorted(
+                    zip(weights, feature_idxs, feature_names, r_eset_feature_descs(eset, feature_idxs + 1)),
+                    reverse=True,
+                )
+                print('Feature Rankings:')
+                for weight, _, feature in feature_ranks: print(feature, '\t', weight)
             else:
-                y_score = search.predict_proba(X[te_idxs])[:,1]
-            roc_auc_te = roc_auc_score(y[te_idxs], y_score)
-            fpr, tpr, thres = roc_curve(y[te_idxs], y_score, pos_label=1)
-            y_pred = search.predict(X[te_idxs])
-            bcr_te = bcr_score(y[te_idxs], y_pred)
-            print(
-                'Dataset:', dataset_tr_name,
-                ' Split: %2s' % split_num,
-                ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
-                ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
-                ' Features: %3s' % feature_idxs.size,
-                ' Params:', search.best_params_,
-            )
-            if args.verbose > 1:
-                if weights.size > 0:
-                    feature_ranks = sorted(zip(weights, feature_idxs, feature_names), reverse=True)
-                    print('Feature Rankings:')
-                    for weight, _, feature in feature_ranks: print(feature, '\t', weight)
-                else:
-                    feature_ranks = sorted(zip(feature_idxs, feature_names), reverse=True)
-                    print('Features:')
-                    for _, feature in feature_ranks: print(feature)
-            for param_idx, param in enumerate(param_grid):
-                if '__' in param and len(param_grid[param]) > 1:
-                    new_shape = (
-                        len(param_grid[param]),
-                        np.prod([len(v) for k,v in param_grid.items() if k != param])
+                feature_ranks = sorted(
+                    zip(feature_idxs, feature_names, r_eset_feature_descs(eset, feature_idxs + 1)),
+                    reverse=True,
+                )
+                print('Features:')
+                for _, feature in feature_ranks: print(feature)
+        for param_idx, param in enumerate(param_grid):
+            if '__' in param and len(param_grid[param]) > 1:
+                new_shape = (
+                    len(param_grid[param]),
+                    np.prod([len(v) for k,v in param_grid.items() if k != param])
+                )
+                if param in (
+                    'fs2__estimator__max_depth', 'fs2__threshold', 'clf__weights',
+                    'clf__max_depth', 'clf__max_features',
+                ):
+                    xaxis_group_sorted_idxs = np.argsort(
+                        np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
                     )
-                    if param in (
-                        'fs2__estimator__max_depth', 'fs2__threshold', 'clf__weights',
-                        'clf__max_depth', 'clf__max_features',
-                    ):
-                        xaxis_group_sorted_idxs = np.argsort(
-                            np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
-                        )
+                else:
+                    xaxis_group_sorted_idxs = np.argsort(
+                        np.ma.getdata(search.cv_results_['param_' + param])
+                    )
+                if not param in param_cv_scores: param_cv_scores[param] = {}
+                for metric in scv_scoring.keys():
+                    mean_scores_cv = np.reshape(
+                        search.cv_results_['mean_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                    )
+                    std_scores_cv = np.reshape(
+                        search.cv_results_['std_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                    )
+                    mean_scores_cv_max_idxs = np.argmax(mean_scores_cv, axis=1)
+                    mean_scores_cv = mean_scores_cv[
+                        np.arange(len(mean_scores_cv)), mean_scores_cv_max_idxs
+                    ]
+                    std_scores_cv = std_scores_cv[
+                        np.arange(len(std_scores_cv)), mean_scores_cv_max_idxs
+                    ]
+                    if split_num == 1:
+                        param_cv_scores[param][metric] = mean_scores_cv
                     else:
-                        xaxis_group_sorted_idxs = np.argsort(
-                            np.ma.getdata(search.cv_results_['param_' + param])
+                        param_cv_scores[param][metric] = np.vstack(
+                            (param_cv_scores[param][metric], mean_scores_cv)
                         )
-                    if not param in param_cv_scores: param_cv_scores[param] = {}
-                    for metric in scv_scoring.keys():
-                        mean_scores_cv = np.reshape(
-                            search.cv_results_['mean_test_' + metric][xaxis_group_sorted_idxs], new_shape
-                        )
-                        std_scores_cv = np.reshape(
-                            search.cv_results_['std_test_' + metric][xaxis_group_sorted_idxs], new_shape
-                        )
-                        mean_scores_cv_max_idxs = np.argmax(mean_scores_cv, axis=1)
-                        mean_scores_cv = mean_scores_cv[
-                            np.arange(len(mean_scores_cv)), mean_scores_cv_max_idxs
-                        ]
-                        std_scores_cv = std_scores_cv[
-                            np.arange(len(std_scores_cv)), mean_scores_cv_max_idxs
-                        ]
-                        if split_num == 1:
-                            param_cv_scores[param][metric] = mean_scores_cv
-                        else:
-                            param_cv_scores[param][metric] = np.vstack(
-                                (param_cv_scores[param][metric], mean_scores_cv)
-                            )
-            split_results.append({
-                'search': search,
-                'feature_idxs': feature_idxs,
-                'feature_names': feature_names,
-                'fprs': fpr,
-                'tprs': tpr,
-                'thres': thres,
-                'weights': weights,
-                'y_score': y_score,
-                'roc_auc_cv': roc_auc_cv,
-                'roc_auc_te': roc_auc_te,
-                'bcr_cv': bcr_cv,
-                'bcr_te': bcr_te,
-            })
-            split_num += 1
-            # flush cache with each combo run (grows too big if not)
-            if args.pipe_memory: memory.clear(warn=False)
-        # plot grid search parameters vs cv perf metrics
-        sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
-        for param_idx, param in enumerate(param_cv_scores):
-            mean_roc_aucs_cv = np.mean(param_cv_scores[param]['roc_auc'], axis=0)
-            mean_bcrs_cv = np.mean(param_cv_scores[param]['bcr'], axis=0)
-            std_roc_aucs_cv = np.std(param_cv_scores[param]['roc_auc'], axis=0)
-            std_bcrs_cv = np.std(param_cv_scores[param]['bcr'], axis=0)
-            plt.figure('Figure 1-' + str(param_idx + 1))
+        split_results.append({
+            'search': search,
+            'feature_idxs': feature_idxs,
+            'feature_names': feature_names,
+            'fprs': fpr,
+            'tprs': tpr,
+            'thres': thres,
+            'weights': weights,
+            'y_score': y_score,
+            'roc_auc_cv': roc_auc_cv,
+            'roc_auc_te': roc_auc_te,
+            'bcr_cv': bcr_cv,
+            'bcr_te': bcr_te,
+        })
+        split_num += 1
+        # flush cache with each combo run (grows too big if not)
+        if args.pipe_memory: memory.clear(warn=False)
+    # plot grid search parameters vs cv perf metrics
+    sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
+    for param_idx, param in enumerate(param_cv_scores):
+        mean_roc_aucs_cv = np.mean(param_cv_scores[param]['roc_auc'], axis=0)
+        mean_bcrs_cv = np.mean(param_cv_scores[param]['bcr'], axis=0)
+        std_roc_aucs_cv = np.std(param_cv_scores[param]['roc_auc'], axis=0)
+        std_bcrs_cv = np.std(param_cv_scores[param]['bcr'], axis=0)
+        plt.figure('Figure ' + str(args.analysis) + '-' + str(param_idx + 1))
+        plt.rcParams['font.size'] = 14
+        if param in (
+            'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__estimator__max_depth',
+            'fs2__n_neighbors', 'fs2__sample_size', 'fs2__n_features_to_select', 'clf__n_neighbors',
+            'clf__n_estimators', 'clf__max_depth',
+        ):
+            x_axis = param_grid[param]
+            plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+            plt.xticks(x_axis)
+        elif param in (
+            'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'clf__C',
+            'clf__weights', 'clf__base_estimator__C', 'clf__max_features',
+        ):
+            x_axis = range(len(param_grid[param]))
+            plt.xticks(x_axis, param_grid[param])
+        plt.title(
+            dataset_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+            'Effect of ' + param + ' on CV Performance Metrics'
+        )
+        plt.xlabel(param)
+        plt.ylabel('CV Score')
+        plt.plot(
+            x_axis,
+            mean_roc_aucs_cv,
+            lw=2, alpha=0.8, label='Mean ROC AUC'
+        )
+        plt.fill_between(
+            x_axis,
+            [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+            [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
+            color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+        )
+        plt.plot(
+            x_axis,
+            mean_bcrs_cv,
+            lw=2, alpha=0.8, label='Mean BCR'
+        )
+        plt.fill_between(
+            x_axis,
+            [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+            [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
+            color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
+        )
+        plt.legend(loc='lower right', fontsize='small')
+        plt.grid('on')
+    roc_aucs_cv, roc_aucs_te, bcrs_cv, bcrs_te, num_features = [], [], [], [], []
+    for split_result in split_results:
+        roc_aucs_cv.append(split_result['roc_auc_cv'])
+        roc_aucs_te.append(split_result['roc_auc_te'])
+        bcrs_cv.append(split_result['bcr_cv'])
+        bcrs_te.append(split_result['bcr_te'])
+        num_features.append(split_result['feature_idxs'].size)
+    print(
+        'Dataset:', dataset_tr_name,
+        ' Mean ROC AUC (CV / Test): %.4f / %.4f' % (np.mean(roc_aucs_cv), np.mean(roc_aucs_te)),
+        ' Mean BCR (CV / Test): %.4f / %.4f' % (np.mean(bcrs_cv), np.mean(bcrs_te)),
+        ' Mean Features: %3d' % np.mean(num_features),
+    )
+    # calculate overall best ranked features
+    feature_idxs = []
+    for split_result in split_results: feature_idxs.extend(split_result['feature_idxs'])
+    feature_idxs = sorted(list(set(feature_idxs)))
+    feature_names = np.array(base.colnames(df_X_tr), dtype=str)[feature_idxs]
+    # print(*natsorted(feature_names), sep='\n')
+    feature_mx_idx = {}
+    for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
+    weight_mx = np.zeros((len(feature_idxs), len(split_results)), dtype=float)
+    roc_auc_mx = np.zeros((len(feature_idxs), len(split_results)), dtype=float)
+    bcr_mx = np.zeros((len(feature_idxs), len(split_results)), dtype=float)
+    for split_idx, split_result in enumerate(split_results):
+        for idx, feature_idx in enumerate(split_result['feature_idxs']):
+            weight_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['weights'][idx]
+            roc_auc_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['roc_auc_cv']
+            bcr_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['bcr_cv']
+    feature_mean_weights, feature_mean_roc_aucs, feature_mean_bcrs = [], [], []
+    for idx in range(len(feature_idxs)):
+        feature_mean_weights.append(np.mean(weight_mx[idx]))
+        feature_mean_roc_aucs.append(np.mean(roc_auc_mx[idx]))
+        feature_mean_bcrs.append(np.mean(bcr_mx[idx]))
+        # print(feature_names[idx], '\t', feature_mean_weights[idx], '\t', weight_mx[idx])
+        # print(feature_names[idx], '\t', feature_mean_roc_aucs[idx], '\t', roc_auc_mx[idx])
+    if args.fs_rank_meth == 'mean_weights':
+        feature_ranks = feature_mean_weights
+    elif args.fs_rank_meth == 'mean_roc_aucs':
+        feature_ranks = feature_mean_roc_aucs
+    elif args.fs_rank_meth == 'mean_bcrs':
+        feature_ranks = feature_mean_bcrs
+    print('Overall Feature Rankings:')
+    for rank, feature in sorted(zip(feature_ranks, feature_names), reverse=True):
+        print(feature, '\t', rank)
+elif args.analysis == 2:
+    norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
+    prep_steps = [norm_meth]
+    if args.feat_type and args.feat_type[0] != 'none':
+        feat_type = [x for x in feat_types if x in args.feat_type][0]
+        prep_steps.append(feat_type)
+    if args.filter_type and args.filter_type[0] != 'none':
+        filter_type = [x for x in filter_types if x in args.filter_type][0]
+        prep_steps.append(filter_type)
+    if args.merge_type and args.merge_type[0] != 'none':
+        merge_type = [x for x in merge_types if x in args.merge_type][0]
+        prep_steps.append(merge_type)
+    if args.bc_meth and args.bc_meth[0] != 'none':
+        bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
+        prep_steps.append(bc_meth)
+    args.fs_meth = args.fs_meth[0]
+    args.slr_meth = args.slr_meth[0]
+    args.clf_meth = args.clf_meth[0]
+    pipe = Pipeline(sorted(
+        pipelines['slr'][args.slr_meth]['steps'] +
+        pipelines['fs'][args.fs_meth]['steps'] +
+        pipelines['clf'][args.clf_meth]['steps'],
+        key=lambda s: pipeline_order.index(s[0])
+    ), memory=memory)
+    param_grid = {
+        **pipelines['slr'][args.slr_meth]['param_grid'][0],
+        **pipelines['fs'][args.fs_meth]['param_grid'][0],
+        **pipelines['clf'][args.clf_meth]['param_grid'][0],
+    }
+    if args.fs_meth == 'Limma-KBest':
+        if dataset_tr_basename in rna_seq_fpkm_dataset_names:
+            pipe.set_params(fs1__score_func=limma_fpkm_score_func)
+        else:
+            pipe.set_params(fs1__score_func=limma_score_func)
+    for param in param_grid:
+        if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
+            param_grid[param] = list(filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param]))
+    if args.scv_type == 'grid':
+        search = GridSearchCV(
+            pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+        )
+    elif args.scv_type == 'rand':
+        search = RandomizedSearchCV(
+            pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+        )
+    if args.verbose > 1:
+        print('Pipeline:')
+        pprint(vars(pipe))
+        print('Param grid:')
+        pprint(param_grid)
+    args.datasets_tr = natsorted(args.datasets_tr)
+    dataset_tr_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
+    print('Train:', dataset_tr_name)
+    eset_tr_name = 'eset_' + dataset_tr_name
+    base.load('data/' + eset_tr_name + '.Rda')
+    eset_tr = robjects.globalenv[eset_tr_name]
+    X_tr = np.array(base.t(biobase.exprs(eset_tr)))
+    y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
+    search.fit(X_tr, y_tr)
+    if args.save_model:
+        dump(search, '_'.join([
+            args.results_dir, '/search', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
+        ]) + '.pkl')
+    feature_idxs = np.arange(X_tr.shape[1])
+    for step in search.best_estimator_.named_steps:
+        if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
+            feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
+    feature_names = np.array(biobase.featureNames(eset_tr), dtype=str)[feature_idxs]
+    weights = np.array([], dtype=float)
+    if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
+        weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
+    elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
+        weights = search.best_estimator_.named_steps['clf'].feature_importances_
+    elif (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
+        hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
+        weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
+    elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
+        weights = search.best_estimator_.named_steps['fs2'].scores_
+    elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
+        weights = search.best_estimator_.named_steps['fs2'].feature_importances_
+    print('Train:', dataset_tr_name, ' ROC AUC (CV): %.4f  BCR (CV): %.4f' % (
+        search.cv_results_['mean_test_roc_auc'][search.best_index_],
+        search.cv_results_['mean_test_bcr'][search.best_index_]
+    ))
+    print('Best Params:', search.best_params_)
+    if weights.size > 0:
+        feature_ranks = sorted(
+            zip(weights, feature_idxs, feature_names, r_eset_feature_descs(eset_tr, feature_idxs + 1)),
+            reverse=True,
+        )
+        print('Feature Rankings:')
+        for weight, _, feature in feature_ranks: print(feature, '\t', weight)
+    else:
+        feature_ranks = sorted(
+            zip(feature_idxs, feature_names, r_eset_feature_descs(eset_tr, feature_idxs + 1)),
+            reverse=True,
+        )
+        print('Features:')
+        for _, feature in feature_ranks: print(feature)
+    # plot grid search parameters vs cv perf metrics
+    sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
+    for param_idx, param in enumerate(param_grid):
+        if '__' in param and len(param_grid[param]) > 1:
+            new_shape = (
+                len(param_grid[param]),
+                np.prod([len(v) for k,v in param_grid.items() if k != param])
+            )
+            if param in (
+                'fs2__estimator__max_depth', 'fs2__threshold', 'clf__weights',
+                'clf__max_depth', 'clf__max_features',
+            ):
+                xaxis_group_sorted_idxs = np.argsort(
+                    np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
+                )
+            else:
+                xaxis_group_sorted_idxs = np.argsort(
+                    np.ma.getdata(search.cv_results_['param_' + param])
+                )
+            plt.figure('Figure ' + str(args.analysis) + '-' + str(param_idx + 1))
             plt.rcParams['font.size'] = 14
             if param in (
                 'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__estimator__max_depth',
@@ -906,142 +1106,192 @@ if args.analysis == 1:
                 x_axis = range(len(param_grid[param]))
                 plt.xticks(x_axis, param_grid[param])
             plt.title(
-                dataset_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+                dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
                 'Effect of ' + param + ' on CV Performance Metrics'
             )
             plt.xlabel(param)
             plt.ylabel('CV Score')
-            plt.plot(
-                x_axis,
-                mean_roc_aucs_cv,
-                lw=2, alpha=0.8, label='Mean ROC AUC'
-            )
-            plt.fill_between(
-                x_axis,
-                [m - s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-                [m + s for m, s in zip(mean_roc_aucs_cv, std_roc_aucs_cv)],
-                color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
-            )
-            plt.plot(
-                x_axis,
-                mean_bcrs_cv,
-                lw=2, alpha=0.8, label='Mean BCR'
-            )
-            plt.fill_between(
-                x_axis,
-                [m - s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-                [m + s for m, s in zip(mean_bcrs_cv, std_bcrs_cv)],
-                color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
-            )
+            for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
+                mean_scores_cv = np.reshape(
+                    search.cv_results_['mean_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                )
+                std_scores_cv = np.reshape(
+                    search.cv_results_['std_test_' + metric][xaxis_group_sorted_idxs], new_shape
+                )
+                mean_scores_cv_max_idxs = np.argmax(mean_scores_cv, axis=1)
+                mean_scores_cv = mean_scores_cv[
+                    np.arange(len(mean_scores_cv)), mean_scores_cv_max_idxs
+                ]
+                std_scores_cv = std_scores_cv[
+                    np.arange(len(std_scores_cv)), mean_scores_cv_max_idxs
+                ]
+                if metric_idx == 0:
+                    label = r'$\pm$ 1 std. dev.'
+                else:
+                    label = None
+                plt.plot(
+                    x_axis,
+                    mean_scores_cv,
+                    lw=2, alpha=0.8, label='Mean ' + metric.replace('_', ' ').upper()
+                )
+                plt.fill_between(
+                    x_axis,
+                    [m - s for m, s in zip(mean_scores_cv, std_scores_cv)],
+                    [m + s for m, s in zip(mean_scores_cv, std_scores_cv)],
+                    color='grey', alpha=0.2, label=label,
+                )
             plt.legend(loc='lower right', fontsize='small')
             plt.grid('on')
-        roc_aucs_cv, roc_aucs_te, bcrs_cv, bcrs_te, num_features = [], [], [], [], []
-        for split_result in split_results:
-            roc_aucs_cv.append(split_result['roc_auc_cv'])
-            roc_aucs_te.append(split_result['roc_auc_te'])
-            bcrs_cv.append(split_result['bcr_cv'])
-            bcrs_te.append(split_result['bcr_te'])
-            num_features.append(split_result['feature_idxs'].size)
-        print(
-            'Dataset:', dataset_tr_name,
-            ' Mean ROC AUC (CV / Test): %.4f / %.4f' % (np.mean(roc_aucs_cv), np.mean(roc_aucs_te)),
-            ' Mean BCR (CV / Test): %.4f / %.4f' % (np.mean(bcrs_cv), np.mean(bcrs_te)),
-            ' Mean Features: %3d' % np.mean(num_features),
+
+    # plot num top-ranked features selected vs test dataset perf metrics
+    if args.datasets_te:
+        dataset_te_basenames = natsorted(list(set(args.datasets_te) - set(args.datasets_tr)))
+    else:
+        dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.datasets_tr)))
+    sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames)))
+    plt.figure('Figure ' + str(args.analysis))
+    plt.rcParams['font.size'] = 14
+    plt.title(
+        dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+        'Effect of Number of Top-Ranked Features Selected on Test Performance Metrics'
+    )
+    plt.xlabel('Number of top-ranked features selected')
+    plt.ylabel('Test Score')
+    x_axis = range(1, feature_idxs.size + 1)
+    plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+    plt.xticks(x_axis)
+    if weights.size > 0:
+        ranked_feature_idxs = [x for _, x, _, _ in feature_ranks]
+    else:
+        ranked_feature_idxs = [x for x, _, _ in feature_ranks]
+    pipe = Pipeline(
+        pipelines['slr'][args.slr_meth]['steps'] +
+        pipelines['clf'][args.clf_meth]['steps']
+    )
+    pipe.set_params(
+        **{ k: v for k, v in search.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
+    )
+    for dataset_te_basename in dataset_te_basenames:
+        if prep_steps[-1] in ['filtered', 'merged'] or args.no_addon_te:
+            dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'merged'])
+        else:
+            dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
+        eset_te_name = 'eset_' + dataset_te_name
+        eset_te_file = 'data/' + eset_te_name + '.Rda'
+        if not path.isfile(eset_te_file): continue
+        base.load(eset_te_file)
+        eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
+        X_te = np.array(base.t(biobase.exprs(eset_te)))
+        y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
+        roc_aucs_te, bcrs_te = [], []
+        for num_features in range(1, len(ranked_feature_idxs) + 1):
+            top_feature_idxs = ranked_feature_idxs[:num_features]
+            top_feature_names = ranked_feature_idxs[:num_features]
+            pipe.fit(X_tr[:,top_feature_idxs], y_tr)
+            if hasattr(pipe, 'decision_function'):
+                y_score = pipe.decision_function(X_te[:,top_feature_idxs])
+            else:
+                y_score = pipe.predict_proba(X_te[:,top_feature_idxs])[:,1]
+            roc_auc_te = roc_auc_score(y_te, y_score)
+            fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
+            y_pred = pipe.predict(X_te[:,top_feature_idxs])
+            bcr_te = bcr_score(y_te, y_pred)
+            roc_aucs_te.append(roc_auc_te)
+            bcrs_te.append(bcr_te)
+        plt.plot(
+            x_axis, roc_aucs_te, lw=2, alpha=0.8,
+            # label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, BCR = %0.4f $\pm$ %0.2f)' % (
+            label=r'%s (ROC AUC = %0.4f, BCR = %0.4f)' % (
+                dataset_te_name,
+                np.max(roc_aucs_te), np.max(bcrs_te),
+                #np.mean(roc_aucs_te), np.std(roc_aucs_te),
+                #np.mean(bcrs_te), np.std(bcrs_te),
+            ),
         )
-        # calculate overall best ranked features
-        feature_idxs = []
-        for split_result in split_results: feature_idxs.extend(split_result['feature_idxs'])
-        feature_idxs = sorted(list(set(feature_idxs)))
-        feature_names = np.array(base.colnames(df_X_tr), dtype=str)[feature_idxs]
-        # print(*natsorted(feature_names), sep='\n')
-        feature_mx_idx = {}
-        for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
-        weight_mx = np.zeros((len(feature_idxs), len(split_results)), dtype=float)
-        roc_auc_mx = np.zeros((len(feature_idxs), len(split_results)), dtype=float)
-        bcr_mx = np.zeros((len(feature_idxs), len(split_results)), dtype=float)
-        for split_idx, split_result in enumerate(split_results):
-            for idx, feature_idx in enumerate(split_result['feature_idxs']):
-                weight_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['weights'][idx]
-                roc_auc_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['roc_auc_cv']
-                bcr_mx[feature_mx_idx[feature_idx]][split_idx] = split_result['bcr_cv']
-        feature_mean_weights, feature_mean_roc_aucs, feature_mean_bcrs = [], [], []
-        for idx in range(len(feature_idxs)):
-            feature_mean_weights.append(np.mean(weight_mx[idx]))
-            feature_mean_roc_aucs.append(np.mean(roc_auc_mx[idx]))
-            feature_mean_bcrs.append(np.mean(bcr_mx[idx]))
-            # print(feature_names[idx], '\t', feature_mean_weights[idx], '\t', weight_mx[idx])
-            # print(feature_names[idx], '\t', feature_mean_roc_aucs[idx], '\t', roc_auc_mx[idx])
-        if args.fs_rank_meth == 'mean_weights':
-            feature_ranks = feature_mean_weights
-        elif args.fs_rank_meth == 'mean_roc_aucs':
-            feature_ranks = feature_mean_roc_aucs
-        elif args.fs_rank_meth == 'mean_bcrs':
-            feature_ranks = feature_mean_bcrs
-        print('Overall Feature Rankings:')
-        for rank, feature in sorted(zip(feature_ranks, feature_names), reverse=True):
-            print(feature, '\t', rank)
-elif args.analysis == 2:
-    if args.norm_meth and args.norm_meth != 'none':
-        norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
+        # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
+        # print summary info
+        print(
+            'Test: %3s' % dataset_te_name,
+            ' ROC AUC: %.4f' % np.max(roc_aucs_te),
+            ' BCR: %.4f' % np.max(bcrs_te),
+        )
+    plt.legend(loc='lower right', fontsize='small')
+    plt.grid('on')
+elif args.analysis == 3:
+    prep_groups = []
+    if args.norm_meth:
+        norm_methods = [x for x in norm_methods if x in args.norm_meth]
+    if args.feat_type:
+        feat_types = [x for x in feat_types if x in args.feat_type]
+    if args.filter_type:
+        filter_types = [x for x in filter_types if x in args.filter_type]
+    if args.merge_type:
+        merge_types = [x for x in merge_types if x in args.merge_type]
+    if args.bc_meth:
+        bc_methods = [x for x in bc_methods if x in args.bc_meth]
+    for norm_meth in norm_methods:
+        for feat_type in feat_types:
+            for filter_type in filter_types:
+                for merge_type in merge_types:
+                    for bc_meth in bc_methods:
+                        prep_groups.append([
+                            x for x in [norm_meth, feat_type, filter_type, merge_type, bc_meth] if x != 'none'
+                        ])
     if args.fs_meth:
         pipelines['fs'] = { k: v for k, v in pipelines['fs'].items() if k in args.fs_meth }
     if args.slr_meth:
         pipelines['slr'] = { k: v for k, v in pipelines['slr'].items() if k in args.slr_meth }
     if args.clf_meth:
         pipelines['clf'] = { k: v for k, v in pipelines['clf'].items() if k in args.clf_meth }
-    if args.datasets_tr and args.num_tr_combo:
-        dataset_tr_combos = [list(x) for x in combinations(
-            [x for x in dataset_names if x in args.datasets_tr], args.num_tr_combo
-        )]
-    elif args.datasets_tr:
-        dataset_tr_combos = [x for x in dataset_names if x in args.datasets_tr]
-    else:
-        dataset_tr_combos = [list(x) for x in combinations(dataset_names, args.num_tr_combo)]
-    if args.datasets_te:
-        dataset_te_names = [x for x in dataset_names if x in args.datasets_te]
-    else:
-        dataset_te_names = dataset_names
-    args.fs_meth = args.fs_meth[0]
-    args.slr_meth = args.slr_meth[0]
-    args.clf_meth = args.clf_meth[0]
-    for dataset_tr_combo in dataset_tr_combos:
-        dataset_tr_nums = np.array(
-            [i for i,d in enumerate(dataset_names) if d in dataset_tr_combo]
-        ) + 1
-        dataset_tr_basename = '_'.join(dataset_tr_combo)
-        if args.norm_meth and args.norm_meth != 'none':
-            dataset_tr_name = '_'.join([dataset_tr_basename, norm_meth, 'tr'])
-            df_X_tr_name = '_'.join(['df', 'X', dataset_tr_name])
-            if len(dataset_tr_combo) > 1:
-                df_p_tr_name = '_'.join(['df', 'p', dataset_tr_basename, 'tr'])
-            else:
-                df_p_tr_name = '_'.join(['df', 'p', dataset_tr_basename])
-        elif len(dataset_tr_combo) > 1:
-            dataset_tr_name = '_'.join([dataset_tr_basename, 'tr'])
-            df_X_tr_name = '_'.join(['df', 'X', dataset_tr_name])
-            df_p_tr_name = '_'.join(['df', 'p', dataset_tr_name])
-        else:
-            dataset_tr_name = dataset_tr_basename
-            df_X_tr_name = '_'.join(['df', 'X', dataset_tr_name])
-            df_p_tr_name = '_'.join(['df', 'p', dataset_tr_name])
-        if (np.array(base.exists(df_X_tr_name), dtype=bool)[0] == False):
-            base.load('data/' + df_X_tr_name + '.Rda')
-        if (np.array(base.exists(df_p_tr_name), dtype=bool)[0] == False):
-            base.load('data/' + df_p_tr_name + '.Rda')
-        df_X_tr = robjects.globalenv[df_X_tr_name]
-        df_p_tr = robjects.globalenv[df_p_tr_name]
-        X_tr = np.array(base.as_matrix(df_X_tr))
-        y_tr = np.array(r_dataset_y(df_p_tr), dtype=int)
-        # nstd_feature_idxs = np.array(r_dataset_nstd_idxs(X_tr, samples=False), dtype=int)
-        # nstd_sample_idxs = np.array(r_dataset_nstd_idxs(X_tr, samples=True), dtype=int)
-        # X_tr = X_tr[np.ix_(nstd_sample_idxs, nstd_feature_idxs)]
-        # y_tr = y_tr[nstd_sample_idxs]
-        # if args.corr_cutoff:
-        #     corr_feature_idxs = np.array(r_dataset_corr_idxs(X_tr, cutoff=args.corr_cutoff, samples=False), dtype=int)
-        #     corr_sample_idxs = np.array(r_dataset_corr_idxs(X_tr, cutoff=args.corr_cutoff, samples=True), dtype=int)
-        #     X_tr = X_tr[np.ix_(corr_sample_idxs, corr_feature_idxs)]
-        #     y_tr = y_tr[corr_sample_idxs]
-        print('Train:', dataset_tr_name, X_tr.shape, y_tr.shape)
+    if args.scv_type == 'grid':
+        param_grid_idx = 0
+        param_grid, param_grid_data = [], []
+        for fs_idx, fs_meth in enumerate(pipelines['fs']):
+            fs_meth_pipeline = deepcopy(pipelines['fs'][fs_meth])
+            if fs_meth == 'Limma-KBest':
+                for (step, object) in fs_meth_pipeline['steps']:
+                    if object.__class__.__name__ == 'SelectKBest':
+                        if dataset_tr_basename in rna_seq_fpkm_dataset_names:
+                            object.set_params(score_func=limma_fpkm_score_func)
+                        else:
+                            object.set_params(score_func=limma_score_func)
+            for fs_params in fs_meth_pipeline['param_grid']:
+                for param in fs_params:
+                    if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
+                        fs_params[param] = list(
+                            filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), fs_params[param])
+                        )
+                for slr_idx, slr_meth in enumerate(pipelines['slr']):
+                    for slr_params in pipelines['slr'][slr_meth]['param_grid']:
+                        for clf_idx, clf_meth in enumerate(pipelines['clf']):
+                            for clf_params in pipelines['clf'][clf_meth]['param_grid']:
+                                params = { **fs_params, **slr_params, **clf_params }
+                                for (step, object) in \
+                                    fs_meth_pipeline['steps'] + \
+                                    pipelines['slr'][slr_meth]['steps'] + \
+                                    pipelines['clf'][clf_meth]['steps'] \
+                                : params[step] = [ object ]
+                                param_grid.append(params)
+                                params_data = {
+                                    'meth_idxs': {
+                                        'fs': fs_idx, 'slr': slr_idx, 'clf': clf_idx,
+                                    },
+                                    'grid_idxs': [],
+                                }
+                                for param_combo in ParameterGrid(params):
+                                    params_data['grid_idxs'].append(param_grid_idx)
+                                    param_grid_idx += 1
+                                param_grid_data.append(params_data)
+        search = GridSearchCV(
+            Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
+            param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+        )
+    elif args.scv_type == 'rand':
+        args.fs_meth = args.fs_meth[0]
+        args.slr_meth = args.slr_meth[0]
+        args.clf_meth = args.clf_meth[0]
         pipe = Pipeline(sorted(
             pipelines['slr'][args.slr_meth]['steps'] +
             pipelines['fs'][args.fs_meth]['steps'] +
@@ -1061,371 +1311,577 @@ elif args.analysis == 2:
         for param in param_grid:
             if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
                 param_grid[param] = list(filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param]))
-        if args.scv_type == 'grid':
-            search = GridSearchCV(
-                pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-                error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-            )
-        elif args.scv_type == 'rand':
-            search = RandomizedSearchCV(
-                pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-                error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-            )
+        search = RandomizedSearchCV(
+            pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
+            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+        )
         if args.verbose > 1:
             print('Pipeline:')
             pprint(vars(pipe))
-            print('Param grid:')
-            pprint(param_grid)
-        search.fit(X_tr, y_tr)
-        feature_idxs = np.arange(X_tr.shape[1])
-        for step in search.best_estimator_.named_steps:
-            if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
-                feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
-        feature_names = np.array(base.colnames(df_X_tr), dtype=str)[feature_idxs]
-        weights = np.array([], dtype=float)
-        if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
-            weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
-        elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
-            weights = search.best_estimator_.named_steps['clf'].feature_importances_
-        elif (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
-            hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
-            weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
-        elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
-            weights = search.best_estimator_.named_steps['fs2'].scores_
-        elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
-            weights = search.best_estimator_.named_steps['fs2'].feature_importances_
-        print('Train:', dataset_tr_name, ' ROC AUC (CV): %.4f  BCR (CV): %.4f' % (
-            search.cv_results_['mean_test_roc_auc'][search.best_index_],
-            search.cv_results_['mean_test_bcr'][search.best_index_]
-        ))
-        print('Best Params:', search.best_params_)
-        if weights.size > 0:
-            feature_ranks = sorted(zip(weights, feature_idxs, feature_names), reverse=True)
-            print('Feature Rankings:')
-            for weight, _, feature in feature_ranks: print(feature, '\t', weight)
-        else:
-            feature_ranks = sorted(zip(feature_idxs, feature_names), reverse=True)
-            print('Features:')
-            for _, feature in feature_ranks: print(feature)
-        sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
-        for param_idx, param in enumerate(param_grid):
-            if '__' in param and len(param_grid[param]) > 1:
-                new_shape = (
-                    len(param_grid[param]),
-                    np.prod([len(v) for k,v in param_grid.items() if k != param])
-                )
-                if param in (
-                    'fs2__estimator__max_depth', 'fs2__threshold', 'clf__weights',
-                    'clf__max_depth', 'clf__max_features',
-                ):
-                    xaxis_group_sorted_idxs = np.argsort(
-                        np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
-                    )
-                else:
-                    xaxis_group_sorted_idxs = np.argsort(
-                        np.ma.getdata(search.cv_results_['param_' + param])
-                    )
-                plt.figure('Figure 2-' + str(param_idx + 1))
-                plt.rcParams['font.size'] = 14
-                if param in (
-                    'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__estimator__max_depth',
-                    'fs2__n_neighbors', 'fs2__sample_size', 'fs2__n_features_to_select', 'clf__n_neighbors',
-                    'clf__n_estimators', 'clf__max_depth',
-                ):
-                    x_axis = param_grid[param]
-                    plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
-                    plt.xticks(x_axis)
-                elif param in (
-                    'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'clf__C',
-                    'clf__weights', 'clf__base_estimator__C', 'clf__max_features',
-                ):
-                    x_axis = range(len(param_grid[param]))
-                    plt.xticks(x_axis, param_grid[param])
-                plt.title(
-                    dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
-                    'Effect of ' + param + ' on CV Performance Metrics'
-                )
-                plt.xlabel(param)
-                plt.ylabel('CV Score')
-                for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
-                    mean_scores_cv = np.reshape(
-                        search.cv_results_['mean_test_' + metric][xaxis_group_sorted_idxs], new_shape
-                    )
-                    std_scores_cv = np.reshape(
-                        search.cv_results_['std_test_' + metric][xaxis_group_sorted_idxs], new_shape
-                    )
-                    mean_scores_cv_max_idxs = np.argmax(mean_scores_cv, axis=1)
-                    mean_scores_cv = mean_scores_cv[
-                        np.arange(len(mean_scores_cv)), mean_scores_cv_max_idxs
-                    ]
-                    std_scores_cv = std_scores_cv[
-                        np.arange(len(std_scores_cv)), mean_scores_cv_max_idxs
-                    ]
-                    if metric_idx == 0:
-                        label = r'$\pm$ 1 std. dev.'
-                    else:
-                        label = None
-                    plt.plot(
-                        x_axis,
-                        mean_scores_cv,
-                        lw=2, alpha=0.8, label='Mean ' + metric.replace('_', ' ').upper()
-                    )
-                    plt.fill_between(
-                        x_axis,
-                        [m - s for m, s in zip(mean_scores_cv, std_scores_cv)],
-                        [m + s for m, s in zip(mean_scores_cv, std_scores_cv)],
-                        color='grey', alpha=0.2, label=label,
-                    )
-                plt.legend(loc='lower right', fontsize='small')
-                plt.grid('on')
-        for dataset_te_basename in natsorted(list(set(dataset_te_names) - set(dataset_tr_combo))):
-            dataset_te_num = np.array(
-                [i for i,d in enumerate(dataset_names) if d == dataset_te_basename]
-            ) + 1
-            if args.norm_meth and args.norm_meth != 'none':
-                dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
-            else:
-                dataset_te_name = dataset_te_basename
-            df_X_te_name = '_'.join(['df', 'X', dataset_te_name])
-            df_p_te_name = '_'.join(['df', 'p', dataset_te_basename])
-            df_X_te_file = 'data/' + df_X_te_name + '.Rda'
-            df_p_te_file = 'data/' + df_p_te_name + '.Rda'
-            if not path.isfile(df_X_te_file): continue
-            if (np.array(base.exists(df_X_te_name), dtype=bool)[0] == False):
-                base.load(df_X_te_file)
-            if (np.array(base.exists(df_p_te_name), dtype=bool)[0] == False):
-                base.load(df_p_te_file)
-            df_X_te = robjects.globalenv[df_X_te_name]
-            df_p_te = robjects.globalenv[df_p_te_name]
-            X_te = np.array(base.as_matrix(df_X_te))
-            y_te = np.array(r_dataset_y(df_p_te), dtype=int)
-            # X_te = X_te[:, nstd_feature_idxs]
-            # if args.corr_cutoff:
-            #     X_te = X_te[:, corr_feature_idxs]
-            if hasattr(search, 'decision_function'):
-                y_score = search.decision_function(X_te)
-                roc_auc_te = roc_auc_score(y_te, y_score)
-                # fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-            else:
-                probas = search.predict_proba(X_te)
-                roc_auc_te = roc_auc_score(y_te, probas[:,1])
-                # fpr, tpr, thres = roc_curve(y_te, probas[:,1], pos_label=1)
-            y_pred = search.predict(X_te)
-            bcr_te = bcr_score(y_te, y_pred)
-            print('Test:', dataset_te_name, ' ROC AUC: %.6f  BCR: %.6f' % (roc_auc_te, bcr_te))
-        if args.save_model:
-            dump(search, 'results/search_' + dataset_tr_name.lower() + '.pkl')
-        # flush cache with each combo run (grows too big if not)
-        if args.pipe_memory: memory.clear(warn=False)
-elif args.analysis == 3:
-    if args.norm_meth and args.norm_meth != 'none':
-        norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
-    if args.fs_meth:
-        pipelines['fs'] = { k: v for k, v in pipelines['fs'].items() if k in args.fs_meth }
-    if args.slr_meth:
-        pipelines['slr'] = { k: v for k, v in pipelines['slr'].items() if k in args.slr_meth }
-    if args.clf_meth:
-        pipelines['clf'] = { k: v for k, v in pipelines['clf'].items() if k in args.clf_meth }
-    if args.datasets_tr and args.num_tr_combo:
-        dataset_tr_combos = [list(x) for x in combinations(
-            [x for x in dataset_names if x in args.datasets_tr], args.num_tr_combo
-        )]
-    elif args.datasets_tr:
-        dataset_tr_combos = [x for x in dataset_names if x in args.datasets_tr]
-    else:
-        dataset_tr_combos = [list(x) for x in combinations(dataset_names, args.num_tr_combo)]
-    if args.datasets_te:
-        dataset_te_names = [x for x in dataset_names if x in args.datasets_te]
-    else:
-        dataset_te_names = dataset_names
-    for dataset_tr_combo in dataset_tr_combos:
-        dataset_tr_nums = np.array(
-            [i for i,d in enumerate(dataset_names) if d in dataset_tr_combo]
-        ) + 1
-        dataset_tr_basename = '_'.join(dataset_tr_combo)
-        if args.norm_meth and args.norm_meth != 'none':
-            dataset_tr_name = '_'.join([dataset_tr_basename, norm_meth, 'tr'])
-            df_X_tr_name = '_'.join(['df', 'X', dataset_tr_name])
-            if len(dataset_tr_combo) > 1:
-                df_p_tr_name = '_'.join(['df', 'p', dataset_tr_basename, 'tr'])
-            else:
-                df_p_tr_name = '_'.join(['df', 'p', dataset_tr_basename])
-        elif len(dataset_tr_combo) > 1:
-            dataset_tr_name = '_'.join([dataset_tr_basename, 'tr'])
-            df_X_tr_name = '_'.join(['df', 'X', dataset_tr_name])
-            df_p_tr_name = '_'.join(['df', 'p', dataset_tr_name])
-        else:
-            dataset_tr_name = dataset_tr_basename
-            df_X_tr_name = '_'.join(['df', 'X', dataset_tr_name])
-            df_p_tr_name = '_'.join(['df', 'p', dataset_tr_name])
-        if (np.array(base.exists(df_X_tr_name), dtype=bool)[0] == False):
-            base.load('data/' + df_X_tr_name + '.Rda')
-        if (np.array(base.exists(df_p_tr_name), dtype=bool)[0] == False):
-            base.load('data/' + df_p_tr_name + '.Rda')
-        df_X_tr = robjects.globalenv[df_X_tr_name]
-        df_p_tr = robjects.globalenv[df_p_tr_name]
-        X_tr = np.array(base.as_matrix(df_X_tr))
-        y_tr = np.array(r_dataset_y(df_p_tr), dtype=int)
-        # nstd_feature_idxs = np.array(r_dataset_nstd_idxs(X_tr, samples=False), dtype=int)
-        # nstd_sample_idxs = np.array(r_dataset_nstd_idxs(X_tr, samples=True), dtype=int)
-        # X_tr = X_tr[np.ix_(nstd_sample_idxs, nstd_feature_idxs)]
-        # y_tr = y_tr[nstd_sample_idxs]
-        # if args.corr_cutoff:
-        #     corr_feature_idxs = np.array(r_dataset_corr_idxs(X_tr, cutoff=args.corr_cutoff, samples=False), dtype=int)
-        #     corr_sample_idxs = np.array(r_dataset_corr_idxs(X_tr, cutoff=args.corr_cutoff, samples=True), dtype=int)
-        #     X_tr = X_tr[np.ix_(corr_sample_idxs, corr_feature_idxs)]
-        #     y_tr = y_tr[corr_sample_idxs]
-        print('Train:', dataset_tr_name, X_tr.shape, y_tr.shape)
+    if args.verbose > 1:
+        print('Param grid:')
+        pprint(param_grid)
         if args.scv_type == 'grid':
-            param_grid_idx = 0
-            param_grid, param_grid_data = [], []
-            for fs_idx, fs_meth in enumerate(pipelines['fs']):
-                fs_meth_pipeline = deepcopy(pipelines['fs'][fs_meth])
-                if fs_meth == 'Limma-KBest':
-                    for (step, object) in fs_meth_pipeline['steps']:
-                        if object.__class__.__name__ == 'SelectKBest':
-                            if dataset_tr_basename in rna_seq_fpkm_dataset_names:
-                                object.set_params(score_func=limma_fpkm_score_func)
-                            else:
-                                object.set_params(score_func=limma_score_func)
-                for fs_params in fs_meth_pipeline['param_grid']:
-                    for param in fs_params:
-                        if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
-                            fs_params[param] = list(
-                                filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), fs_params[param])
-                            )
-                    for slr_idx, slr_meth in enumerate(pipelines['slr']):
-                        for slr_params in pipelines['slr'][slr_meth]['param_grid']:
-                            for clf_idx, clf_meth in enumerate(pipelines['clf']):
-                                for clf_params in pipelines['clf'][clf_meth]['param_grid']:
-                                    params = { **fs_params, **slr_params, **clf_params }
-                                    for (step, object) in \
-                                        fs_meth_pipeline['steps'] + \
-                                        pipelines['slr'][slr_meth]['steps'] + \
-                                        pipelines['clf'][clf_meth]['steps'] \
-                                    : params[step] = [ object ]
-                                    param_grid.append(params)
-                                    params_data = {
-                                        'meth_idxs': {
-                                            'fs': fs_idx, 'slr': slr_idx, 'clf': clf_idx,
-                                        },
-                                        'grid_idxs': [],
-                                    }
-                                    for param_combo in ParameterGrid(params):
-                                        params_data['grid_idxs'].append(param_grid_idx)
-                                        param_grid_idx += 1
-                                    param_grid_data.append(params_data)
-            search = GridSearchCV(
-                Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-                param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-                error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-            )
-        elif args.scv_type == 'rand':
-            args.fs_meth = args.fs_meth[0]
-            args.slr_meth = args.slr_meth[0]
-            args.clf_meth = args.clf_meth[0]
-            pipe = Pipeline(sorted(
-                pipelines['slr'][args.slr_meth]['steps'] +
-                pipelines['fs'][args.fs_meth]['steps'] +
-                pipelines['clf'][args.clf_meth]['steps'],
-                key=lambda s: pipeline_order.index(s[0])
-            ), memory=memory)
-            param_grid = {
-                **pipelines['slr'][args.slr_meth]['param_grid'][0],
-                **pipelines['fs'][args.fs_meth]['param_grid'][0],
-                **pipelines['clf'][args.clf_meth]['param_grid'][0],
-            }
-            if args.fs_meth == 'Limma-KBest':
-                if dataset_tr_basename in rna_seq_fpkm_dataset_names:
-                    pipe.set_params(fs1__score_func=limma_fpkm_score_func)
+            print("Param grid data:")
+            pprint(param_grid_data)
+    if args.datasets_tr and args.num_tr_combo:
+        dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_tr_combo)]
+    elif args.datasets_tr:
+        dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), len(args.datasets_tr))]
+    else:
+        dataset_tr_combos = [list(x) for x in combinations(natsorted(dataset_names), args.num_tr_combo)]
+    if args.datasets_te:
+        dataset_te_basenames = [x for x in natsorted(dataset_names) if x in args.datasets_te]
+    else:
+        dataset_te_basenames = dataset_names
+    # determine which data combinations will be used
+    num_dataset_pairs = 0
+    dataset_tr_combos_subset, dataset_te_basenames_subset, prep_groups_subset = [], [], []
+    for dataset_tr_combo in dataset_tr_combos:
+        dataset_tr_basename = '_'.join(dataset_tr_combo)
+        for dataset_te_basename in dataset_te_basenames:
+            if dataset_te_basename in dataset_tr_combo: continue
+            for prep_steps in prep_groups:
+                prep_method = '_'.join(prep_steps)
+                dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
+                if prep_steps[-1] in ['filtered', 'merged'] or args.no_addon_te:
+                    dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'merged'])
                 else:
-                    pipe.set_params(fs1__score_func=limma_score_func)
-            for param in param_grid:
-                if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
-                    param_grid[param] = list(filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param]))
-            search = RandomizedSearchCV(
-                pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
-                cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-                error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-            )
-            if args.verbose > 1:
-                print('Pipeline:')
-                pprint(vars(pipe))
-        if args.verbose > 1:
-            print('Param grid:')
-            pprint(param_grid)
-        search.fit(X_tr, y_tr)
-        print('Train:', dataset_tr_name, ' ROC AUC (CV): %.4f  BCR (CV): %.4f' % (
-            search.cv_results_['mean_test_roc_auc'][search.best_index_],
-            search.cv_results_['mean_test_bcr'][search.best_index_]
-        ))
-        print('Best Params:', search.best_params_)
-        feature_idxs = np.arange(X_tr.shape[1])
-        for step in search.best_estimator_.named_steps:
-            if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
-                feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
-        feature_names = np.array(base.colnames(df_X_tr), dtype=str)[feature_idxs]
-        weights = np.array([], dtype=float)
-        if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
-            weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
-        elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
-            weights = search.best_estimator_.named_steps['clf'].feature_importances_
-        elif (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
-            hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
-            weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
-        elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
-            weights = search.best_estimator_.named_steps['fs2'].scores_
-        elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
-            weights = search.best_estimator_.named_steps['fs2'].feature_importances_
-        if weights.size > 0:
-            feature_ranks = sorted(zip(weights, feature_idxs, feature_names), reverse=True)
-            print('Feature Rankings:')
-            for weight, _, feature in feature_ranks: print(feature, '\t', weight)
+                    dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
+                eset_tr_name = 'eset_' + dataset_tr_name
+                eset_te_name = 'eset_' + dataset_te_name
+                eset_tr_file = 'data/' + eset_tr_name + '.Rda'
+                eset_te_file = 'data/' + eset_te_name + '.Rda'
+                if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
+                if args.load_only: print(dataset_tr_name, '->', dataset_te_name)
+                dataset_tr_combos_subset.append(dataset_tr_combo)
+                dataset_te_basenames_subset.append(dataset_te_basename)
+                prep_groups_subset.append(prep_steps)
+                num_dataset_pairs += 1
+    dataset_tr_combos = [x for x in dataset_tr_combos if x in dataset_tr_combos_subset]
+    dataset_te_basenames = [x for x in dataset_te_basenames if x in dataset_te_basenames_subset]
+    prep_groups = [x for x in prep_groups if x in prep_groups_subset]
+    print("Num dataset pairs:", num_dataset_pairs)
+    if args.load_only: quit()
+    score_dtypes = [
+        ('roc_auc_cv', float), ('bcr_cv', float),
+        ('roc_auc_te', float), ('bcr_te', float),
+        ('num_features', int),
+    ]
+    results = {
+        'te_pr': np.zeros((len(dataset_te_basenames), len(prep_groups)), dtype=[
+            ('tr_fs', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_tr_combos), len(pipelines['fs'])))
+        ]),
+        'tr_pr': np.zeros((len(dataset_tr_combos), len(prep_groups)), dtype=[
+            ('te_fs', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(pipelines['fs'])))
+        ]),
+        'te_fs': np.zeros((len(dataset_te_basenames), len(pipelines['fs'])), dtype=[
+            ('tr_pr', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_tr_combos), len(prep_groups)))
+        ]),
+        'tr_fs': np.zeros((len(dataset_tr_combos), len(pipelines['fs'])), dtype=[
+            ('te_pr', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(prep_groups)))
+        ]),
+        'te_clf': np.zeros((len(dataset_te_basenames), len(pipelines['clf'])), dtype=[
+            ('tr_pr', [
+                ('fs_slr', score_dtypes, (len(pipelines['fs']), len(pipelines['slr'])))
+            ], (len(dataset_tr_combos), len(prep_groups)))
+        ]),
+        'tr_clf': np.zeros((len(dataset_tr_combos), len(pipelines['clf'])), dtype=[
+            ('te_pr', [
+                ('fs_slr', score_dtypes, (len(pipelines['fs']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(prep_groups)))
+        ]),
+        'pr_fs': np.zeros((len(prep_groups), len(pipelines['fs'])), dtype=[
+            ('te_tr', [
+                ('clf_slr', score_dtypes, (len(pipelines['clf']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(dataset_tr_combos)))
+        ]),
+        'pr_clf': np.zeros((len(prep_groups), len(pipelines['clf'])), dtype=[
+            ('te_tr', [
+                ('fs_slr', score_dtypes, (len(pipelines['fs']), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(dataset_tr_combos)))
+        ]),
+        'fs_clf': np.zeros((len(pipelines['fs']), len(pipelines['clf'])), dtype=[
+            ('te_tr', [
+                ('pr_slr', score_dtypes, (len(prep_groups), len(pipelines['slr'])))
+            ], (len(dataset_te_basenames), len(dataset_tr_combos)))
+        ]),
+    }
+    dataset_pair_counter = 1
+    for tr_idx, dataset_tr_combo in enumerate(dataset_tr_combos):
+        dataset_tr_basename = '_'.join(dataset_tr_combo)
+        for te_idx, dataset_te_basename in enumerate(dataset_te_basenames):
+            if dataset_te_basename in dataset_tr_combo: continue
+            for pr_idx, prep_steps in enumerate(prep_groups):
+                prep_method = '_'.join(prep_steps)
+                dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
+                if prep_steps[-1] in ['filtered', 'merged'] or args.no_addon_te:
+                    dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'merged'])
+                else:
+                    dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
+                eset_tr_name = 'eset_' + dataset_tr_name
+                eset_te_name = 'eset_' + dataset_te_name
+                eset_tr_file = 'data/' + eset_tr_name + '.Rda'
+                eset_te_file = 'data/' + eset_te_name + '.Rda'
+                if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
+                print(str(dataset_pair_counter), ': ', dataset_tr_name, ' -> ', dataset_te_name, sep='')
+                base.load('data/' + eset_tr_name + '.Rda')
+                eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
+                X_tr = np.array(base.t(biobase.exprs(eset_tr)))
+                y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
+                base.load('data/' + eset_te_name + '.Rda')
+                eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
+                X_te = np.array(base.t(biobase.exprs(eset_te)))
+                y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
+                search.fit(X_tr, y_tr)
+                group_best_grid_idx, group_best_params = [], []
+                for group_idx, param_grid_group in enumerate(param_grid_data):
+                    for grid_idx in param_grid_group['grid_idxs']:
+                        if group_idx < len(group_best_grid_idx):
+                            if (search.cv_results_['rank_test_' + args.scv_refit][grid_idx] <
+                                search.cv_results_['rank_test_' + args.scv_refit][group_best_grid_idx[group_idx]]):
+                                group_best_grid_idx[group_idx] = grid_idx
+                        else:
+                            group_best_grid_idx.append(grid_idx)
+                    group_best_params.append({
+                        k: clone(v) if k in pipeline_order else v
+                        for k, v in search.cv_results_['params'][group_best_grid_idx[group_idx]].items()
+                    })
+                print('Fitting ' + str(len(group_best_params)) + ' pipelines', end='', flush=True)
+                if args.scv_verbose > 0: print()
+                pipes = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
+                    delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
+                )
+                if args.scv_verbose == 0: print('done')
+                best_roc_auc_te = 0
+                best_bcr_te = 0
+                best_params_te = {}
+                for group_idx, param_grid_group in enumerate(param_grid_data):
+                    if hasattr(pipes[group_idx], 'decision_function'):
+                        y_score = pipes[group_idx].decision_function(X_te)
+                    else:
+                        y_score = pipes[group_idx].predict_proba(X_te)[:,1]
+                    roc_auc_te = roc_auc_score(y_te, y_score)
+                    y_pred = pipes[group_idx].predict(X_te)
+                    bcr_te = bcr_score(y_te, y_pred)
+                    metric_scores_te = { 'roc_auc_te': roc_auc_te, 'bcr_te': bcr_te }
+                    fs_idx = param_grid_group['meth_idxs']['fs']
+                    clf_idx = param_grid_group['meth_idxs']['clf']
+                    slr_idx = param_grid_group['meth_idxs']['slr']
+                    for metric in scv_scoring.keys():
+                        metric_cv = metric + '_cv'
+                        metric_te = metric + '_te'
+                        metric_score_cv = search.cv_results_['mean_test_' + metric][group_best_grid_idx[group_idx]]
+                        (results['te_pr'][te_idx, pr_idx]['tr_fs'][tr_idx, fs_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['te_pr'][te_idx, pr_idx]['tr_fs'][tr_idx, fs_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['tr_pr'][tr_idx, pr_idx]['te_fs'][te_idx, fs_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['tr_pr'][tr_idx, pr_idx]['te_fs'][te_idx, fs_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['te_fs'][te_idx, fs_idx]['tr_pr'][tr_idx, pr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['te_fs'][te_idx, fs_idx]['tr_pr'][tr_idx, pr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['tr_fs'][tr_idx, fs_idx]['te_pr'][te_idx, pr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['tr_fs'][tr_idx, fs_idx]['te_pr'][te_idx, pr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['te_clf'][te_idx, clf_idx]['tr_pr'][tr_idx, pr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['te_clf'][te_idx, clf_idx]['tr_pr'][tr_idx, pr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['tr_clf'][tr_idx, clf_idx]['te_pr'][te_idx, pr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['tr_clf'][tr_idx, clf_idx]['te_pr'][te_idx, pr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['pr_fs'][pr_idx, fs_idx]['te_tr'][te_idx, tr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['pr_fs'][pr_idx, fs_idx]['te_tr'][te_idx, tr_idx]
+                            ['clf_slr'][clf_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['pr_clf'][pr_idx, clf_idx]['te_tr'][te_idx, tr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['pr_clf'][pr_idx, clf_idx]['te_tr'][te_idx, tr_idx]
+                            ['fs_slr'][fs_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                        (results['fs_clf'][fs_idx, clf_idx]['te_tr'][te_idx, tr_idx]
+                            ['pr_slr'][pr_idx, slr_idx][metric_cv]) = metric_score_cv
+                        (results['fs_clf'][fs_idx, clf_idx]['te_tr'][te_idx, tr_idx]
+                            ['pr_slr'][pr_idx, slr_idx][metric_te]) = metric_scores_te[metric_te]
+                    if ((args.scv_refit == 'roc_auc' and roc_auc_te > best_roc_auc_te) or
+                        (args.scv_refit == 'bcr' and bcr_te > best_bcr_te)):
+                        best_roc_auc_te = roc_auc_te
+                        best_bcr_te = bcr_te
+                        best_params_te = group_best_params[group_idx]
+                best_grid_idx_cv = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
+                best_roc_auc_cv = search.cv_results_['mean_test_roc_auc'][best_grid_idx_cv]
+                best_bcr_cv = search.cv_results_['mean_test_bcr'][best_grid_idx_cv]
+                best_params_cv = search.cv_results_['params'][best_grid_idx_cv]
+                print('Best Params (Train):', best_params_cv)
+                print('Best Params (Test):', best_params_te)
+                print('ROC AUC (CV / Test): %.4f / %.4f' % (best_roc_auc_cv, best_roc_auc_te),
+                    ' BCR (CV / Test): %.4f / %.4f' % (best_bcr_cv, best_bcr_te))
+                base.remove(eset_tr_name)
+                base.remove(eset_te_name)
+                dataset_pair_counter += 1
+                # flush cache with each tr/te pair run (can grow too big if not)
+                if args.pipe_memory: memory.clear(warn=False)
+    dump(results, args.results_dir + '/results_analysis_' + str(args.analysis) + '.pkl')
+    title_sub = ''
+    if args.clf_meth and isinstance(args.clf_meth, str):
+        title_sub = 'Classifier: ' + args.clf_meth
+    if args.fs_meth and isinstance(args.fs_meth, str):
+        if title_sub: title_sub += ' '
+        title_sub = 'Feature Selection: ' + args.fs_meth
+    if title_sub: title_sub = '[' + title_sub + ']'
+    prep_methods = ['_'.join(g) for g in prep_groups]
+    dataset_tr_basenames = ['_'.join(c) for c in dataset_tr_combos]
+    figures = [
+        # plot results['te_pr']
+        {
+            'x_axis': range(1, len(prep_methods) + 1),
+            'x_axis_labels': prep_methods,
+            'x_ticks_rotation': 15,
+            'x_axis_title': 'Preprocessing Method',
+            'lines_title': 'Test Dataset',
+            'title_sub': title_sub,
+            'results': results['te_pr'],
+            'line_names': dataset_te_basenames,
+            'field_results_key': 'tr_fs',
+            'sub_results_key': 'clf_slr',
+        },
+        {
+            'x_axis': range(1, len(dataset_te_basenames) + 1),
+            'x_axis_labels': dataset_te_basenames,
+            'x_axis_title': 'Test Dataset',
+            'lines_title': 'Preprocessing Method',
+            'title_sub': title_sub,
+            'results': results['te_pr'].T,
+            'line_names': prep_methods,
+            'field_results_key': 'tr_fs',
+            'sub_results_key': 'clf_slr',
+        },
+        # plot results['tr_pr']
+        {
+            'x_axis': range(1, len(prep_methods) + 1),
+            'x_axis_labels': prep_methods,
+            'x_ticks_rotation': 15,
+            'x_axis_title': 'Preprocessing Method',
+            'lines_title': 'Train Dataset',
+            'title_sub': title_sub,
+            'results': results['tr_pr'],
+            'line_names': dataset_tr_basenames,
+            'field_results_key': 'te_fs',
+            'sub_results_key': 'clf_slr',
+        },
+        {
+            'x_axis': range(1, len(dataset_tr_basenames) + 1),
+            'x_axis_labels': dataset_tr_basenames,
+            'x_axis_title': 'Train Dataset',
+            'lines_title': 'Preprocessing Method',
+            'title_sub': title_sub,
+            'results': results['tr_pr'].T,
+            'line_names': prep_methods,
+            'field_results_key': 'te_fs',
+            'sub_results_key': 'clf_slr',
+        },
+        # plot results['te_fs']
+        {
+            'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
+            'x_axis_labels': list(pipelines['fs'].keys()),
+            'x_axis_title': 'Feature Selection Method',
+            'lines_title': 'Test Dataset',
+            'title_sub': title_sub,
+            'results': results['te_fs'],
+            'line_names': dataset_te_basenames,
+            'field_results_key': 'tr_pr',
+            'sub_results_key': 'clf_slr',
+        },
+        {
+            'x_axis': range(1, len(dataset_te_basenames) + 1),
+            'x_axis_labels': dataset_te_basenames,
+            'x_axis_title': 'Test Dataset',
+            'lines_title': 'Feature Selection Method',
+            'title_sub': title_sub,
+            'results': results['te_fs'].T,
+            'line_names': list(pipelines['fs'].keys()),
+            'field_results_key': 'tr_pr',
+            'sub_results_key': 'clf_slr',
+        },
+        # plot results['tr_fs']
+        {
+            'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
+            'x_axis_labels': list(pipelines['fs'].keys()),
+            'x_axis_title': 'Feature Selection Method',
+            'lines_title': 'Train Dataset',
+            'title_sub': title_sub,
+            'results': results['tr_fs'],
+            'line_names': dataset_tr_basenames,
+            'field_results_key': 'te_pr',
+            'sub_results_key': 'clf_slr',
+        },
+        {
+            'x_axis': range(1, len(dataset_tr_basenames) + 1),
+            'x_axis_labels': dataset_tr_basenames,
+            'x_axis_title': 'Train Dataset',
+            'lines_title': 'Feature Selection Method',
+            'title_sub': title_sub,
+            'results': results['tr_fs'].T,
+            'line_names': list(pipelines['fs'].keys()),
+            'field_results_key': 'te_pr',
+            'sub_results_key': 'clf_slr',
+        },
+        # plot results['te_clf']
+        {
+            'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
+            'x_axis_labels': list(pipelines['clf'].keys()),
+            'x_axis_title': 'Classifier Algorithm',
+            'lines_title': 'Test Dataset',
+            'title_sub': title_sub,
+            'results': results['te_clf'],
+            'line_names': dataset_te_basenames,
+            'field_results_key': 'tr_pr',
+            'sub_results_key': 'fs_slr',
+        },
+        {
+            'x_axis': range(1, len(dataset_te_basenames) + 1),
+            'x_axis_labels': dataset_te_basenames,
+            'x_axis_title': 'Test Dataset',
+            'lines_title': 'Classifier Algorithm',
+            'title_sub': title_sub,
+            'results': results['te_clf'].T,
+            'line_names': list(pipelines['clf'].keys()),
+            'field_results_key': 'tr_pr',
+            'sub_results_key': 'fs_slr',
+        },
+        # plot results['tr_clf']
+        {
+            'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
+            'x_axis_labels': list(pipelines['clf'].keys()),
+            'x_axis_title': 'Classifier Algorithm',
+            'lines_title': 'Train Dataset',
+            'title_sub': title_sub,
+            'results': results['tr_clf'],
+            'line_names': dataset_tr_basenames,
+            'field_results_key': 'te_pr',
+            'sub_results_key': 'fs_slr',
+        },
+        {
+            'x_axis': range(1, len(dataset_tr_basenames) + 1),
+            'x_axis_labels': dataset_tr_basenames,
+            'x_axis_title': 'Train Dataset',
+            'lines_title': 'Classifier Algorithm',
+            'title_sub': title_sub,
+            'results': results['tr_clf'].T,
+            'line_names': list(pipelines['clf'].keys()),
+            'field_results_key': 'te_pr',
+            'sub_results_key': 'fs_slr',
+        },
+        # plot results['pr_fs']
+        {
+            'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
+            'x_axis_labels': list(pipelines['fs'].keys()),
+            'x_axis_title': 'Feature Selection Method',
+            'lines_title': 'Preprocessing Method',
+            'title_sub': title_sub,
+            'results': results['pr_fs'],
+            'line_names': prep_methods,
+            'field_results_key': 'te_tr',
+            'sub_results_key': 'clf_slr',
+        },
+        {
+            'x_axis': range(1, len(prep_methods) + 1),
+            'x_axis_labels': prep_methods,
+            'x_ticks_rotation': 15,
+            'x_axis_title': 'Preprocessing Method',
+            'lines_title': 'Feature Selection Method',
+            'title_sub': title_sub,
+            'results': results['pr_fs'].T,
+            'line_names': list(pipelines['fs'].keys()),
+            'field_results_key': 'te_tr',
+            'sub_results_key': 'clf_slr',
+        },
+        # plot results['pr_clf']
+        {
+            'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
+            'x_axis_labels': list(pipelines['clf'].keys()),
+            'x_axis_title': 'Classifier Algorithm',
+            'lines_title': 'Preprocessing Method',
+            'title_sub': title_sub,
+            'results': results['pr_clf'],
+            'line_names': prep_methods,
+            'field_results_key': 'te_tr',
+            'sub_results_key': 'fs_slr',
+        },
+        {
+            'x_axis': range(1, len(prep_methods) + 1),
+            'x_axis_labels': prep_methods,
+            'x_ticks_rotation': 15,
+            'x_axis_title': 'Preprocessing Method',
+            'lines_title': 'Classifier Algorithm',
+            'title_sub': title_sub,
+            'results': results['pr_clf'].T,
+            'line_names': list(pipelines['clf'].keys()),
+            'field_results_key': 'te_tr',
+            'sub_results_key': 'fs_slr',
+        },
+        # plot results['fs_clf']
+        {
+            'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
+            'x_axis_labels': list(pipelines['clf'].keys()),
+            'x_axis_title': 'Classifier Algorithm',
+            'lines_title': 'Feature Selection Method',
+            'title_sub': title_sub,
+            'results': results['fs_clf'],
+            'line_names': list(pipelines['fs'].keys()),
+            'field_results_key': 'te_tr',
+            'sub_results_key': 'pr_slr',
+        },
+        {
+            'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
+            'x_axis_labels': list(pipelines['fs'].keys()),
+            'x_axis_title': 'Feature Selection Method',
+            'lines_title': 'Classifier Algorithm',
+            'title_sub': title_sub,
+            'results': results['fs_clf'].T,
+            'line_names': list(pipelines['clf'].keys()),
+            'field_results_key': 'te_tr',
+            'sub_results_key': 'pr_slr',
+        },
+    ]
+    plt.rcParams['figure.max_open_warning'] = 0
+    for figure_idx, figure in enumerate(figures):
+        if (args.fs_meth and len(args.fs_meth) == 1 and
+            args.slr_meth and len(args.slr_meth) == 1 and
+            args.clf_meth and len(args.clf_meth) == 1 and
+            figure_idx > 3): continue
+        legend_kwargs = {
+            'loc': 'lower left',
+            'ncol': max(1, len(figure['line_names']) // 12),
+        }
+        if len(figure['line_names']) > 10:
+            legend_kwargs['fontsize'] = 'xx-small'
         else:
-            feature_ranks = sorted(zip(feature_idxs, feature_names), reverse=True)
-            print('Features:')
-            for _, feature in feature_ranks: print(feature)
-        for dataset_te_basename in natsorted(list(set(dataset_te_names) - set(dataset_tr_combo))):
-            dataset_te_num = np.array(
-                [i for i,d in enumerate(dataset_names) if d == dataset_te_basename]
-            ) + 1
-            if args.norm_meth and args.norm_meth != 'none':
-                dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
+            legend_kwargs['fontsize'] = 'x-small'
+        sns.set_palette(sns.color_palette('hls', len(figure['line_names'])))
+        for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
+            metric_title = metric.replace('_', ' ').upper()
+            figure_name = 'Figure ' + str(args.analysis) + '-' + str(figure_idx + 1) + '-' + str(metric_idx + 1)
+            plt.figure(figure_name + 'A')
+            plt.rcParams['font.size'] = 14
+            plt.title(
+                'Effect of ' + figure['x_axis_title'] + ' on Train CV ' +
+                metric_title + ' for each ' + figure['lines_title'] + '\n' +
+                figure['title_sub']
+            )
+            plt.xlabel(figure['x_axis_title'])
+            plt.ylabel(metric_title)
+            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 7:
+                plt.xticks(
+                    figure['x_axis'], figure['x_axis_labels'],
+                    fontsize='x-small', rotation=figure['x_ticks_rotation'],
+                )
             else:
-                dataset_te_name = dataset_te_basename
-            df_X_te_name = '_'.join(['df', 'X', dataset_te_name])
-            df_p_te_name = '_'.join(['df', 'p', dataset_te_basename])
-            df_X_te_file = 'data/' + df_X_te_name + '.Rda'
-            df_p_te_file = 'data/' + df_p_te_name + '.Rda'
-            if not path.isfile(df_X_te_file): continue
-            if (np.array(base.exists(df_X_te_name), dtype=bool)[0] == False):
-                base.load(df_X_te_file)
-            if (np.array(base.exists(df_p_te_name), dtype=bool)[0] == False):
-                base.load(df_p_te_file)
-            df_X_te = robjects.globalenv[df_X_te_name]
-            df_p_te = robjects.globalenv[df_p_te_name]
-            X_te = np.array(base.as_matrix(df_X_te))
-            y_te = np.array(r_dataset_y(df_p_te), dtype=int)
-            # X_te = X_te[:, nstd_feature_idxs]
-            # if args.corr_cutoff:
-            #     X_te = X_te[:, corr_feature_idxs]
-            if hasattr(search, 'decision_function'):
-                y_score = search.decision_function(X_te)
-                roc_auc_te = roc_auc_score(y_te, y_score)
-                # fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
+                plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
+            if len(figure['x_axis']) > 20:
+                plt.xlim([ min(figure['x_axis']) - 1, max(figure['x_axis']) + 1 ])
+            plt.figure(figure_name + 'B')
+            plt.rcParams['font.size'] = 14
+            plt.title(
+                'Effect of ' + figure['x_axis_title'] + ' on Test ' +
+                metric_title + ' for each ' + figure['lines_title'] + '\n' +
+                figure['title_sub']
+            )
+            plt.xlabel(figure['x_axis_title'])
+            plt.ylabel(metric_title)
+            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 7:
+                plt.xticks(
+                    figure['x_axis'], figure['x_axis_labels'],
+                    fontsize='x-small', rotation=figure['x_ticks_rotation'],
+                )
             else:
-                probas = search.predict_proba(X_te)
-                roc_auc_te = roc_auc_score(y_te, probas[:,1])
-                # fpr, tpr, thres = roc_curve(y_te, probas[:,1], pos_label=1)
-            y_pred = search.predict(X_te)
-            bcr_te = bcr_score(y_te, y_pred)
-            print('Test:', dataset_te_name, ' ROC AUC: %.6f  BCR: %.6f' % (roc_auc_te, bcr_te))
-        if args.save_model:
-            dump(search, 'results/search_' + dataset_tr_name.lower() + '.pkl')
-        # flush cache with each combo run (grows too big if not)
-        if args.pipe_memory: memory.clear(warn=False)
+                plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
+            if len(figure['x_axis']) > 20:
+                plt.xlim([ min(figure['x_axis']) - 1, max(figure['x_axis']) + 1 ])
+            for row_idx, row_results in enumerate(figure['results']):
+                mean_scores_cv = np.full((figure['results'].shape[1],), np.nan, dtype=float)
+                range_scores_cv = np.full((2, figure['results'].shape[1]), np.nan, dtype=float)
+                mean_scores_te = np.full((figure['results'].shape[1],), np.nan, dtype=float)
+                range_scores_te = np.full((2, figure['results'].shape[1]), np.nan, dtype=float)
+                num_features = np.array([], dtype=int)
+                for col_idx, col_results in enumerate(row_results):
+                    scores_cv = np.array([], dtype=float)
+                    scores_te = np.array([], dtype=float)
+                    field_results = col_results[figure['field_results_key']]
+                    if 'sub_results_key' in figure:
+                        sub_field_results = field_results[figure['sub_results_key']]
+                        scores_cv = sub_field_results[metric + '_cv'][sub_field_results[metric + '_cv'] > 0]
+                        scores_te = sub_field_results[metric + '_te'][sub_field_results[metric + '_te'] > 0]
+                        num_features = np.append(num_features, sub_field_results['num_features'])
+                    else:
+                        scores_cv = field_results[metric + '_cv'][field_results[metric + '_cv'] > 0]
+                        scores_te = field_results[metric + '_te'][field_results[metric + '_te'] > 0]
+                        num_features = np.append(num_features, field_results['num_features'])
+                    if scores_cv.size > 0:
+                        mean_scores_cv[col_idx] = np.mean(scores_cv)
+                        range_scores_cv[0][col_idx] = np.mean(scores_cv) - np.min(scores_cv)
+                        range_scores_cv[1][col_idx] = np.max(scores_cv) - np.mean(scores_cv)
+                        mean_scores_te[col_idx] = np.mean(scores_te)
+                        range_scores_te[0][col_idx] = np.mean(scores_te) - np.min(scores_te)
+                        range_scores_te[1][col_idx] = np.max(scores_te) - np.mean(scores_te)
+                if not np.all(np.isnan(mean_scores_cv)):
+                    label_values_cv = (
+                        figure['line_names'][row_idx], 'CV',
+                        np.mean(mean_scores_cv[~np.isnan(mean_scores_cv)]),
+                        np.std(mean_scores_cv[~np.isnan(mean_scores_cv)]),
+                    )
+                    label_values_te = (
+                        figure['line_names'][row_idx], 'Test',
+                        np.mean(mean_scores_te[~np.isnan(mean_scores_te)]),
+                        np.std(mean_scores_te[~np.isnan(mean_scores_te)]),
+                    )
+                    if np.mean(num_features) == 0:
+                        label = r'%s (%s = %0.4f $\pm$ %0.2f)'
+                    elif np.std(num_features) == 0:
+                        label = r'%s (%s = %0.4f $\pm$ %0.2f, Features = %d)'
+                        label_values_cv = label_values_cv + (np.mean(num_features),)
+                        label_values_te = label_values_te + (np.mean(num_features),)
+                    else:
+                        label = r'%s (%s = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)'
+                        label_values_cv = label_values_cv + (np.mean(num_features), np.std(num_features))
+                        label_values_te = label_values_te + (np.mean(num_features), np.std(num_features))
+                    # color = next(plt.gca()._get_lines.prop_cycler)['color']
+                    plt.figure(figure_name + 'A')
+                    plt.errorbar(
+                        figure['x_axis'], mean_scores_cv, yerr=range_scores_cv, lw=2, alpha=0.8,
+                        capsize=10, elinewidth=2, markeredgewidth=2, marker='s',
+                        label=label % label_values_cv,
+                    )
+                    plt.figure(figure_name + 'B')
+                    plt.errorbar(
+                        figure['x_axis'], mean_scores_te, yerr=range_scores_te, lw=2, alpha=0.8,
+                        capsize=10, elinewidth=2, markeredgewidth=2, marker='s',
+                        label=label % label_values_te,
+                    )
+            plt.figure(figure_name + 'A')
+            plt.legend(**legend_kwargs)
+            plt.grid('on')
+            plt.figure(figure_name + 'B')
+            plt.legend(**legend_kwargs)
+            plt.grid('on')
+            if args.save_figs:
+                dump(plt.figure(figure_name + 'A'),
+                    args.results_dir + '/' + (figure_name + 'A').replace(' ', '_').lower() + '.pkl')
+                dump(plt.figure(figure_name + 'B'),
+                    args.results_dir + '/' + (figure_name + 'B').replace(' ', '_').lower() + '.pkl')
 if args.show_figs or not args.save_figs: plt.show()
 if args.pipe_memory: rmtree(cachedir)
