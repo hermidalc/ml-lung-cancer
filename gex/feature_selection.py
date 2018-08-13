@@ -12,7 +12,7 @@ from sklearn.utils import check_X_y
 from sklearn.utils.validation import check_is_fitted
 
 base = importr('base')
-base.source('lib/R/functions.R')
+base.source('functions.R')
 r_cfs_feature_idxs = robjects.globalenv['cfsFeatureIdxs']
 r_fcbf_feature_idxs = robjects.globalenv['fcbfFeatureIdxs']
 r_relieff_feature_score = robjects.globalenv['relieffFeatureScore']

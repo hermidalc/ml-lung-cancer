@@ -19,7 +19,7 @@ from matplotlib import style
 
 base = importr('base')
 biobase = importr('Biobase')
-base.source('lib/R/functions.R')
+base.source('functions.R')
 r_rand_perm_sample_nums = robjects.globalenv['randPermSampleNums']
 r_filter_eset = robjects.globalenv['filterEset']
 r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']

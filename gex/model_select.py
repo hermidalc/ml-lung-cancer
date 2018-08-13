@@ -120,7 +120,7 @@ if args.scv_size > 1.0: args.scv_size = int(args.scv_size)
 
 base = importr('base')
 biobase = importr('Biobase')
-base.source('lib/R/functions.R')
+base.source('functions.R')
 r_filter_eset_ctrl_probesets = robjects.globalenv['filterEsetControlProbesets']
 r_eset_class_labels = robjects.globalenv['esetClassLabels']
 r_eset_gene_symbols = robjects.globalenv['esetGeneSymbols']
