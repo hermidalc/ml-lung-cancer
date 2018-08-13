@@ -794,7 +794,7 @@ if args.analysis == 1:
         y_pred = search.predict(X[te_idxs])
         bcr_te = bcr_score(y[te_idxs], y_pred)
         print(
-            'Dataset:', dataset_tr_name,
+            'Dataset:', dataset_name,
             ' Split: %2s' % split_num,
             ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
             ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
@@ -932,7 +932,7 @@ if args.analysis == 1:
         bcrs_te.append(split_result['bcr_te'])
         num_features.append(split_result['feature_idxs'].size)
     print(
-        'Dataset:', dataset_tr_name,
+        'Dataset:', dataset_name,
         ' Mean ROC AUC (CV / Test): %.4f / %.4f' % (np.mean(roc_aucs_cv), np.mean(roc_aucs_te)),
         ' Mean BCR (CV / Test): %.4f / %.4f' % (np.mean(bcrs_cv), np.mean(bcrs_te)),
         ' Mean Features: %3d' % np.mean(num_features),
