@@ -25,12 +25,12 @@ esetClassLabels <- function(eset, samples=NULL) {
     }
 }
 
-esetFeatureDescs <- function(eset, features=NULL) {
+esetFeatureAnnot <- function(eset, annot, features=NULL) {
     if (!is.null(features)) {
-        symbols <- as.character(featureData(eset)[c(features)]$Description)
+        symbols <- as.character(featureData(eset)[c(features)][[annot]])
     }
     else {
-        symbols <- as.character(featureData(eset)$Description)
+        symbols <- as.character(featureData(eset)[[annot]])
     }
     symbols[is.na(symbols)] <- ""
     return(symbols)

@@ -628,7 +628,7 @@ if args.analysis == 1:
         error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
     )
     if args.verbose > 0:
-        print("Param grid:")
+        print('Param grid:')
         pprint(param_grid)
     args.datasets_tr = natsorted(args.datasets_tr)
     dataset_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
@@ -879,7 +879,7 @@ elif args.analysis == 2:
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
         )
     if args.verbose > 0:
-        print("Param grid:")
+        print('Param grid:')
         pprint(param_grid)
     args.datasets_tr = natsorted(args.datasets_tr)
     dataset_tr_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
@@ -1125,9 +1125,9 @@ elif args.analysis == 3:
                                 param_grid_idx += 1
                             param_grid_data.append(params_data)
     if args.verbose > 0:
-        print("Param grid:")
+        print('Param grid:')
         pprint(param_grid)
-        print("Param grid data:")
+        print('Param grid data:')
         pprint(param_grid_data)
     search = GridSearchCV(
         Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
@@ -1172,7 +1172,7 @@ elif args.analysis == 3:
     dataset_tr_combos = [x for x in dataset_tr_combos if x in dataset_tr_combos_subset]
     dataset_te_basenames = [x for x in dataset_te_basenames if x in dataset_te_basenames_subset]
     prep_groups = [x for x in prep_groups if x in prep_groups_subset]
-    print("Num dataset pairs:", num_dataset_pairs)
+    print('Num dataset pairs:', num_dataset_pairs)
     if args.load_only: quit()
     score_dtypes = [
         ('roc_auc_cv', float), ('bcr_cv', float),

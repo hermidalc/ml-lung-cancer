@@ -135,7 +135,7 @@ base = importr('base')
 biobase = importr('Biobase')
 base.source('functions.R')
 r_eset_class_labels = robjects.globalenv['esetClassLabels']
-r_eset_feature_descs = robjects.globalenv['esetFeatureDescs']
+r_eset_feature_annot = robjects.globalenv['esetFeatureAnnot']
 r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
 numpy2ri.activate()
 
@@ -807,7 +807,7 @@ if args.analysis == 1:
         if args.verbose > 1:
             if weights.size > 0:
                 feature_ranks = sorted(
-                    # zip(weights, feature_idxs, feature_names, r_eset_feature_descs(eset, feature_idxs + 1)),
+                    # zip(weights, feature_idxs, feature_names, r_eset_feature_annot(eset, feature_idxs + 1)),
                     zip(weights, feature_idxs, feature_names),
                     reverse=True,
                 )
@@ -815,7 +815,7 @@ if args.analysis == 1:
                 for weight, _, feature in feature_ranks: print(feature, '\t', weight)
             else:
                 feature_ranks = sorted(
-                    # zip(feature_idxs, feature_names, r_eset_feature_descs(eset, feature_idxs + 1)),
+                    # zip(feature_idxs, feature_names, r_eset_feature_annot(eset, feature_idxs + 1)),
                     zip(feature_idxs, feature_names),
                     reverse=True,
                 )
@@ -1070,7 +1070,7 @@ elif args.analysis == 2:
     print('Best Params:', search.best_params_)
     if weights.size > 0:
         feature_ranks = sorted(
-            # zip(weights, feature_idxs, feature_names, r_eset_feature_descs(eset_tr, feature_idxs + 1)),
+            # zip(weights, feature_idxs, feature_names, r_eset_feature_annot(eset_tr, feature_idxs + 1)),
             zip(weights, feature_idxs, feature_names),
             reverse=True,
         )
@@ -1078,7 +1078,7 @@ elif args.analysis == 2:
         for weight, _, feature in feature_ranks: print(feature, '\t', weight)
     else:
         feature_ranks = sorted(
-            # zip(feature_idxs, feature_names, r_eset_feature_descs(eset_tr, feature_idxs + 1)),
+            # zip(feature_idxs, feature_names, r_eset_feature_annot(eset_tr, feature_idxs + 1)),
             zip(feature_idxs, feature_names),
             reverse=True,
         )
@@ -1337,7 +1337,7 @@ elif args.analysis == 3:
         print('Param grid:')
         pprint(param_grid)
         if args.scv_type == 'grid':
-            print("Param grid data:")
+            print('Param grid data:')
             pprint(param_grid_data)
     if args.datasets_tr and args.num_tr_combo:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_tr_combo)]
@@ -1376,7 +1376,7 @@ elif args.analysis == 3:
     dataset_tr_combos = [x for x in dataset_tr_combos if x in dataset_tr_combos_subset]
     dataset_te_basenames = [x for x in dataset_te_basenames if x in dataset_te_basenames_subset]
     prep_groups = [x for x in prep_groups if x in prep_groups_subset]
-    print("Num dataset pairs:", num_dataset_pairs)
+    print('Num dataset pairs:', num_dataset_pairs)
     if args.load_only: quit()
     score_dtypes = [
         ('roc_auc_cv', float), ('bcr_cv', float),
