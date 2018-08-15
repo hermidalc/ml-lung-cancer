@@ -51,6 +51,7 @@ bioconductor-vsn \
 bioconductor-gcrma \
 bioconductor-impute \
 bioconductor-edger
+conda install -c sebp scikit-survival
 ```
 
 4. Setup for rJava (used by Biocomb and FSelector R packages)
