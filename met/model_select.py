@@ -946,7 +946,7 @@ if args.analysis == 1:
     feature_idxs = []
     for split_result in split_results: feature_idxs.extend(split_result['feature_idxs'])
     feature_idxs = sorted(list(set(feature_idxs)))
-    feature_names = np.array(base.colnames(df_X_tr), dtype=str)[feature_idxs]
+    feature_names = np.array(biobase.featureNames(eset), dtype=str)[feature_idxs]
     # print(*natsorted(feature_names), sep='\n')
     feature_mx_idx = {}
     for idx, feature_idx in enumerate(feature_idxs): feature_mx_idx[feature_idx] = idx
