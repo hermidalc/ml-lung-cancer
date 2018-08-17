@@ -724,7 +724,7 @@ if args.analysis == 1:
     eset_name = 'eset_' + dataset_name
     base.load('data/' + eset_name + '.Rda')
     eset = robjects.globalenv[eset_name]
-    X = np.array(base.t(biobase.exprs(eset)))
+    X = np.array(base.t(biobase.exprs(eset)), dtype=float)
     y = np.array(r_eset_class_labels(eset), dtype=int)
     pipe = Pipeline(sorted(
         pipelines['slr'][args.slr_meth]['steps'] +
@@ -1002,7 +1002,7 @@ elif args.analysis == 2:
     eset_tr_name = 'eset_' + dataset_tr_name
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = robjects.globalenv[eset_tr_name]
-    X_tr = np.array(base.t(biobase.exprs(eset_tr)))
+    X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
     y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
     pipe = Pipeline(sorted(
         pipelines['slr'][args.slr_meth]['steps'] +
@@ -1195,7 +1195,7 @@ elif args.analysis == 2:
         if not path.isfile(eset_te_file): continue
         base.load(eset_te_file)
         eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
-        X_te = np.array(base.t(biobase.exprs(eset_te)))
+        X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
         y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
         roc_aucs_te, bcrs_te = [], []
         for num_features in range(1, len(ranked_feature_idxs) + 1):
@@ -1450,11 +1450,11 @@ elif args.analysis == 3:
                 print(str(dataset_pair_counter), ': ', dataset_tr_name, ' -> ', dataset_te_name, sep='')
                 base.load('data/' + eset_tr_name + '.Rda')
                 eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
-                X_tr = np.array(base.t(biobase.exprs(eset_tr)))
+                X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
                 y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
                 base.load('data/' + eset_te_name + '.Rda')
                 eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
-                X_te = np.array(base.t(biobase.exprs(eset_te)))
+                X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
                 search.fit(X_tr, y_tr)
                 group_best_grid_idx, group_best_params = [], []
