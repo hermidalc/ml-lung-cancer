@@ -49,7 +49,7 @@ limmaFeatureScore <- function(X, y) {
     return(list(results$F, results$adj.P.Val))
 }
 
-limmaFpkmFeatureScore <- function(X, y) {
+limmaPkmFeatureScore <- function(X, y) {
     suppressPackageStartupMessages(require("limma"))
     design <- model.matrix(~0 + factor(y))
     colnames(design) <- c("Class0", "Class1")

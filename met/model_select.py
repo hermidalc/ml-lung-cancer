@@ -3,7 +3,7 @@
 import warnings
 from argparse import ArgumentParser
 from copy import deepcopy
-from os import path
+from os import makedirs, path
 from pprint import pprint
 from tempfile import mkdtemp
 from shutil import rmtree
@@ -17,6 +17,7 @@ from rpy2.robjects.packages import importr
 from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
+from sklearn.base import clone
 from sklearn.feature_selection import f_classif, mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
 from sklearn.model_selection import GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsClassifier
@@ -49,13 +50,14 @@ parser.add_argument('--test-size', type=float, default=0.3, help='outer splits t
 parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
 parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
 parser.add_argument('--num-tr-combo', type=int, default=1, help='dataset tr num combos')
-parser.add_argument('--corr-cutoff', type=float, help='correlation filter cutoff')
-parser.add_argument('--no-addon-te', default=False, action='store_true', help='dataset te no addon')
+parser.add_argument('--data-type', type=str, nargs='+', help='dataset data type')
+parser.add_argument('--norm-meth', type=str, nargs='+', help='normalization method')
 parser.add_argument('--feat-type', type=str, nargs='+', help='dataset feature type')
-parser.add_argument('--filter-type', type=str, nargs='+', help='dataset filter type')
-parser.add_argument('--merge-type', type=str, nargs='+', help='dataset merge type')
-parser.add_argument('--norm-meth', type=str, nargs='+', help='preprocess/normalization method')
+parser.add_argument('--prep-type', type=str, nargs='+', help='dataset preprocess type')
 parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correction method')
+parser.add_argument('--filter-type', type=str, nargs='+', help='dataset filter type')
+parser.add_argument('--corr-cutoff', type=float, help='correlation filter cutoff')
+parser.add_argument('--no-addon-te', default=False, action='store_true', help='dataset te no add-on')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
 parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
@@ -125,8 +127,9 @@ parser.add_argument('--save-figs', default=False, action='store_true', help='sav
 parser.add_argument('--show-figs', default=False, action='store_true', help='show figures')
 parser.add_argument('--save-model', default=False, action='store_true', help='save model')
 parser.add_argument('--results-dir', type=str, default='results', help='results dir')
+parser.add_argument('--load-only', default=False, action='store_true', help='show dataset loads only')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
-parser.add_argument('--verbose', type=int, default=1, help='program verbosity')
+parser.add_argument('--verbose', type=int, default=0, help='program verbosity')
 args = parser.parse_args()
 if args.test_size > 1.0: args.test_size = int(args.test_size)
 if args.scv_size > 1.0: args.scv_size = int(args.scv_size)
@@ -137,6 +140,7 @@ base.source('functions.R')
 r_eset_class_labels = robjects.globalenv['esetClassLabels']
 r_eset_feature_annot = robjects.globalenv['esetFeatureAnnot']
 r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
+r_limma_pkm_feature_score = robjects.globalenv['limmaPkmFeatureScore']
 numpy2ri.activate()
 
 if args.pipe_memory:
@@ -159,16 +163,13 @@ class CachedLinearSVC(CachedFitMixin, LinearSVC):
 class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
     pass
 
-class CachedLogisticRegression(CachedFitMixin, LogisticRegression):
-    pass
-
 # limma feature selection scoring function
 def limma(X, y):
     f, pv = r_limma_feature_score(X, y)
     return np.array(f), np.array(pv)
 
-def limma_fpkm(X, y):
-    f, pv = r_limma_fpkm_feature_score(X, y)
+def limma_pkm(X, y):
+    f, pv = r_limma_pkm_feature_score(X, y)
     return np.array(f), np.array(pv)
 
 # bcr performance metric scoring function
@@ -201,7 +202,7 @@ def fit_pipeline(params, pipeline_order, X_tr, y_tr):
 # config
 if args.pipe_memory:
     limma_score_func = memory.cache(limma)
-    limma_fpkm_score_func = memory.cache(limma_fpkm)
+    limma_pkm_score_func = memory.cache(limma_pkm)
     f_classif_func = memory.cache(f_classif)
     mi_classif_func = memory.cache(mutual_info_classif)
     rfe_svm_estimator = CachedLinearSVC()
@@ -209,7 +210,7 @@ if args.pipe_memory:
     sfm_ext_estimator = CachedExtraTreesClassifier()
 else:
     limma_score_func = limma
-    limma_fpkm_score_func = limma_fpkm
+    limma_pkm_score_func = limma_pkm
     f_classif_func = f_classif
     mi_classif_func = mutual_info_classif
     rfe_svm_estimator = LinearSVC()
@@ -677,7 +678,10 @@ pipelines = {
 }
 
 dataset_names = [
-    'lhc_nsclc_met',
+    'lhc_nsclc',
+]
+data_types = [
+    'met',
 ]
 norm_methods = [
     'none',
@@ -685,39 +689,57 @@ norm_methods = [
 feat_types = [
     'none',
 ]
-filter_types = [
+prep_types = [
     'none',
-]
-merge_types = [
-    'none',
+    'cff',
+    'mrg',
 ]
 bc_methods = [
+    'none',
+    'ctr',
+    'std',
+    'rta',
+    'rtg',
+    'qnorm',
+    'cbt',
+    'fab',
+    'sva',
+    'stica0',
+    'stica025',
+    'stica05',
+    'stica1',
+    'svd',
+]
+filter_types = [
     'none',
 ]
 
 # analyses
 if args.analysis == 1:
     prep_steps = []
+    if args.data_type and args.data_type[0] != 'none':
+        data_type = [x for x in data_types if x in args.data_type][0]
+        prep_steps.append(data_type)
     if args.norm_meth and args.norm_meth[0] != 'none':
         norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
         prep_steps.append(norm_meth)
     if args.feat_type and args.feat_type[0] != 'none':
         feat_type = [x for x in feat_types if x in args.feat_type][0]
         prep_steps.append(feat_type)
-    if args.filter_type and args.filter_type[0] != 'none':
-        filter_type = [x for x in filter_types if x in args.filter_type][0]
-        prep_steps.append(filter_type)
-    if args.merge_type and args.merge_type[0] != 'none':
-        merge_type = [x for x in merge_types if x in args.merge_type][0]
-        prep_steps.append(merge_type)
+    if args.prep_type and args.prep_type[0] != 'none':
+        prep_type = [x for x in prep_types if x in args.prep_type][0]
+        prep_steps.append(prep_type)
     if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_steps.append(bc_meth)
+    if args.filter_type and args.filter_type[0] != 'none':
+        filter_type = [x for x in filter_types if x in args.filter_type][0]
+        prep_steps.append(filter_type)
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
     args.datasets_tr = natsorted(args.datasets_tr)
-    if len(args.datasets_tr) > 1:
+    if len(args.datasets_tr) > 1 or bc_meth:
         dataset_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
     else:
         dataset_name = '_'.join(args.datasets_tr + prep_steps)
@@ -738,8 +760,8 @@ if args.analysis == 1:
         **pipelines['clf'][args.clf_meth]['param_grid'][0],
     }
     if args.fs_meth == 'Limma-KBest':
-        if dataset_tr_basename in rna_seq_fpkm_dataset_names:
-            pipe.set_params(fs1__score_func=limma_fpkm_score_func)
+        if norm_meth and norm_meth == 'pkm':
+            pipe.set_params(fs1__score_func=limma_pkm_score_func)
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
@@ -753,11 +775,12 @@ if args.analysis == 1:
         )
     elif args.scv_type == 'rand':
         search = RandomizedSearchCV(
-            pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
+            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit,
             cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+            n_iter=args.scv_n_iter,
         )
-    if args.verbose > 1:
+    if args.verbose > 0:
         print('Pipeline:')
         pprint(vars(pipe))
         print('Param grid:')
@@ -804,7 +827,7 @@ if args.analysis == 1:
             ' Features: %3s' % feature_idxs.size,
             ' Params:', search.best_params_,
         )
-        if args.verbose > 1:
+        if args.verbose > 0:
             if weights.size > 0:
                 feature_ranks = sorted(
                     # zip(weights, feature_idxs, feature_names, r_eset_feature_annot(eset, feature_idxs + 1)),
@@ -976,29 +999,32 @@ if args.analysis == 1:
         print(feature, '\t', rank)
 elif args.analysis == 2:
     prep_steps = []
+    if args.data_type and args.data_type[0] != 'none':
+        data_type = [x for x in data_types if x in args.data_type][0]
+        prep_steps.append(data_type)
     if args.norm_meth and args.norm_meth[0] != 'none':
         norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
         prep_steps.append(norm_meth)
     if args.feat_type and args.feat_type[0] != 'none':
         feat_type = [x for x in feat_types if x in args.feat_type][0]
         prep_steps.append(feat_type)
-    if args.filter_type and args.filter_type[0] != 'none':
-        filter_type = [x for x in filter_types if x in args.filter_type][0]
-        prep_steps.append(filter_type)
-    if args.merge_type and args.merge_type[0] != 'none':
-        merge_type = [x for x in merge_types if x in args.merge_type][0]
-        prep_steps.append(merge_type)
+    if args.prep_type and args.prep_type[0] != 'none':
+        prep_type = [x for x in prep_types if x in args.prep_type][0]
+        prep_steps.append(prep_type)
     if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_steps.append(bc_meth)
+    if args.filter_type and args.filter_type[0] != 'none':
+        filter_type = [x for x in filter_types if x in args.filter_type][0]
+        prep_steps.append(filter_type)
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
     args.datasets_tr = natsorted(args.datasets_tr)
-    if len(args.datasets_tr) > 1:
-        dataset_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
+    if len(args.datasets_tr) > 1 or bc_meth:
+        dataset_tr_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
     else:
-        dataset_name = '_'.join(args.datasets_tr + prep_steps)
+        dataset_tr_name = '_'.join(args.datasets_tr + prep_steps)
     eset_tr_name = 'eset_' + dataset_tr_name
     base.load('data/' + eset_tr_name + '.Rda')
     eset_tr = robjects.globalenv[eset_tr_name]
@@ -1016,8 +1042,8 @@ elif args.analysis == 2:
         **pipelines['clf'][args.clf_meth]['param_grid'][0],
     }
     if args.fs_meth == 'Limma-KBest':
-        if dataset_tr_basename in rna_seq_fpkm_dataset_names:
-            pipe.set_params(fs1__score_func=limma_fpkm_score_func)
+        if norm_meth and norm_meth == 'pkm':
+            pipe.set_params(fs1__score_func=limma_pkm_score_func)
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
@@ -1031,11 +1057,12 @@ elif args.analysis == 2:
         )
     elif args.scv_type == 'rand':
         search = RandomizedSearchCV(
-            pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
+            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit,
             cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+            n_iter=args.scv_n_iter,
         )
-    if args.verbose > 1:
+    if args.verbose > 0:
         print('Pipeline:')
         pprint(vars(pipe))
         print('Param grid:')
@@ -1043,8 +1070,10 @@ elif args.analysis == 2:
     print('Train:', dataset_tr_name, X_tr.shape, y_tr.shape)
     search.fit(X_tr, y_tr)
     if args.save_model:
+        makedirs(args.results_dir, mode=0o755, exist_ok=True)
         dump(search, '_'.join([
-            args.results_dir, '/search', dataset_tr_name, args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
+            args.results_dir, '/search', dataset_tr_name,
+            args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
         ]) + '.pkl')
     feature_idxs = np.arange(X_tr.shape[1])
     for step in search.best_estimator_.named_steps:
@@ -1156,7 +1185,6 @@ elif args.analysis == 2:
                 )
             plt.legend(loc='lower right', fontsize='small')
             plt.grid('on')
-
     # plot num top-ranked features selected vs test dataset perf metrics
     if args.datasets_te:
         dataset_te_basenames = natsorted(list(set(args.datasets_te) - set(args.datasets_tr)))
@@ -1175,7 +1203,7 @@ elif args.analysis == 2:
     plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
     plt.xticks(x_axis)
     if weights.size > 0:
-        ranked_feature_idxs = [x for _, x, _, _ in feature_ranks]
+        ranked_feature_idxs = [x for _, x, _ in feature_ranks]
     else:
         ranked_feature_idxs = [x for x, _, _ in feature_ranks]
     pipe = Pipeline(
@@ -1185,16 +1213,19 @@ elif args.analysis == 2:
     pipe.set_params(
         **{ k: v for k, v in search.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
     )
+    if args.verbose > 1:
+        print('Pipeline:')
+        pprint(vars(pipe))
     for dataset_te_basename in dataset_te_basenames:
-        if prep_steps[-1] in ['filtered', 'merged'] or args.no_addon_te:
-            dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'merged'])
+        if ((prep_type and prep_type == 'mrg' and not bc_meth) or args.no_addon_te):
+            dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
         else:
             dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
         eset_te_name = 'eset_' + dataset_te_name
         eset_te_file = 'data/' + eset_te_name + '.Rda'
         if not path.isfile(eset_te_file): continue
         base.load(eset_te_file)
-        eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
+        eset_te = robjects.globalenv[eset_te_name]
         X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
         y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
         roc_aucs_te, bcrs_te = [], []
@@ -1232,113 +1263,45 @@ elif args.analysis == 2:
     plt.legend(loc='lower right', fontsize='small')
     plt.grid('on')
 elif args.analysis == 3:
-    prep_groups = []
+    if args.data_type:
+        data_types = [x for x in data_types if x in args.data_type]
     if args.norm_meth:
         norm_methods = [x for x in norm_methods if x in args.norm_meth]
     if args.feat_type:
         feat_types = [x for x in feat_types if x in args.feat_type]
-    if args.filter_type:
-        filter_types = [x for x in filter_types if x in args.filter_type]
-    if args.merge_type:
-        merge_types = [x for x in merge_types if x in args.merge_type]
+    if args.prep_type:
+        prep_types = [x for x in prep_types if x in args.prep_type]
     if args.bc_meth:
         bc_methods = [x for x in bc_methods if x in args.bc_meth]
-    for norm_meth in norm_methods:
-        for feat_type in feat_types:
-            for filter_type in filter_types:
-                for merge_type in merge_types:
+    if args.filter_type:
+        filter_types = [x for x in filter_types if x in args.filter_type]
+    prep_groups, prep_group_info = [], []
+    for data_type in data_types:
+        for norm_meth in norm_methods:
+            for feat_type in feat_types:
+                for prep_type in prep_types:
                     for bc_meth in bc_methods:
-                        prep_groups.append([
-                            x for x in [norm_meth, feat_type, filter_type, merge_type, bc_meth] if x != 'none'
-                        ])
+                        for filter_type in filter_types:
+                            prep_groups.append([
+                                x for x in [
+                                    data_type, norm_meth, feat_type, prep_type, bc_meth, filter_type
+                                ] if x != 'none'
+                            ])
+                            prep_group_info.append({
+                                'pkm': True if norm_meth == 'pkm' else False,
+                                'mrg': True if prep_type == 'mrg' else False,
+                                'bcm': True if bc_meth != 'none' else False,
+                            })
     if args.fs_meth:
         pipelines['fs'] = { k: v for k, v in pipelines['fs'].items() if k in args.fs_meth }
     if args.slr_meth:
         pipelines['slr'] = { k: v for k, v in pipelines['slr'].items() if k in args.slr_meth }
     if args.clf_meth:
         pipelines['clf'] = { k: v for k, v in pipelines['clf'].items() if k in args.clf_meth }
-    if args.scv_type == 'grid':
-        param_grid_idx = 0
-        param_grid, param_grid_data = [], []
-        for fs_idx, fs_meth in enumerate(pipelines['fs']):
-            fs_meth_pipeline = deepcopy(pipelines['fs'][fs_meth])
-            if fs_meth == 'Limma-KBest':
-                for (step, object) in fs_meth_pipeline['steps']:
-                    if object.__class__.__name__ == 'SelectKBest':
-                        if dataset_tr_basename in rna_seq_fpkm_dataset_names:
-                            object.set_params(score_func=limma_fpkm_score_func)
-                        else:
-                            object.set_params(score_func=limma_score_func)
-            for fs_params in fs_meth_pipeline['param_grid']:
-                for param in fs_params:
-                    if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
-                        fs_params[param] = list(
-                            filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), fs_params[param])
-                        )
-                for slr_idx, slr_meth in enumerate(pipelines['slr']):
-                    for slr_params in pipelines['slr'][slr_meth]['param_grid']:
-                        for clf_idx, clf_meth in enumerate(pipelines['clf']):
-                            for clf_params in pipelines['clf'][clf_meth]['param_grid']:
-                                params = { **fs_params, **slr_params, **clf_params }
-                                for (step, object) in \
-                                    fs_meth_pipeline['steps'] + \
-                                    pipelines['slr'][slr_meth]['steps'] + \
-                                    pipelines['clf'][clf_meth]['steps'] \
-                                : params[step] = [ object ]
-                                param_grid.append(params)
-                                params_data = {
-                                    'meth_idxs': {
-                                        'fs': fs_idx, 'slr': slr_idx, 'clf': clf_idx,
-                                    },
-                                    'grid_idxs': [],
-                                }
-                                for param_combo in ParameterGrid(params):
-                                    params_data['grid_idxs'].append(param_grid_idx)
-                                    param_grid_idx += 1
-                                param_grid_data.append(params_data)
-        search = GridSearchCV(
-            Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-            param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-        )
-    elif args.scv_type == 'rand':
+    if args.scv_type == 'rand':
         args.fs_meth = args.fs_meth[0]
         args.slr_meth = args.slr_meth[0]
         args.clf_meth = args.clf_meth[0]
-        pipe = Pipeline(sorted(
-            pipelines['slr'][args.slr_meth]['steps'] +
-            pipelines['fs'][args.fs_meth]['steps'] +
-            pipelines['clf'][args.clf_meth]['steps'],
-            key=lambda s: pipeline_order.index(s[0])
-        ), memory=memory)
-        param_grid = {
-            **pipelines['slr'][args.slr_meth]['param_grid'][0],
-            **pipelines['fs'][args.fs_meth]['param_grid'][0],
-            **pipelines['clf'][args.clf_meth]['param_grid'][0],
-        }
-        if args.fs_meth == 'Limma-KBest':
-            if dataset_tr_basename in rna_seq_fpkm_dataset_names:
-                pipe.set_params(fs1__score_func=limma_fpkm_score_func)
-            else:
-                pipe.set_params(fs1__score_func=limma_score_func)
-        for param in param_grid:
-            if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
-                param_grid[param] = list(filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param]))
-        search = RandomizedSearchCV(
-            pipe, param_distributions=param_grid, scoring=scv_scoring, n_iter=args.scv_n_iter, refit=args.scv_refit,
-            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-        )
-        if args.verbose > 1:
-            print('Pipeline:')
-            pprint(vars(pipe))
-    if args.verbose > 1:
-        print('Param grid:')
-        pprint(param_grid)
-        if args.scv_type == 'grid':
-            print('Param grid data:')
-            pprint(param_grid_data)
     if args.datasets_tr and args.num_tr_combo:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_tr_combo)]
     elif args.datasets_tr:
@@ -1356,11 +1319,14 @@ elif args.analysis == 3:
         dataset_tr_basename = '_'.join(dataset_tr_combo)
         for dataset_te_basename in dataset_te_basenames:
             if dataset_te_basename in dataset_tr_combo: continue
-            for prep_steps in prep_groups:
+            for pr_idx, prep_steps in enumerate(prep_groups):
                 prep_method = '_'.join(prep_steps)
-                dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
-                if prep_steps[-1] in ['filtered', 'merged'] or args.no_addon_te:
-                    dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'merged'])
+                if len(dataset_tr_combo) > 1 or prep_group_info[pr_idx]['bcm']:
+                    dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
+                else:
+                    dataset_tr_name = '_'.join([dataset_tr_basename, prep_method])
+                if (prep_group_info[pr_idx]['mrg'] and not prep_group_info[pr_idx]['bcm']) or args.no_addon_te:
+                    dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
@@ -1377,7 +1343,9 @@ elif args.analysis == 3:
     dataset_te_basenames = [x for x in dataset_te_basenames if x in dataset_te_basenames_subset]
     prep_groups = [x for x in prep_groups if x in prep_groups_subset]
     print('Num dataset pairs:', num_dataset_pairs)
-    if args.load_only: quit()
+    if args.load_only:
+        if args.pipe_memory: rmtree(cachedir)
+        quit()
     score_dtypes = [
         ('roc_auc_cv', float), ('bcr_cv', float),
         ('roc_auc_te', float), ('bcr_te', float),
@@ -1437,9 +1405,12 @@ elif args.analysis == 3:
             if dataset_te_basename in dataset_tr_combo: continue
             for pr_idx, prep_steps in enumerate(prep_groups):
                 prep_method = '_'.join(prep_steps)
-                dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
-                if prep_steps[-1] in ['filtered', 'merged'] or args.no_addon_te:
-                    dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'merged'])
+                if len(dataset_tr_combo) > 1 or prep_group_info[pr_idx]['bcm']:
+                    dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
+                else:
+                    dataset_tr_name = '_'.join([dataset_tr_basename, prep_method])
+                if (prep_group_info[pr_idx]['mrg'] and not prep_group_info[pr_idx]['bcm']) or args.no_addon_te:
+                    dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
                 eset_tr_name = 'eset_' + dataset_tr_name
@@ -1449,13 +1420,95 @@ elif args.analysis == 3:
                 if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
                 print(str(dataset_pair_counter), ': ', dataset_tr_name, ' -> ', dataset_te_name, sep='')
                 base.load('data/' + eset_tr_name + '.Rda')
-                eset_tr = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_tr_name])
+                eset_tr = robjects.globalenv[eset_tr_name]
                 X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
                 y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
                 base.load('data/' + eset_te_name + '.Rda')
-                eset_te = r_filter_eset_ctrl_probesets(robjects.globalenv[eset_te_name])
+                eset_te = robjects.globalenv[eset_te_name]
                 X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
+                if args.scv_type == 'grid':
+                    param_grid_idx = 0
+                    param_grid, param_grid_data = [], []
+                    for fs_idx, fs_meth in enumerate(pipelines['fs']):
+                        fs_meth_pipeline = deepcopy(pipelines['fs'][fs_meth])
+                        if fs_meth == 'Limma-KBest':
+                            for (step, object) in fs_meth_pipeline['steps']:
+                                if object.__class__.__name__ == 'SelectKBest':
+                                    if prep_group_info[pr_idx]['pkm']:
+                                        object.set_params(score_func=limma_pkm_score_func)
+                                    else:
+                                        object.set_params(score_func=limma_score_func)
+                        for fs_params in fs_meth_pipeline['param_grid']:
+                            for param in fs_params:
+                                if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
+                                    fs_params[param] = list(
+                                        filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), fs_params[param])
+                                    )
+                            for slr_idx, slr_meth in enumerate(pipelines['slr']):
+                                for slr_params in pipelines['slr'][slr_meth]['param_grid']:
+                                    for clf_idx, clf_meth in enumerate(pipelines['clf']):
+                                        for clf_params in pipelines['clf'][clf_meth]['param_grid']:
+                                            params = { **fs_params, **slr_params, **clf_params }
+                                            for (step, object) in \
+                                                fs_meth_pipeline['steps'] + \
+                                                pipelines['slr'][slr_meth]['steps'] + \
+                                                pipelines['clf'][clf_meth]['steps'] \
+                                            : params[step] = [ object ]
+                                            param_grid.append(params)
+                                            params_data = {
+                                                'meth_idxs': {
+                                                    'fs': fs_idx, 'slr': slr_idx, 'clf': clf_idx,
+                                                },
+                                                'grid_idxs': [],
+                                            }
+                                            for param_combo in ParameterGrid(params):
+                                                params_data['grid_idxs'].append(param_grid_idx)
+                                                param_grid_idx += 1
+                                            param_grid_data.append(params_data)
+                    search = GridSearchCV(
+                        Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
+                        param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
+                        cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+                        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+                    )
+                elif args.scv_type == 'rand':
+                    pipe = Pipeline(sorted(
+                        pipelines['slr'][args.slr_meth]['steps'] +
+                        pipelines['fs'][args.fs_meth]['steps'] +
+                        pipelines['clf'][args.clf_meth]['steps'],
+                        key=lambda s: pipeline_order.index(s[0])
+                    ), memory=memory)
+                    param_grid = {
+                        **pipelines['slr'][args.slr_meth]['param_grid'][0],
+                        **pipelines['fs'][args.fs_meth]['param_grid'][0],
+                        **pipelines['clf'][args.clf_meth]['param_grid'][0],
+                    }
+                    if args.fs_meth == 'Limma-KBest':
+                        if prep_group_info[pr_idx]['pkm']:
+                            pipe.set_params(fs1__score_func=limma_pkm_score_func)
+                        else:
+                            pipe.set_params(fs1__score_func=limma_score_func)
+                    for param in param_grid:
+                        if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
+                            param_grid[param] = list(
+                                filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param])
+                            )
+                    search = RandomizedSearchCV(
+                        pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit,
+                        cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+                        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+                        n_iter=args.scv_n_iter,
+                    )
+                    if args.verbose > 0:
+                        print('Pipeline:')
+                        pprint(vars(pipe))
+                if args.verbose > 0:
+                    print('Param grid:')
+                    pprint(param_grid)
+                    if args.verbose > 1 and args.scv_type == 'grid':
+                        print('Param grid data:')
+                        pprint(param_grid_data)
                 search.fit(X_tr, y_tr)
                 group_best_grid_idx, group_best_params = [], []
                 for group_idx, param_grid_group in enumerate(param_grid_data):
@@ -1549,6 +1602,7 @@ elif args.analysis == 3:
                 dataset_pair_counter += 1
                 # flush cache with each tr/te pair run (can grow too big if not)
                 if args.pipe_memory: memory.clear(warn=False)
+    makedirs(args.results_dir, mode=0o755, exist_ok=True)
     dump(results, args.results_dir + '/results_analysis_' + str(args.analysis) + '.pkl')
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
