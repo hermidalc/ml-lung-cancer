@@ -1217,7 +1217,7 @@ elif args.analysis == 2:
         print('Pipeline:')
         pprint(vars(pipe))
     for dataset_te_basename in dataset_te_basenames:
-        if ((len(args.datasets_tr) == 1 and not bc_meth) or args.no_addon_te:
+        if (len(args.datasets_tr) == 1 and not bc_meth) or args.no_addon_te:
             dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
         else:
             dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
