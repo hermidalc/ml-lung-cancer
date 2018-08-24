@@ -15,8 +15,8 @@ parser$add_argument("--num-tr-combo", type="integer", help="num datasets to comb
 parser$add_argument("--data-type", type="character", nargs="+", help="data type")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="normalization method")
 parser$add_argument("--feat-type", type="character", nargs="+", help="feature type")
-parser$add_argument("--prep-type", type="character", nargs="+", help="preprocess type")
-parser$add_argument("--bc-meth", type="character", nargs="+", help="dataset batch correct method")
+parser$add_argument("--prep-meth", type="character", nargs="+", help="preprocess method")
+parser$add_argument("--bc-meth", type="character", nargs="+", help="batch correction method")
 parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
 parser$add_argument("--save-obj", action="store_true", default=FALSE, help="save add-on param obj")
 args <- parser$parse_args()
@@ -42,8 +42,8 @@ if (!is.null(args$norm_meth)) {
 if (!is.null(args$feat_type)) {
     feat_types <- feat_types[feat_types %in% args$feat_type]
 }
-if (!is.null(args$prep_type)) {
-    prep_types <- prep_types[prep_types %in% args$prep_type]
+if (!is.null(args$prep_meth)) {
+    prep_methods <- prep_methods[prep_methods %in% args$prep_meth]
 }
 if (!is.null(args$bc_meth)) {
     bc_methods <- bc_methods[bc_methods %in% args$bc_meth]
@@ -56,35 +56,23 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                 for (suffix in c(norm_meth, feat_type)) {
                     if (suffix != "none") suffixes <- c(suffixes, suffix)
                 }
-                for (prep_type in prep_types) {
-                    if (length(dataset_tr_name_combos[,col]) > 1) {
-                        if (prep_type != "none") {
-                            suffixes_tr <- c(suffixes, prep_type, "tr")
-                            if (prep_type != "mrg") {
-                                suffixes_te <- c(suffixes, prep_type)
-                            }
-                            else {
-                                suffixes_te <- suffixes
-                            }
-                        }
-                        else {
-                            suffixes_tr <- c(suffixes, "tr")
-                            suffixes_te <- suffixes
-                        }
+                for (prep_meth in prep_methods) {
+                    suffixes_tr <- suffixes
+                    suffixes_te <- suffixes
+                    if (prep_meth != "none") {
+                        suffixes_tr <- c(suffixes_tr, prep_meth)
+                        if (prep_meth != "mrg") suffixes_te <- suffixes_tr
                     }
-                    else if (prep_type != "mrg") {
-                        if (prep_type != "none") {
-                            suffixes_tr <- c(suffixes, prep_type)
-                        }
-                        else {
-                            suffixes_tr <- suffixes
-                        }
-                        suffixes_te <- suffixes_tr
+                    if (length(dataset_tr_name_combos[,col]) > 1) {
+                        eset_tr_name <- paste0(
+                            c("eset", dataset_tr_name_combos[,col], suffixes_tr, "tr"), collapse="_"
+                        )
                     }
                     else {
-                        next
+                        eset_tr_name <- paste0(
+                            c("eset", dataset_tr_name_combos[,col], suffixes_tr), collapse="_"
+                        )
                     }
-                    eset_tr_name <- paste0(c("eset", dataset_tr_name_combos[,col], suffixes_tr), collapse="_")
                     eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
                     if (!exists(eset_tr_name)) {
                         if (file.exists(eset_tr_file)) {
@@ -96,7 +84,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                         }
                     }
                     for (dataset_te_name in setdiff(dataset_te_names, dataset_tr_name_combos[,col])) {
-                        if (length(dataset_tr_name_combos[,col]) == 1 || prep_type == "mrg") {
+                        if (length(dataset_tr_name_combos[,col]) == 1 || prep_meth == "mrg") {
                             eset_te_name <- paste0(c("eset", dataset_te_name, suffixes_te), collapse="_")
                         }
                         else {
@@ -110,10 +98,18 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                     }
                     if (args$load_only) next
                     for (bc_meth in bc_methods) {
+                        if (length(dataset_tr_name_combos[,col]) > 1 || bc_meth != "none") {
+                            eset_tr_bc_name <- paste0(
+                                c("eset", dataset_tr_name_combos[,col], suffixes_tr, bc_meth, "tr"),
+                                collapse="_"
+                            )
+                        }
+                        else {
+                            eset_tr_bc_name <- paste0(c(eset_tr_name, bc_meth), collapse="_")
+                        }
                         if (grepl("^(stica\\d+|svd)$", bc_meth)) {
                             Xtr <- exprs(get(eset_tr_name))
                             ptr <- pData(get(eset_tr_name))
-                            eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_meth, "_tr")
                             cat("Creating:", eset_tr_bc_name, "\n")
                             if (substr(bc_meth, 1, 5) == "stica") {
                                 bc_obj <- normFact(
@@ -138,7 +134,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                                 save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
                             }
                             for (dataset_te_name in setdiff(dataset_te_names, dataset_tr_name_combos[,col])) {
-                                if (length(dataset_tr_name_combos[,col]) == 1 || prep_type == "mrg") {
+                                if (length(dataset_tr_name_combos[,col]) == 1 || prep_meth == "mrg") {
                                     eset_te_name <- paste0(c("eset", dataset_te_name, suffixes_te), collapse="_")
                                 }
                                 else {
@@ -171,7 +167,6 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                                 }
                             }
                             btr <- as.factor(btr)
-                            eset_tr_bc_name <- paste0(sub("_tr$", "", eset_tr_name), "_", bc_meth, "_tr")
                             cat("Creating:", eset_tr_bc_name, "\n")
                             eset_tr_bc <- get(eset_tr_name)
                             if (bc_meth == "cbt") {
@@ -217,7 +212,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                                 save(list=eset_tr_bc_obj_name, file=paste0("data/", eset_tr_bc_obj_name, ".Rda"))
                             }
                             for (dataset_te_name in setdiff(dataset_te_names, dataset_tr_name_combos[,col])) {
-                                if (length(dataset_tr_name_combos[,col]) == 1 || prep_type == "mrg") {
+                                if (length(dataset_tr_name_combos[,col]) == 1 || prep_meth == "mrg") {
                                     eset_te_name <- paste0(c("eset", dataset_te_name, suffixes_te), collapse="_")
                                 }
                                 else {

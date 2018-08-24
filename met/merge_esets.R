@@ -12,6 +12,9 @@ parser$add_argument("--norm-meth", type="character", nargs="+", help="normalizat
 parser$add_argument("--feat-type", type="character", nargs="+", help="feature type")
 parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
 args <- parser$parse_args()
+if (!is.null(args$datasets)) {
+    dataset_names <- intersect(dataset_names, args$datasets)
+}
 if (!is.null(args$datasets) && !is.null(args$num_tr_combo)) {
     dataset_name_combos <- combn(intersect(dataset_names, args$datasets), as.integer(args$num_tr_combo))
 } else if (!is.null(args$datasets)) {

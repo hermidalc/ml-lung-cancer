@@ -53,7 +53,7 @@ parser.add_argument('--num-tr-combo', type=int, default=1, help='dataset tr num 
 parser.add_argument('--data-type', type=str, nargs='+', help='dataset data type')
 parser.add_argument('--norm-meth', type=str, nargs='+', help='normalization method')
 parser.add_argument('--feat-type', type=str, nargs='+', help='dataset feature type')
-parser.add_argument('--prep-type', type=str, nargs='+', help='dataset preprocess type')
+parser.add_argument('--prep-meth', type=str, nargs='+', help='dataset preprocess method')
 parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correction method')
 parser.add_argument('--filter-type', type=str, nargs='+', help='dataset filter type')
 parser.add_argument('--corr-cutoff', type=float, help='correlation filter cutoff')
@@ -689,7 +689,7 @@ norm_methods = [
 feat_types = [
     'none',
 ]
-prep_types = [
+prep_methods = [
     'none',
     'cff',
     'mrg',
@@ -726,9 +726,9 @@ if args.analysis == 1:
     if args.feat_type and args.feat_type[0] != 'none':
         feat_type = [x for x in feat_types if x in args.feat_type][0]
         prep_steps.append(feat_type)
-    if args.prep_type and args.prep_type[0] != 'none':
-        prep_type = [x for x in prep_types if x in args.prep_type][0]
-        prep_steps.append(prep_type)
+    if args.prep_meth and args.prep_meth[0] != 'none':
+        prep_meth = [x for x in prep_methods if x in args.prep_meth][0]
+        prep_steps.append(prep_meth)
     if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_steps.append(bc_meth)
@@ -1008,9 +1008,9 @@ elif args.analysis == 2:
     if args.feat_type and args.feat_type[0] != 'none':
         feat_type = [x for x in feat_types if x in args.feat_type][0]
         prep_steps.append(feat_type)
-    if args.prep_type and args.prep_type[0] != 'none':
-        prep_type = [x for x in prep_types if x in args.prep_type][0]
-        prep_steps.append(prep_type)
+    if args.prep_meth and args.prep_meth[0] != 'none':
+        prep_meth = [x for x in prep_methods if x in args.prep_meth][0]
+        prep_steps.append(prep_meth)
     if args.bc_meth and args.bc_meth[0] != 'none':
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_steps.append(bc_meth)
@@ -1217,7 +1217,7 @@ elif args.analysis == 2:
         print('Pipeline:')
         pprint(vars(pipe))
     for dataset_te_basename in dataset_te_basenames:
-        if ((prep_type and prep_type == 'mrg' and not bc_meth) or args.no_addon_te):
+        if ((len(args.datasets_tr) == 1 and not bc_meth) or args.no_addon_te:
             dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
         else:
             dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
@@ -1269,8 +1269,8 @@ elif args.analysis == 3:
         norm_methods = [x for x in norm_methods if x in args.norm_meth]
     if args.feat_type:
         feat_types = [x for x in feat_types if x in args.feat_type]
-    if args.prep_type:
-        prep_types = [x for x in prep_types if x in args.prep_type]
+    if args.prep_meth:
+        prep_methods = [x for x in prep_methods if x in args.prep_meth]
     if args.bc_meth:
         bc_methods = [x for x in bc_methods if x in args.bc_meth]
     if args.filter_type:
@@ -1279,17 +1279,17 @@ elif args.analysis == 3:
     for data_type in data_types:
         for norm_meth in norm_methods:
             for feat_type in feat_types:
-                for prep_type in prep_types:
+                for prep_meth in prep_methods:
                     for bc_meth in bc_methods:
                         for filter_type in filter_types:
                             prep_groups.append([
                                 x for x in [
-                                    data_type, norm_meth, feat_type, prep_type, bc_meth, filter_type
+                                    data_type, norm_meth, feat_type, prep_meth, bc_meth, filter_type
                                 ] if x != 'none'
                             ])
                             prep_group_info.append({
                                 'pkm': True if norm_meth == 'pkm' else False,
-                                'mrg': True if prep_type == 'mrg' else False,
+                                'mrg': True if prep_meth == 'mrg' else False,
                                 'bcm': True if bc_meth != 'none' else False,
                             })
     if args.fs_meth:
@@ -1325,7 +1325,7 @@ elif args.analysis == 3:
                     dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
                 else:
                     dataset_tr_name = '_'.join([dataset_tr_basename, prep_method])
-                if (prep_group_info[pr_idx]['mrg'] and not prep_group_info[pr_idx]['bcm']) or args.no_addon_te:
+                if (len(dataset_tr_combo) == 1 and not prep_group_info[pr_idx]['bcm']) or args.no_addon_te:
                     dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
@@ -1409,7 +1409,7 @@ elif args.analysis == 3:
                     dataset_tr_name = '_'.join([dataset_tr_basename, prep_method, 'tr'])
                 else:
                     dataset_tr_name = '_'.join([dataset_tr_basename, prep_method])
-                if (prep_group_info[pr_idx]['mrg'] and not prep_group_info[pr_idx]['bcm']) or args.no_addon_te:
+                if (len(dataset_tr_combo) == 1 and not prep_group_info[pr_idx]['bcm']) or args.no_addon_te:
                     dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
                 else:
                     dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])

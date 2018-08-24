@@ -11,7 +11,7 @@ norm_methods <- c(
 feat_types <- c(
     "none"
 )
-prep_types <- c(
+prep_methods <- c(
     "none",
     "cff",
     "mrg"
