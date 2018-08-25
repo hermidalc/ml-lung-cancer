@@ -37,7 +37,7 @@ for (dataset_name in dataset_names) {
                 exprs_file <- paste0("data/", exprs_file_basename, ".txt")
                 if (file.exists(pdata_file) && file.exists(exprs_file)) {
                     if (!exists("pdata")) {
-                        cat("Loading:", pdata_file_basename, "\n")
+                        cat(" Loading:", pdata_file_basename, "\n")
                         pdata <- read.delim(pdata_file, row.names=1)
                         pdata <- pdata[!is.na(pdata$Class),]
                     }

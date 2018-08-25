@@ -76,7 +76,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                     eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
                     if (!exists(eset_tr_name)) {
                         if (file.exists(eset_tr_file)) {
-                            cat("Loading: ", eset_tr_name, "\n")
+                            cat(" Loading:", eset_tr_name, "\n")
                             load(eset_tr_file)
                         }
                         else {
@@ -92,7 +92,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                         }
                         eset_te_file <- paste0("data/", eset_te_name, ".Rda")
                         if (!exists(eset_te_name) & file.exists(eset_te_file)) {
-                            cat("Loading: ", eset_te_name, "\n")
+                            cat(" Loading:", eset_te_name, "\n")
                             load(eset_te_file)
                         }
                     }

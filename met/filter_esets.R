@@ -14,7 +14,7 @@ parser$add_argument("--norm-meth", type="character", nargs="+", help="normalizat
 parser$add_argument("--feat-type", type="character", nargs="+", help="feature type")
 parser$add_argument("--prep-meth", type="character", nargs="+", help="preprocess method")
 parser$add_argument("--bc-meth", type="character", nargs="+", help="batch correction method")
-parser$add_argument("--feat-file", type="character", nargs="+", help="feature file")
+parser$add_argument("--feat-file", type="character", nargs=1, help="feature file")
 parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
 args <- parser$parse_args()
 if (is.null(args$filter) || !(args$filter %in% c("common_features", "features"))) {
@@ -67,7 +67,7 @@ if (args$filter == "common_features") {
                     eset_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
                     eset_file <- paste0("data/", eset_name, ".Rda")
                     if (file.exists(eset_file)) {
-                        cat("Loading: ", eset_name, "\n")
+                        cat(" Loading:", eset_name, "\n")
                         load(eset_file)
                         # get common features
                         if (args$filter == "common_features") {
@@ -159,7 +159,7 @@ if (args$filter == "common_features") {
                             eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
                             if (!exists(eset_tr_name)) {
                                 if (file.exists(eset_tr_file)) {
-                                    cat("Loading: ", eset_tr_name, "\n")
+                                    cat(" Loading:", eset_tr_name, "\n")
                                     load(eset_tr_file)
                                 }
                                 else {
@@ -179,7 +179,7 @@ if (args$filter == "common_features") {
                                         c(eset_tr_name, dataset_te_name, "te"), collapse="_"
                                     )
                                     eset_te_flt_name <- paste0(
-                                        c(eset_tr_name, dataset_te_name, filter_type, "te"), collapse="_"
+                                        c(eset_tr_flt_name, dataset_te_name, "te"), collapse="_"
                                     )
                                 }
                                 else {
@@ -189,7 +189,7 @@ if (args$filter == "common_features") {
                                 eset_te_file <- paste0("data/", eset_te_name, ".Rda")
                                 if (!exists(eset_te_name)) {
                                     if (file.exists(eset_te_file)) {
-                                        cat("Loading: ", eset_te_name, "\n")
+                                        cat(" Loading:", eset_te_name, "\n")
                                         load(eset_te_file)
                                     }
                                     else {

@@ -43,7 +43,7 @@ for (dataset_name in dataset_names) {
                 eset_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
                 eset_file <- paste0("data/", eset_name, ".Rda")
                 if (file.exists(eset_file)) {
-                    cat("Loading: ", eset_name, "\n")
+                    cat(" Loading:", eset_name, "\n")
                     load(eset_file)
                     # subset common pheno data
                     eset <- get(eset_name)
