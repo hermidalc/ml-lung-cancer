@@ -27,10 +27,10 @@ if (!is.null(args$data_type)) {
     data_types <- intersect(data_types, args$data_type)
 }
 if (!is.null(args$norm_meth)) {
-    norm_methods <- norm_methods[norm_methods %in% args$norm_meth]
+    norm_methods <- intersect(norm_methods, args$norm_meth)
 }
 if (!is.null(args$feat_type)) {
-    feat_types <- feat_types[feat_types %in% args$feat_type]
+    feat_types <- intersect(feat_types, args$feat_type)
 }
 for (dataset_name in dataset_names) {
     for (data_type in data_types) {

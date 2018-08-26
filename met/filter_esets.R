@@ -44,16 +44,16 @@ if (!is.null(args$data_type)) {
     data_types <- intersect(data_types, args$data_type)
 }
 if (!is.null(args$norm_meth)) {
-    norm_methods <- norm_methods[norm_methods %in% args$norm_meth]
+    norm_methods <- intersect(norm_methods, args$norm_meth)
 }
 if (!is.null(args$feat_type)) {
-    feat_types <- feat_types[feat_types %in% args$feat_type]
+    feat_types <- intersect(feat_types, args$feat_type)
 }
 if (!is.null(args$prep_meth)) {
-    prep_methods <- prep_methods[prep_methods %in% args$prep_meth]
+    prep_methods <- intersect(prep_methods, args$prep_meth)
 }
 if (!is.null(args$bc_meth)) {
-    bc_methods <- bc_methods[bc_methods %in% args$bc_meth]
+    bc_methods <- intersect(bc_methods, args$bc_meth)
 }
 if (args$filter == "common_features") {
     for (dataset_name in dataset_names) {
