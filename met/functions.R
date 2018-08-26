@@ -25,7 +25,7 @@ esetClassLabels <- function(eset, samples=NULL) {
     }
 }
 
-esetFeatureAnnot <- function(eset, annot, features=NULL) {
+esetFeatureAnnot <- function(eset, annot=annot, features=NULL) {
     if (!is.null(features)) {
         symbols <- as.character(featureData(eset)[c(features)][[annot]])
     }
