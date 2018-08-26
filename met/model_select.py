@@ -49,7 +49,7 @@ parser.add_argument('--splits', type=int, default=10, help='num outer splits')
 parser.add_argument('--test-size', type=float, default=0.3, help='outer splits test size')
 parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
 parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
-parser.add_argument('--num-tr-combo', type=int, default=1, help='dataset tr num combos')
+parser.add_argument('--num-combo-tr', type=int, default=1, help='dataset tr num combos')
 parser.add_argument('--data-type', type=str, nargs='+', help='dataset data type')
 parser.add_argument('--norm-meth', type=str, nargs='+', help='normalization method')
 parser.add_argument('--feat-type', type=str, nargs='+', help='dataset feature type')
@@ -1304,12 +1304,12 @@ elif args.analysis == 3:
         args.fs_meth = args.fs_meth[0]
         args.slr_meth = args.slr_meth[0]
         args.clf_meth = args.clf_meth[0]
-    if args.datasets_tr and args.num_tr_combo:
-        dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_tr_combo)]
+    if args.datasets_tr and args.num_combo_tr:
+        dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_combo_tr)]
     elif args.datasets_tr:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), len(args.datasets_tr))]
     else:
-        dataset_tr_combos = [list(x) for x in combinations(natsorted(dataset_names), args.num_tr_combo)]
+        dataset_tr_combos = [list(x) for x in combinations(natsorted(dataset_names), args.num_combo_tr)]
     if args.datasets_te:
         dataset_te_basenames = [x for x in natsorted(dataset_names) if x in args.datasets_te]
     else:
