@@ -252,13 +252,19 @@ if args.fs_sfm_ext_e:
 else:
     FS_SFM_EXT_E = list(range(5, args.fs_sfm_ext_e_max + 1, 5))
 if args.fs_sfm_ext_d:
-    FS_SFM_EXT_D = sorted(args.fs_sfm_ext_d)
+    FS_SFM_EXT_D = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_ext_d],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    FS_SFM_EXT_D = list(range(1, args.fs_sfm_ext_d_max + 1, 1)) + [None]
+    FS_SFM_EXT_D = [None] + list(range(1, args.fs_sfm_ext_d_max + 1, 1))
 if args.fs_sfm_ext_cw:
-    FS_SFM_EXT_CW = [None if a in ('None', 'none') else a for a in sorted(args.fs_sfm_ext_cw)]
+    FS_SFM_EXT_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_ext_cw],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    FS_SFM_EXT_CW = ['balanced', None]
+    FS_SFM_EXT_CW = [None, 'balanced']
 if args.fs_sfm_svm_thres:
     FS_SFM_SVM_THRES = sorted(args.fs_sfm_svm_thres)
 else:
@@ -266,31 +272,43 @@ else:
 if args.fs_sfm_svm_c:
     FS_SFM_SVM_C = sorted(args.fs_sfm_svm_c)
 else:
-    FS_SFM_SVM_C = np.logspace(3, 7, 5)
+    FS_SFM_SVM_C = np.logspace(-2, 5, 8)
 if args.fs_sfm_svm_cw:
-    FS_SFM_SVM_CW = [None if a in ('None', 'none') else a for a in sorted(args.fs_sfm_svm_cw)]
+    FS_SFM_SVM_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_svm_cw],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    FS_SFM_SVM_CW = ['balanced', None]
+    FS_SFM_SVM_CW = [None, 'balanced']
 if args.fs_rfe_svm_c:
     FS_RFE_SVM_C = sorted(args.fs_rfe_svm_c)
 else:
     FS_RFE_SVM_C = np.logspace(-7, 3, 11)
 if args.fs_rfe_svm_cw:
-    FS_RFE_SVM_CW = [None if a in ('None', 'none') else a for a in sorted(args.fs_rfe_svm_cw)]
+    FS_RFE_SVM_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_svm_cw],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    FS_RFE_SVM_CW = ['balanced', None]
+    FS_RFE_SVM_CW = [None, 'balanced']
 if args.fs_rfe_ext_e:
     FS_RFE_EXT_E = sorted(args.fs_rfe_ext_e)
 else:
     FS_RFE_EXT_E = list(range(5, args.fs_rfe_ext_e_max + 1, 5))
 if args.fs_rfe_ext_d:
-    FS_RFE_EXT_D = sorted(args.fs_rfe_ext_d)
+    FS_RFE_EXT_D = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_ext_d],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    FS_RFE_EXT_D = list(range(1, args.fs_rfe_ext_d_max + 1, 1)) + [None]
+    FS_RFE_EXT_D = [None] + list(range(1, args.fs_rfe_ext_d_max + 1, 1))
 if args.fs_rfe_ext_cw:
-    FS_RFE_EXT_CW = [None if a in ('None', 'none') else a for a in sorted(args.fs_rfe_ext_cw)]
+    FS_RFE_EXT_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_ext_cw],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    FS_RFE_EXT_CW = ['balanced', None]
+    FS_RFE_EXT_CW = [None, 'balanced']
 if args.fs_rfe_step:
     FS_RFE_STEP = sorted(args.fs_rfe_step)
 else:
@@ -308,9 +326,12 @@ if args.clf_svm_c:
 else:
     CLF_SVM_C = np.logspace(-7, 3, 11)
 if args.clf_svm_cw:
-    CLF_SVM_CW = [None if a in ('None', 'none') else a for a in sorted(args.clf_svm_cw)]
+    CLF_SVM_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_svm_cw],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    CLF_SVM_CW = ['balanced', None]
+    CLF_SVM_CW = [None, 'balanced']
 if args.clf_svm_kern:
     CLF_SVM_KERN = sorted(args.clf_svm_kern)
 else:
@@ -328,13 +349,19 @@ if args.clf_ext_e:
 else:
     CLF_EXT_E = list(range(5, args.clf_ext_e_max + 1, 5))
 if args.clf_ext_d:
-    CLF_EXT_D = sorted(args.clf_ext_d)
+    CLF_EXT_D = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_ext_d],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    CLF_EXT_D = list(range(1, args.clf_ext_d_max + 1, 1)) + [None]
+    CLF_EXT_D = [None] + list(range(1, args.clf_ext_d_max + 1, 1))
 if args.clf_ext_cw:
-    CLF_EXT_CW = [None if a in ('None', 'none') else a for a in sorted(args.clf_ext_cw)]
+    CLF_EXT_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_ext_cw],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    CLF_EXT_CW = ['balanced', None]
+    CLF_EXT_CW = [None, 'balanced']
 if args.clf_ada_e:
     CLF_ADA_E = sorted(args.clf_ada_e)
 else:
@@ -344,9 +371,12 @@ if args.clf_ada_lgr_c:
 else:
     CLF_ADA_LGR_C = np.logspace(-7, 3, 11)
 if args.clf_ada_lgr_cw:
-    CLF_ADA_LGR_CW = [None if a in ('None', 'none') else a for a in sorted(args.clf_ada_lgr_cw)]
+    CLF_ADA_LGR_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_ada_lgr_cw],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    CLF_ADA_LGR_CW = ['balanced', None]
+    CLF_ADA_LGR_CW = [None, 'balanced']
 if args.clf_grb_e:
     CLF_GRB_E = sorted(args.clf_grb_e)
 else:
@@ -356,9 +386,12 @@ if args.clf_grb_d:
 else:
     CLF_GRB_D = list(range(1, args.clf_grb_d_max + 1, 1))
 if args.clf_grb_f:
-    CLF_GRB_F = [None if a in ('None', 'none') else a for a in sorted(args.clf_grb_f)]
+    CLF_GRB_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_grb_f],
+        key=lambda x: (x is not None, x)
+    )
 else:
-    CLF_GRB_F = ['auto', 'log2', 'sqrt', None]
+    CLF_GRB_F = [None, 'auto', 'log2', 'sqrt']
 if args.clf_mlp_hls:
     CLF_MLP_HLS = tuple(args.clf_mlp_hls)
 else:
@@ -837,12 +870,15 @@ if args.analysis == 1:
                     np.prod([len(v) for k,v in param_grid.items() if k != param])
                 )
                 if param in (
-                    'fs2__estimator__max_depth', 'fs2__threshold', 'clf__weights',
-                    'clf__max_depth', 'clf__max_features',
+                    'fs2__estimator__class_weight', 'fs2__estimator__max_depth',
+                    'fs2__threshold', 'clf__class_weight', 'clf__weights',
+                    'clf__max_depth', 'clf__base_estimator__class_weight',
+                    'clf__max_features',
                 ):
-                    xaxis_group_sorted_idxs = np.argsort(
-                        np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
-                    )
+                    # so None argsorts first instead of last (for strings and numbers)
+                    param_values = np.ma.getdata(search.cv_results_['param_' + param])
+                    param_values[param_values == None] = -np.Inf
+                    xaxis_group_sorted_idxs = np.argsort(param_values).astype(str))
                 else:
                     xaxis_group_sorted_idxs = np.argsort(
                         np.ma.getdata(search.cv_results_['param_' + param])
@@ -895,16 +931,18 @@ if args.analysis == 1:
         plt.figure('Figure ' + str(args.analysis) + '-' + str(param_idx + 1))
         plt.rcParams['font.size'] = 14
         if param in (
-            'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__estimator__max_depth',
-            'fs2__n_neighbors', 'fs2__sample_size', 'fs2__n_features_to_select', 'clf__n_neighbors',
-            'clf__n_estimators', 'clf__max_depth',
+            'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__n_neighbors',
+            'fs2__sample_size', 'fs2__n_features_to_select', 'clf__n_neighbors',
+            'clf__n_estimators',
         ):
             x_axis = param_grid[param]
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
         elif param in (
-            'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'clf__C',
-            'clf__weights', 'clf__base_estimator__C', 'clf__max_features',
+            'fs1__alpha', 'fs2__estimator__C', 'fs2__estimator__class_weight',
+            'fs2__estimator__max_depth', 'fs2__threshold', 'clf__C', 'clf__class_weight',
+            'clf__weights', 'clf__max_depth', 'clf__base_estimator__C',
+            'clf__base_estimator__class_weight', 'clf__max_features',
         ):
             x_axis = range(len(param_grid[param]))
             plt.xticks(x_axis, param_grid[param])
@@ -1120,12 +1158,15 @@ elif args.analysis == 2:
                 np.prod([len(v) for k,v in param_grid.items() if k != param])
             )
             if param in (
-                'fs2__estimator__max_depth', 'fs2__threshold', 'clf__weights',
-                'clf__max_depth', 'clf__max_features',
+                'fs2__estimator__class_weight', 'fs2__estimator__max_depth',
+                'fs2__threshold', 'clf__class_weight', 'clf__weights',
+                'clf__max_depth', 'clf__base_estimator__class_weight',
+                'clf__max_features',
             ):
-                xaxis_group_sorted_idxs = np.argsort(
-                    np.ma.getdata(search.cv_results_['param_' + param]).astype(str)
-                )
+                # so None argsorts first instead of last (for strings and numbers)
+                param_values = np.ma.getdata(search.cv_results_['param_' + param])
+                param_values[param_values == None] = -np.Inf
+                xaxis_group_sorted_idxs = np.argsort(param_values).astype(str))
             else:
                 xaxis_group_sorted_idxs = np.argsort(
                     np.ma.getdata(search.cv_results_['param_' + param])
@@ -1133,16 +1174,18 @@ elif args.analysis == 2:
             plt.figure('Figure ' + str(args.analysis) + '-' + str(param_idx + 1))
             plt.rcParams['font.size'] = 14
             if param in (
-                'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__estimator__max_depth',
-                'fs2__n_neighbors', 'fs2__sample_size', 'fs2__n_features_to_select', 'clf__n_neighbors',
-                'clf__n_estimators', 'clf__max_depth',
+                'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__n_neighbors',
+                'fs2__sample_size', 'fs2__n_features_to_select', 'clf__n_neighbors',
+                'clf__n_estimators',
             ):
                 x_axis = param_grid[param]
                 plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
                 plt.xticks(x_axis)
             elif param in (
-                'fs1__alpha', 'fs2__estimator__C', 'fs2__threshold', 'clf__C',
-                'clf__weights', 'clf__base_estimator__C', 'clf__max_features',
+                'fs1__alpha', 'fs2__estimator__C', 'fs2__estimator__class_weight',
+                'fs2__estimator__max_depth', 'fs2__threshold', 'clf__C', 'clf__class_weight',
+                'clf__weights', 'clf__max_depth', 'clf__base_estimator__C',
+                'clf__base_estimator__class_weight', 'clf__max_features',
             ):
                 x_axis = range(len(param_grid[param]))
                 plt.xticks(x_axis, param_grid[param])
