@@ -6,8 +6,8 @@ source("config.R")
 
 parser <- ArgumentParser()
 parser$add_argument("--filter", type="character", nargs="+", help="filter function")
-parser$add_argument("--datasets-tr", type="character", nargs="+", help="datasets tr")
-parser$add_argument("--datasets-te", type="character", nargs="+", help="datasets te")
+parser$add_argument("--dataset-tr", type="character", nargs="+", help="dataset tr")
+parser$add_argument("--dataset-te", type="character", nargs="+", help="dataset te")
 parser$add_argument("--num-combo-tr", type="integer", help="num datasets to combine")
 parser$add_argument("--data-type", type="character", nargs="+", help="data type")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="normalization method")
@@ -25,17 +25,17 @@ if (args$filter == "features") {
     if (is.null(args$feat_file)) stop("--feat-file option required")
     if (!file.exists(args$feat_file)) stop("Invalid feature file")
 }
-if (!is.null(args$datasets_tr) && !is.null(args$num_combo_tr)) {
-    dataset_tr_name_combos <- combn(intersect(dataset_names, args$datasets_tr), as.integer(args$num_combo_tr))
-} else if (!is.null(args$datasets_tr)) {
-    dataset_tr_name_combos <- combn(intersect(dataset_names, args$datasets_tr), length(args$datasets_tr))
+if (!is.null(args$dataset_tr) && !is.null(args$num_combo_tr)) {
+    dataset_tr_name_combos <- combn(intersect(dataset_names, args$dataset_tr), as.integer(args$num_combo_tr))
+} else if (!is.null(args$dataset_tr)) {
+    dataset_tr_name_combos <- combn(intersect(dataset_names, args$dataset_tr), length(args$dataset_tr))
 } else {
     dataset_tr_name_combos <- combn(dataset_names, as.integer(args$num_combo_tr))
 }
-if (!is.null(args$datasets_tr)) {
-    dataset_names <- intersect(dataset_names, args$datasets_tr)
+if (!is.null(args$dataset_tr)) {
+    dataset_names <- intersect(dataset_names, args$dataset_tr)
 }
-if (!is.null(args$datasets_te)) {
+if (!is.null(args$dataset_te)) {
     dataset_te_names <- intersect(dataset_names, args$datasets_te)
 } else {
     dataset_te_names <- dataset_names

@@ -47,8 +47,8 @@ parser = ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--splits', type=int, default=10, help='num outer splits')
 parser.add_argument('--test-size', type=float, default=0.3, help='outer splits test size')
-parser.add_argument('--datasets-tr', type=str, nargs='+', help='datasets tr')
-parser.add_argument('--datasets-te', type=str, nargs='+', help='datasets te')
+parser.add_argument('--dataset-tr', type=str, nargs='+', help='dataset tr')
+parser.add_argument('--dataset-te', type=str, nargs='+', help='dataset te')
 parser.add_argument('--num-combo-tr', type=int, default=1, help='dataset tr num combos')
 parser.add_argument('--data-type', type=str, nargs='+', help='dataset data type')
 parser.add_argument('--norm-meth', type=str, nargs='+', help='normalization method')
@@ -799,11 +799,11 @@ if args.analysis == 1:
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
-    args.datasets_tr = natsorted(args.datasets_tr)
-    if len(args.datasets_tr) > 1 or bc_meth:
-        dataset_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
+    args.dataset_tr = natsorted(args.dataset_tr)
+    if len(args.dataset_tr) > 1 or bc_meth:
+        dataset_name = '_'.join(args.dataset_tr + prep_steps + ['tr'])
     else:
-        dataset_name = '_'.join(args.datasets_tr + prep_steps)
+        dataset_name = '_'.join(args.dataset_tr + prep_steps)
     eset_name = 'eset_' + dataset_name
     eset_file = 'data/' + eset_name + '.Rda'
     if path.isfile(eset_file):
@@ -1101,11 +1101,11 @@ elif args.analysis == 2:
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
-    args.datasets_tr = natsorted(args.datasets_tr)
-    if len(args.datasets_tr) > 1 or bc_meth:
-        dataset_tr_name = '_'.join(args.datasets_tr + prep_steps + ['tr'])
+    args.dataset_tr = natsorted(args.dataset_tr)
+    if len(args.dataset_tr) > 1 or bc_meth:
+        dataset_tr_name = '_'.join(args.dataset_tr + prep_steps + ['tr'])
     else:
-        dataset_tr_name = '_'.join(args.datasets_tr + prep_steps)
+        dataset_tr_name = '_'.join(args.dataset_tr + prep_steps)
     eset_tr_name = 'eset_' + dataset_tr_name
     eset_tr_file = 'data/' + eset_tr_name + '.Rda'
     if path.isfile(eset_file):
@@ -1275,10 +1275,10 @@ elif args.analysis == 2:
             plt.legend(loc='lower right', fontsize='small')
             plt.grid('on')
     # plot num top-ranked features selected vs test dataset perf metrics
-    if args.datasets_te:
-        dataset_te_basenames = natsorted(list(set(args.datasets_te) - set(args.datasets_tr)))
+    if args.dataset_te:
+        dataset_te_basenames = natsorted(list(set(args.dataset_te) - set(args.dataset_tr)))
     else:
-        dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.datasets_tr)))
+        dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.dataset_tr)))
     sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames)))
     plt.figure('Figure ' + str(args.analysis))
     plt.rcParams['font.size'] = 14
@@ -1306,7 +1306,7 @@ elif args.analysis == 2:
         print('Pipeline:')
         pprint(vars(pipe))
     for dataset_te_basename in dataset_te_basenames:
-        if (len(args.datasets_tr) == 1 and not bc_meth) or args.no_addon_te:
+        if (len(args.dataset_tr) == 1 and not bc_meth) or args.no_addon_te:
             dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
         else:
             dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
@@ -1395,14 +1395,14 @@ elif args.analysis == 3:
         args.fs_meth = args.fs_meth[0]
         args.slr_meth = args.slr_meth[0]
         args.clf_meth = args.clf_meth[0]
-    if args.datasets_tr and args.num_combo_tr:
-        dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), args.num_combo_tr)]
-    elif args.datasets_tr:
-        dataset_tr_combos = [list(x) for x in combinations(natsorted(args.datasets_tr), len(args.datasets_tr))]
+    if args.dataset_tr and args.num_combo_tr:
+        dataset_tr_combos = [list(x) for x in combinations(natsorted(args.dataset_tr), args.num_combo_tr)]
+    elif args.dataset_tr:
+        dataset_tr_combos = [list(x) for x in combinations(natsorted(args.dataset_tr), len(args.dataset_tr))]
     else:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(dataset_names), args.num_combo_tr)]
-    if args.datasets_te:
-        dataset_te_basenames = [x for x in natsorted(dataset_names) if x in args.datasets_te]
+    if args.dataset_te:
+        dataset_te_basenames = [x for x in natsorted(dataset_names) if x in args.dataset_te]
     else:
         dataset_te_basenames = dataset_names
     # determine which data combinations will be used
