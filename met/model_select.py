@@ -108,7 +108,7 @@ parser.add_argument('--clf-ada-e-max', type=int, default=200, help='clf ada n es
 parser.add_argument('--clf-ada-lgr-c', type=float, nargs='+', help='clf ada lgr c')
 parser.add_argument('--clf-ada-lgr-cw', type=str, nargs='+', help='clf ada lgr class weight')
 parser.add_argument('--clf-grb-e', type=int, nargs='+', help='clf grb n estimators')
-parser.add_argument('--clf-grb-e-max', type=int, default=300, help='clf grb n estimators max')
+parser.add_argument('--clf-grb-e-max', type=int, default=200, help='clf grb n estimators max')
 parser.add_argument('--clf-grb-d', type=int, nargs='+', help='clf grb max depth')
 parser.add_argument('--clf-grb-d-max', type=int, default=10, help='clf grb max depth max')
 parser.add_argument('--clf-grb-f', type=str, nargs='+', help='clf grb max features')
@@ -381,7 +381,7 @@ else:
 if args.clf_grb_e:
     CLF_GRB_E = sorted(args.clf_grb_e)
 else:
-    CLF_GRB_E = list(range(5, args.clf_grb_e_max + 1, 5))
+    CLF_GRB_E = list(range(20, args.clf_ada_e_max + 1, 20))
 if args.clf_grb_d:
     CLF_GRB_D = sorted(args.clf_grb_d)
 else:
