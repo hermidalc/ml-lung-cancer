@@ -45,7 +45,7 @@ warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are 
 # config
 parser = ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
-parser.add_argument('--splits', type=int, default=10, help='num outer splits')
+parser.add_argument('--test-splits', type=int, default=10, help='num outer splits')
 parser.add_argument('--test-size', type=float, default=0.3, help='outer splits test size')
 parser.add_argument('--dataset-tr', type=str, nargs='+', help='dataset tr')
 parser.add_argument('--dataset-te', type=str, nargs='+', help='dataset te')
@@ -868,7 +868,7 @@ if args.analysis == 1:
     split_num = 1
     split_results = []
     param_cv_scores = {}
-    sss = StratifiedShuffleSplit(n_splits=args.splits, test_size=args.test_size)
+    sss = StratifiedShuffleSplit(n_splits=args.test_splits, test_size=args.test_size)
     for tr_idxs, te_idxs in sss.split(X, y):
         search.fit(X[tr_idxs], y[tr_idxs])
         feature_idxs = np.arange(X[tr_idxs].shape[1])
