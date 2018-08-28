@@ -54,12 +54,12 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             for (feat_type in feat_types) {
                 suffixes <- c(data_type)
                 for (suffix in c(norm_meth, feat_type)) {
-                    if (suffix != "none") suffixes <- c(suffixes, suffix)
+                    if (!(suffix %in% c("none", "None"))) suffixes <- c(suffixes, suffix)
                 }
                 for (prep_meth in prep_methods) {
                     suffixes_tr <- suffixes
                     suffixes_te <- suffixes
-                    if (prep_meth != "none") {
+                    if (!(prep_meth %in% c("none", "None"))) {
                         suffixes_tr <- c(suffixes_tr, prep_meth)
                         if (prep_meth != "mrg") suffixes_te <- suffixes_tr
                     }
@@ -98,7 +98,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
                     }
                     if (args$load_only) next
                     for (bc_meth in bc_methods) {
-                        if (length(dataset_tr_name_combos[,col]) > 1 || bc_meth != "none") {
+                        if (length(dataset_tr_name_combos[,col]) > 1 || !(bc_meth %in% c("none", "None"))) {
                             eset_tr_bc_name <- paste0(
                                 c("eset", dataset_tr_name_combos[,col], suffixes_tr, bc_meth, "tr"),
                                 collapse="_"

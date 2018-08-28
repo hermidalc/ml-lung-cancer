@@ -31,7 +31,7 @@ for (dataset_name in dataset_names) {
             for (feat_type in feat_types) {
                 suffixes <- c(data_type)
                 for (suffix in c(norm_meth, feat_type)) {
-                    if (suffix != "none") suffixes <- c(suffixes, suffix)
+                    if (!(suffix %in% c("none", "None"))) suffixes <- c(suffixes, suffix)
                 }
                 exprs_file_basename <- paste0(c(dataset_name, suffixes, "data"), collapse="_")
                 exprs_file <- paste0("data/", exprs_file_basename, ".txt")

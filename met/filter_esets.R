@@ -62,7 +62,7 @@ if (args$filter == "common_features") {
                 for (feat_type in feat_types) {
                     suffixes <- c(data_type)
                     for (suffix in c(norm_meth, feat_type)) {
-                        if (suffix != "none") suffixes <- c(suffixes, suffix)
+                        if (!(suffix %in% c("none", "None"))) suffixes <- c(suffixes, suffix)
                     }
                     eset_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
                     eset_file <- paste0("data/", eset_name, ".Rda")
@@ -92,7 +92,7 @@ if (args$filter == "common_features") {
                 for (feat_type in feat_types) {
                     suffixes <- c(data_type)
                     for (suffix in c(norm_meth, feat_type)) {
-                        if (suffix != "none") suffixes <- c(suffixes, suffix)
+                        if (!(suffix %in% c("none", "None"))) suffixes <- c(suffixes, suffix)
                     }
                     eset_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
                     if (exists(eset_name)) {
@@ -118,21 +118,21 @@ if (args$filter == "common_features") {
                 for (feat_type in feat_types) {
                     suffixes <- c(data_type)
                     for (suffix in c(norm_meth, feat_type)) {
-                        if (suffix != "none") suffixes <- c(suffixes, suffix)
+                        if (!(suffix %in% c("none", "None"))) suffixes <- c(suffixes, suffix)
                     }
                     for (prep_meth in prep_methods) {
                         for (bc_meth in bc_methods) {
                             suffixes_tr <- suffixes
                             suffixes_te <- suffixes
-                            if (prep_meth != "none") {
+                            if (!(prep_meth %in% c("none", "None"))) {
                                 suffixes_tr <- c(suffixes_tr, prep_meth)
-                                if (bc_meth != "none") {
+                                if (!(bc_meth %in% c("none", "None"))) {
                                     suffixes_tr <- c(suffixes_tr, bc_meth)
                                 }
                                 if (prep_meth != "mrg") {
                                     suffixes_te <- suffixes_tr
                                 }
-                                else if (bc_meth != "none") {
+                                else if (!(bc_meth %in% c("none", "None"))) {
                                     suffixes_te <- c(suffixes_te, bc_meth)
                                 }
                             }

@@ -38,7 +38,7 @@ for (dataset_name in dataset_names) {
             for (feat_type in feat_types) {
                 suffixes <- c(data_type)
                 for (suffix in c(norm_meth, feat_type)) {
-                    if (suffix != "none") suffixes <- c(suffixes, suffix)
+                    if (!(suffix %in% c("none", "None"))) suffixes <- c(suffixes, suffix)
                 }
                 eset_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
                 eset_file <- paste0("data/", eset_name, ".Rda")
@@ -61,7 +61,7 @@ for (col in 1:ncol(dataset_tr_name_combos)) {
             for (feat_type in feat_types) {
                 suffixes <- c(data_type)
                 for (suffix in c(norm_meth, feat_type)) {
-                    if (suffix != "none") suffixes <- c(suffixes, suffix)
+                    if (!(suffix %in% c("none", "None"))) suffixes <- c(suffixes, suffix)
                 }
                 for (dataset_name in dataset_tr_name_combos[,col]) {
                     eset_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
