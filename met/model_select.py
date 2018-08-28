@@ -58,7 +58,7 @@ parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correct
 parser.add_argument('--filter-type', type=str, nargs='+', help='dataset filter type')
 parser.add_argument('--flt-nzsd-feats', default=False, action='store_true', help='filter nzsd features')
 parser.add_argument('--flt-corr-cutoff', type=float, help='correlation filter cutoff')
-parser.add_argument('--no-addon-te', default=False, action='store_true', help='dataset te no add-on')
+parser.add_argument('--no-addon-te', default=False, action='store_true', help='no add-on dataset te')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
 parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
@@ -66,6 +66,7 @@ parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr mi
 parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=1000, help='fs skb k select max')
+parser.add_argument('--fs-skb-lim-off', default=False, action='store_true', help='skb turn off sample limit')
 parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
 parser.add_argument('--fs-sfm-ext-thres', type=float, nargs='+', help='fs sfm ext threshold')
 parser.add_argument('--fs-sfm-ext-e', type=int, nargs='+', help='fs sfm ext n estimators')
@@ -839,7 +840,7 @@ if args.analysis == 1:
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
-        if param in params_feature_select:
+        if param in params_feature_select and not args.fs_skb_lim_off:
             param_grid[param] = list(filter(lambda x: x <= min(X.shape[1], y.shape[0]), param_grid[param]))
     if args.scv_type == 'grid':
         search = GridSearchCV(
@@ -1137,7 +1138,7 @@ elif args.analysis == 2:
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
-        if param in params_feature_select:
+        if param in params_feature_select and not args.fs_skb_lim_off:
             param_grid[param] = list(filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param]))
     if args.scv_type == 'grid':
         search = GridSearchCV(
@@ -1543,7 +1544,7 @@ elif args.analysis == 3:
                                         object.set_params(score_func=limma_score_func)
                         for fs_params in fs_meth_pipeline['param_grid']:
                             for param in fs_params:
-                                if param in params_feature_select:
+                                if param in params_feature_select and not args.fs_skb_lim_off:
                                     fs_params[param] = list(
                                         filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), fs_params[param])
                                     )
@@ -1592,7 +1593,7 @@ elif args.analysis == 3:
                         else:
                             pipe.set_params(fs1__score_func=limma_score_func)
                     for param in param_grid:
-                        if param in params_feature_select:
+                        if param in params_feature_select and not args.fs_skb_lim_off:
                             param_grid[param] = list(
                                 filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param])
                             )
