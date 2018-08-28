@@ -844,8 +844,14 @@ if args.analysis == 1:
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
-        if param in params_feature_select and not args.fs_skb_lim_off:
-            param_grid[param] = list(filter(lambda x: x <= min(X.shape[1], y.shape[0]), param_grid[param]))
+        if param in params_feature_select:
+            param_grid[param] = list(filter(
+                lambda x: x <= min(
+                    X.shape[1],
+                    args.fs_skb_k_max if args.fs_skb_lim_off else y.shape[0]
+                ),
+                param_grid[param]
+            ))
     if args.scv_type == 'grid':
         search = GridSearchCV(
             pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
@@ -1146,8 +1152,14 @@ elif args.analysis == 2:
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
-        if param in params_feature_select and not args.fs_skb_lim_off:
-            param_grid[param] = list(filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param]))
+        if param in params_feature_select:
+            param_grid[param] = list(filter(
+                lambda x: x <= min(
+                    X_tr.shape[1],
+                    args.fs_skb_k_max if args.fs_skb_lim_off else y_tr.shape[0]
+                ),
+                param_grid[param]
+            ))
     if args.scv_type == 'grid':
         search = GridSearchCV(
             pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
@@ -1552,10 +1564,14 @@ elif args.analysis == 3:
                                         object.set_params(score_func=limma_score_func)
                         for fs_params in fs_meth_pipeline['param_grid']:
                             for param in fs_params:
-                                if param in params_feature_select and not args.fs_skb_lim_off:
-                                    fs_params[param] = list(
-                                        filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), fs_params[param])
-                                    )
+                                if param in params_feature_select:
+                                    param_grid[param] = list(filter(
+                                        lambda x: x <= min(
+                                            X_tr.shape[1],
+                                            args.fs_skb_k_max if args.fs_skb_lim_off else y_tr.shape[0]
+                                        ),
+                                        param_grid[param]
+                                    ))
                             for slr_idx, slr_meth in enumerate(pipelines['slr']):
                                 for slr_params in pipelines['slr'][slr_meth]['param_grid']:
                                     for clf_idx, clf_meth in enumerate(pipelines['clf']):
@@ -1601,10 +1617,14 @@ elif args.analysis == 3:
                         else:
                             pipe.set_params(fs1__score_func=limma_score_func)
                     for param in param_grid:
-                        if param in params_feature_select and not args.fs_skb_lim_off:
-                            param_grid[param] = list(
-                                filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param])
-                            )
+                        if param in params_feature_select:
+                            param_grid[param] = list(filter(
+                                lambda x: x <= min(
+                                    X_tr.shape[1],
+                                    args.fs_skb_k_max if args.fs_skb_lim_off else y_tr.shape[0]
+                                ),
+                                param_grid[param]
+                            ))
                     search = RandomizedSearchCV(
                         pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit,
                         cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
