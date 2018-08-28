@@ -805,7 +805,11 @@ if args.analysis == 1:
     else:
         dataset_name = '_'.join(args.datasets_tr + prep_steps)
     eset_name = 'eset_' + dataset_name
-    base.load('data/' + eset_name + '.Rda')
+    eset_file = 'data/' + eset_name + '.Rda'
+    if path.isfile(eset_file):
+        base.load('data/' + eset_name + '.Rda')
+    else:
+        exit('File does not exist or invalid: ' + eset_file)
     eset = robjects.globalenv[eset_name]
     X = np.array(base.t(biobase.exprs(eset)), dtype=float)
     y = np.array(r_eset_class_labels(eset), dtype=int)
@@ -1103,7 +1107,11 @@ elif args.analysis == 2:
     else:
         dataset_tr_name = '_'.join(args.datasets_tr + prep_steps)
     eset_tr_name = 'eset_' + dataset_tr_name
-    base.load('data/' + eset_tr_name + '.Rda')
+    eset_tr_file = 'data/' + eset_tr_name + '.Rda'
+    if path.isfile(eset_file):
+        base.load('data/' + eset_tr_name + '.Rda')
+    else:
+        exit('File does not exist or invalid: ' + eset_tr_file)
     eset_tr = robjects.globalenv[eset_tr_name]
     X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
     y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
