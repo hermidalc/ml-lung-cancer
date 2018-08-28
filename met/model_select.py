@@ -720,28 +720,81 @@ pipelines = {
         },
     },
 }
+params_feature_select = [
+    'fs1__k',
+    'fs2__k',
+    'fs2__n_features_to_select',
+]
+params_with_strs = [
+    'fs2__estimator__class_weight',
+    'fs2__estimator__max_depth',
+    'fs2__threshold',
+    'clf__class_weight',
+    'clf__kernel',
+    'clf__weights',
+    'clf__max_depth',
+    'clf__base_estimator__class_weight',
+    'clf__max_features',
+]
+params_num_xticks = [
+    'fs1__k',
+    'fs2__k',
+    'fs2__estimator__n_estimators',
+    'fs2__n_neighbors',
+    'fs2__sample_size',
+    'fs2__n_features_to_select',
+    'clf__n_neighbors',
+    'clf__n_estimators',
+]
+params_fixed_xticks = [
+    'fs1__alpha',
+    'fs2__estimator__C',
+    'fs2__estimator__class_weight',
+    'fs2__estimator__max_depth',
+    'fs2__threshold',
+    'clf__C',
+    'clf__class_weight',
+    'clf__kernel',
+    'clf__weights',
+    'clf__max_depth',
+    'clf__base_estimator__C',
+    'clf__base_estimator__class_weight',
+    'clf__max_features',
+]
 
 # analyses
 if args.analysis == 1:
     prep_steps = []
-    if args.data_type and args.data_type[0] != 'none':
+    if args.data_type and args.data_type[0] not in ('None', 'none'):
         data_type = [x for x in data_types if x in args.data_type][0]
         prep_steps.append(data_type)
-    if args.norm_meth and args.norm_meth[0] != 'none':
+    else:
+        data_type = None
+    if args.norm_meth and args.norm_meth[0] not in ('None', 'none'):
         norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
         prep_steps.append(norm_meth)
-    if args.feat_type and args.feat_type[0] != 'none':
+    else:
+        norm_meth = None
+    if args.feat_type and args.feat_type[0] not in ('None', 'none'):
         feat_type = [x for x in feat_types if x in args.feat_type][0]
         prep_steps.append(feat_type)
-    if args.prep_meth and args.prep_meth[0] != 'none':
+    else:
+        feat_type = None
+    if args.prep_meth and args.prep_meth[0] not in ('None', 'none'):
         prep_meth = [x for x in prep_methods if x in args.prep_meth][0]
         prep_steps.append(prep_meth)
-    if args.bc_meth and args.bc_meth[0] != 'none':
+    else:
+        prep_meth = None
+    if args.bc_meth and args.bc_meth[0] not in ('None', 'none'):
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_steps.append(bc_meth)
-    if args.filter_type and args.filter_type[0] != 'none':
+    else:
+        bc_meth = None
+    if args.filter_type and args.filter_type[0] not in ('None', 'none'):
         filter_type = [x for x in filter_types if x in args.filter_type][0]
         prep_steps.append(filter_type)
+    else:
+        filter_type = None
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
@@ -786,7 +839,7 @@ if args.analysis == 1:
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
-        if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
+        if param in params_feature_select:
             param_grid[param] = list(filter(lambda x: x <= min(X.shape[1], y.shape[0]), param_grid[param]))
     if args.scv_type == 'grid':
         search = GridSearchCV(
@@ -823,13 +876,14 @@ if args.analysis == 1:
             weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
         elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
             weights = search.best_estimator_.named_steps['clf'].feature_importances_
-        elif (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
-            hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
-            weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
-        elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
-            weights = search.best_estimator_.named_steps['fs2'].scores_
-        elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
-            weights = search.best_estimator_.named_steps['fs2'].feature_importances_
+        elif ('fs2' in search.best_estimator_.named_steps):
+            if (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
+                hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
+                weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
+            elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
+                weights = search.best_estimator_.named_steps['fs2'].scores_
+            elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
+                weights = search.best_estimator_.named_steps['fs2'].feature_importances_
         roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search.best_index_]
         bcr_cv = search.cv_results_['mean_test_bcr'][search.best_index_]
         if hasattr(search, 'decision_function'):
@@ -869,16 +923,11 @@ if args.analysis == 1:
                     len(param_grid[param]),
                     np.prod([len(v) for k,v in param_grid.items() if k != param])
                 )
-                if param in (
-                    'fs2__estimator__class_weight', 'fs2__estimator__max_depth',
-                    'fs2__threshold', 'clf__class_weight', 'clf__weights',
-                    'clf__max_depth', 'clf__base_estimator__class_weight',
-                    'clf__max_features',
-                ):
+                if param in params_with_strs:
                     # so None argsorts first instead of last (for strings and numbers)
                     param_values = np.ma.getdata(search.cv_results_['param_' + param])
                     param_values[param_values == None] = -np.Inf
-                    xaxis_group_sorted_idxs = np.argsort(param_values).astype(str))
+                    xaxis_group_sorted_idxs = np.argsort(param_values.astype(str))
                 else:
                     xaxis_group_sorted_idxs = np.argsort(
                         np.ma.getdata(search.cv_results_['param_' + param])
@@ -930,20 +979,11 @@ if args.analysis == 1:
         std_bcrs_cv = np.std(param_cv_scores[param]['bcr'], axis=0)
         plt.figure('Figure ' + str(args.analysis) + '-' + str(param_idx + 1))
         plt.rcParams['font.size'] = 14
-        if param in (
-            'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__n_neighbors',
-            'fs2__sample_size', 'fs2__n_features_to_select', 'clf__n_neighbors',
-            'clf__n_estimators',
-        ):
+        if param in params_num_xticks:
             x_axis = param_grid[param]
             plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
             plt.xticks(x_axis)
-        elif param in (
-            'fs1__alpha', 'fs2__estimator__C', 'fs2__estimator__class_weight',
-            'fs2__estimator__max_depth', 'fs2__threshold', 'clf__C', 'clf__class_weight',
-            'clf__weights', 'clf__max_depth', 'clf__base_estimator__C',
-            'clf__base_estimator__class_weight', 'clf__max_features',
-        ):
+        elif param in params_fixed_xticks:
             x_axis = range(len(param_grid[param]))
             plt.xticks(x_axis, param_grid[param])
         plt.title(
@@ -1023,24 +1063,36 @@ if args.analysis == 1:
         print(feature, '\t', rank)
 elif args.analysis == 2:
     prep_steps = []
-    if args.data_type and args.data_type[0] != 'none':
+    if args.data_type and args.data_type[0] not in ('None', 'none'):
         data_type = [x for x in data_types if x in args.data_type][0]
         prep_steps.append(data_type)
-    if args.norm_meth and args.norm_meth[0] != 'none':
+    else:
+        data_type = None
+    if args.norm_meth and args.norm_meth[0] not in ('None', 'none'):
         norm_meth = [x for x in norm_methods if x in args.norm_meth][0]
         prep_steps.append(norm_meth)
-    if args.feat_type and args.feat_type[0] != 'none':
+    else:
+        norm_meth = None
+    if args.feat_type and args.feat_type[0] not in ('None', 'none'):
         feat_type = [x for x in feat_types if x in args.feat_type][0]
         prep_steps.append(feat_type)
-    if args.prep_meth and args.prep_meth[0] != 'none':
+    else:
+        feat_type = None
+    if args.prep_meth and args.prep_meth[0] not in ('None', 'none'):
         prep_meth = [x for x in prep_methods if x in args.prep_meth][0]
         prep_steps.append(prep_meth)
-    if args.bc_meth and args.bc_meth[0] != 'none':
+    else:
+        prep_meth = None
+    if args.bc_meth and args.bc_meth[0] not in ('None', 'none'):
         bc_meth = [x for x in bc_methods if x in args.bc_meth][0]
         prep_steps.append(bc_meth)
-    if args.filter_type and args.filter_type[0] != 'none':
+    else:
+        bc_meth = None
+    if args.filter_type and args.filter_type[0] not in ('None', 'none'):
         filter_type = [x for x in filter_types if x in args.filter_type][0]
         prep_steps.append(filter_type)
+    else:
+        filter_type = None
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
@@ -1085,7 +1137,7 @@ elif args.analysis == 2:
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
-        if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
+        if param in params_feature_select:
             param_grid[param] = list(filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param]))
     if args.scv_type == 'grid':
         search = GridSearchCV(
@@ -1123,13 +1175,14 @@ elif args.analysis == 2:
         weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
     elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
         weights = search.best_estimator_.named_steps['clf'].feature_importances_
-    elif (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
-        hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
-        weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
-    elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
-        weights = search.best_estimator_.named_steps['fs2'].scores_
-    elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
-        weights = search.best_estimator_.named_steps['fs2'].feature_importances_
+    elif ('fs2' in search.best_estimator_.named_steps):
+        if (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
+            hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
+            weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
+        elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
+            weights = search.best_estimator_.named_steps['fs2'].scores_
+        elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
+            weights = search.best_estimator_.named_steps['fs2'].feature_importances_
     print('Train:', dataset_tr_name, ' ROC AUC (CV): %.4f  BCR (CV): %.4f' % (
         search.cv_results_['mean_test_roc_auc'][search.best_index_],
         search.cv_results_['mean_test_bcr'][search.best_index_]
@@ -1157,36 +1210,22 @@ elif args.analysis == 2:
                 len(param_grid[param]),
                 np.prod([len(v) for k,v in param_grid.items() if k != param])
             )
-            if param in (
-                'fs2__estimator__class_weight', 'fs2__estimator__max_depth',
-                'fs2__threshold', 'clf__class_weight', 'clf__weights',
-                'clf__max_depth', 'clf__base_estimator__class_weight',
-                'clf__max_features',
-            ):
+            if param in params_with_strs:
                 # so None argsorts first instead of last (for strings and numbers)
                 param_values = np.ma.getdata(search.cv_results_['param_' + param])
                 param_values[param_values == None] = -np.Inf
-                xaxis_group_sorted_idxs = np.argsort(param_values).astype(str))
+                xaxis_group_sorted_idxs = np.argsort(param_values.astype(str))
             else:
                 xaxis_group_sorted_idxs = np.argsort(
                     np.ma.getdata(search.cv_results_['param_' + param])
                 )
             plt.figure('Figure ' + str(args.analysis) + '-' + str(param_idx + 1))
             plt.rcParams['font.size'] = 14
-            if param in (
-                'fs1__k', 'fs2__k', 'fs2__estimator__n_estimators', 'fs2__n_neighbors',
-                'fs2__sample_size', 'fs2__n_features_to_select', 'clf__n_neighbors',
-                'clf__n_estimators',
-            ):
+            if param in params_num_xticks:
                 x_axis = param_grid[param]
                 plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
                 plt.xticks(x_axis)
-            elif param in (
-                'fs1__alpha', 'fs2__estimator__C', 'fs2__estimator__class_weight',
-                'fs2__estimator__max_depth', 'fs2__threshold', 'clf__C', 'clf__class_weight',
-                'clf__weights', 'clf__max_depth', 'clf__base_estimator__C',
-                'clf__base_estimator__class_weight', 'clf__max_features',
-            ):
+            elif param in params_fixed_xticks:
                 x_axis = range(len(param_grid[param]))
                 plt.xticks(x_axis, param_grid[param])
             plt.title(
@@ -1246,7 +1285,7 @@ elif args.analysis == 2:
     if weights.size > 0:
         ranked_feature_idxs = [x for _, x, _ in feature_ranks]
     else:
-        ranked_feature_idxs = [x for x, _, _ in feature_ranks]
+        ranked_feature_idxs = [x for x, _ in feature_ranks]
     pipe = Pipeline(
         pipelines['slr'][args.slr_meth]['steps'] +
         pipelines['clf'][args.clf_meth]['steps']
@@ -1330,12 +1369,12 @@ elif args.analysis == 3:
                             prep_groups.append([
                                 x for x in [
                                     data_type, norm_meth, feat_type, prep_meth, bc_meth, filter_type
-                                ] if x != 'none'
+                                ] if x not in ('None', 'none')
                             ])
                             prep_group_info.append({
                                 'pkm': True if norm_meth == 'pkm' else False,
                                 'mrg': True if prep_meth == 'mrg' else False,
-                                'bcm': True if bc_meth != 'none' else False,
+                                'bcm': True if bc_meth not in ('None', 'none') else False,
                             })
     if args.fs_meth:
         pipelines['fs'] = { k: v for k, v in pipelines['fs'].items() if k in args.fs_meth }
@@ -1504,7 +1543,7 @@ elif args.analysis == 3:
                                         object.set_params(score_func=limma_score_func)
                         for fs_params in fs_meth_pipeline['param_grid']:
                             for param in fs_params:
-                                if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
+                                if param in params_feature_select:
                                     fs_params[param] = list(
                                         filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), fs_params[param])
                                     )
@@ -1553,7 +1592,7 @@ elif args.analysis == 3:
                         else:
                             pipe.set_params(fs1__score_func=limma_score_func)
                     for param in param_grid:
-                        if param in ('fs1__k', 'fs2__k', 'fs2__n_features_to_select'):
+                        if param in params_feature_select:
                             param_grid[param] = list(
                                 filter(lambda x: x <= min(X_tr.shape[1], y_tr.shape[0]), param_grid[param])
                             )
