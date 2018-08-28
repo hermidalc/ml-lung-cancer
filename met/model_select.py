@@ -1108,7 +1108,7 @@ elif args.analysis == 2:
         dataset_tr_name = '_'.join(args.dataset_tr + prep_steps)
     eset_tr_name = 'eset_' + dataset_tr_name
     eset_tr_file = 'data/' + eset_tr_name + '.Rda'
-    if path.isfile(eset_file):
+    if path.isfile(eset_tr_file):
         base.load('data/' + eset_tr_name + '.Rda')
     else:
         exit('File does not exist or invalid: ' + eset_tr_file)
