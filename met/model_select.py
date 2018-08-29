@@ -68,15 +68,20 @@ parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=1000, help='fs skb k select max')
 parser.add_argument('--fs-skb-lim-off', default=False, action='store_true', help='skb turn off sample limit')
 parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
+parser.add_argument('--fs-sfm-svm-thres', type=float, nargs='+', help='fs sfm svm threshold')
+parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
+parser.add_argument('--fs-sfm-svm-cw', type=str, nargs='+', help='fs sfm svm class weight')
 parser.add_argument('--fs-sfm-ext-thres', type=float, nargs='+', help='fs sfm ext threshold')
 parser.add_argument('--fs-sfm-ext-e', type=int, nargs='+', help='fs sfm ext n estimators')
 parser.add_argument('--fs-sfm-ext-e-max', type=int, default=50, help='fs sfm ext n estimators max')
 parser.add_argument('--fs-sfm-ext-d', type=int, nargs='+', help='fs sfm ext max depth')
 parser.add_argument('--fs-sfm-ext-d-max', type=int, default=10, help='fs sfm ext max depth max')
 parser.add_argument('--fs-sfm-ext-cw', type=str, nargs='+', help='fs sfm ext class weight')
-parser.add_argument('--fs-sfm-svm-thres', type=float, nargs='+', help='fs sfm svm threshold')
-parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
-parser.add_argument('--fs-sfm-svm-cw', type=str, nargs='+', help='fs sfm svm class weight')
+parser.add_argument('--fs-sfm-grb-e', type=int, nargs='+', help='fs sfm grb n estimators')
+parser.add_argument('--fs-sfm-grb-e-max', type=int, default=200, help='fs sfm grb n estimators max')
+parser.add_argument('--fs-sfm-grb-d', type=int, nargs='+', help='fs sfm grb max depth')
+parser.add_argument('--fs-sfm-grb-d-max', type=int, default=10, help='fs sfm grb max depth max')
+parser.add_argument('--fs-sfm-grb-f', type=str, nargs='+', help='fs sfm grb max features')
 parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
 parser.add_argument('--fs-rfe-svm-cw', type=str, nargs='+', help='fs rfe svm class weight')
 parser.add_argument('--fs-rfe-ext-e', type=int, nargs='+', help='fs rfe ext n estimators')
@@ -84,6 +89,11 @@ parser.add_argument('--fs-rfe-ext-e-max', type=int, default=50, help='fs rfe ext
 parser.add_argument('--fs-rfe-ext-d', type=int, nargs='+', help='fs rfe ext max depth')
 parser.add_argument('--fs-rfe-ext-d-max', type=int, default=10, help='fs rfe ext max depth max')
 parser.add_argument('--fs-rfe-ext-cw', type=str, nargs='+', help='fs rfe ext class weight')
+parser.add_argument('--fs-rfe-grb-e', type=int, nargs='+', help='fs rfe grb n estimators')
+parser.add_argument('--fs-rfe-grb-e-max', type=int, default=200, help='fs rfe grb n estimators max')
+parser.add_argument('--fs-rfe-grb-d', type=int, nargs='+', help='fs rfe grb max depth')
+parser.add_argument('--fs-rfe-grb-d-max', type=int, default=10, help='fs rfe grb max depth max')
+parser.add_argument('--fs-rfe-grb-f', type=str, nargs='+', help='fs rfe grb max features')
 parser.add_argument('--fs-rfe-step', type=float, nargs='+', help='fs rfe step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-rlf-n', type=int, nargs='+', help='fs rlf n neighbors')
@@ -175,6 +185,9 @@ class CachedLinearSVC(CachedFitMixin, LinearSVC):
 class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
     pass
 
+class CachedGradientBoostingClassifier(CachedFitMixin, GradientBoostingClassifier):
+    pass
+
 # limma feature selection scoring function
 def limma(X, y):
     f, pv = r_limma_feature_score(X, y)
@@ -217,17 +230,19 @@ if args.pipe_memory:
     limma_pkm_score_func = memory.cache(limma_pkm)
     f_classif_func = memory.cache(f_classif)
     mi_classif_func = memory.cache(mutual_info_classif)
-    rfe_svm_estimator = CachedLinearSVC()
+    fs_svm_estimator = CachedLinearSVC()
+    fs_ext_estimator = CachedExtraTreesClassifier()
+    fs_grb_estimator = CachedGradientBoostingClassifier()
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False)
-    sfm_ext_estimator = CachedExtraTreesClassifier()
 else:
     limma_score_func = limma
     limma_pkm_score_func = limma_pkm
     f_classif_func = f_classif
     mi_classif_func = mutual_info_classif
-    rfe_svm_estimator = LinearSVC()
+    fs_svm_estimator = LinearSVC()
+    fs_ext_estimator = ExtraTreesClassifier()
+    fs_grb_estimator = GradientBoostingClassifier()
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False)
-    sfm_ext_estimator = ExtraTreesClassifier()
 
 scv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
@@ -244,6 +259,21 @@ if args.fs_sfp_p:
     FS_SFP_P = sorted(args.fs_sfp_p)
 else:
     FS_SFP_P = [ 1e-2, 5e-2 ]
+if args.fs_sfm_svm_thres:
+    FS_SFM_SVM_THRES = sorted(args.fs_sfm_svm_thres)
+else:
+    FS_SFM_SVM_THRES = np.logspace(-11, -5, 7)
+if args.fs_sfm_svm_c:
+    FS_SFM_SVM_C = sorted(args.fs_sfm_svm_c)
+else:
+    FS_SFM_SVM_C = np.logspace(-2, 5, 8)
+if args.fs_sfm_svm_cw:
+    FS_SFM_SVM_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_svm_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_SVM_CW = [None, 'balanced']
 if args.fs_sfm_ext_thres:
     FS_SFM_EXT_THRES = sorted(args.fs_sfm_ext_thres)
 else:
@@ -266,21 +296,21 @@ if args.fs_sfm_ext_cw:
     )
 else:
     FS_SFM_EXT_CW = [None, 'balanced']
-if args.fs_sfm_svm_thres:
-    FS_SFM_SVM_THRES = sorted(args.fs_sfm_svm_thres)
+if args.fs_sfm_grb_e:
+    FS_SFM_GRB_E = sorted(args.fs_sfm_grb_e)
 else:
-    FS_SFM_SVM_THRES = np.logspace(-11, -5, 7)
-if args.fs_sfm_svm_c:
-    FS_SFM_SVM_C = sorted(args.fs_sfm_svm_c)
+    FS_SFM_GRB_E = list(range(20, args.fs_sfm_grb_e_max + 1, 20))
+if args.fs_sfm_grb_d:
+    FS_SFM_GRB_D = sorted(args.fs_sfm_grb_d)
 else:
-    FS_SFM_SVM_C = np.logspace(-2, 5, 8)
-if args.fs_sfm_svm_cw:
-    FS_SFM_SVM_CW = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_sfm_svm_cw],
+    FS_SFM_GRB_D = list(range(1, args.fs_sfm_grb_d_max + 1, 1))
+if args.fs_sfm_grb_f:
+    FS_SFM_GRB_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_grb_f],
         key=lambda x: (x is not None, x)
     )
 else:
-    FS_SFM_SVM_CW = [None, 'balanced']
+    FS_SFM_GRB_F = [None, 'auto', 'log2', 'sqrt']
 if args.fs_rfe_svm_c:
     FS_RFE_SVM_C = sorted(args.fs_rfe_svm_c)
 else:
@@ -310,6 +340,21 @@ if args.fs_rfe_ext_cw:
     )
 else:
     FS_RFE_EXT_CW = [None, 'balanced']
+if args.fs_rfe_grb_e:
+    FS_RFE_GRB_E = sorted(args.fs_rfe_grb_e)
+else:
+    FS_RFE_GRB_E = list(range(20, args.fs_rfe_grb_e_max + 1, 20))
+if args.fs_rfe_grb_d:
+    FS_RFE_GRB_D = sorted(args.fs_rfe_grb_d)
+else:
+    FS_RFE_GRB_D = list(range(1, args.fs_rfe_grb_d_max + 1, 1))
+if args.fs_rfe_grb_f:
+    FS_RFE_GRB_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_grb_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_GRB_F = [None, 'auto', 'log2', 'sqrt']
 if args.fs_rfe_step:
     FS_RFE_STEP = sorted(args.fs_rfe_step)
 else:
@@ -381,7 +426,7 @@ else:
 if args.clf_grb_e:
     CLF_GRB_E = sorted(args.clf_grb_e)
 else:
-    CLF_GRB_E = list(range(20, args.clf_ada_e_max + 1, 20))
+    CLF_GRB_E = list(range(20, args.clf_grb_e_max + 1, 20))
 if args.clf_grb_d:
     CLF_GRB_D = sorted(args.clf_grb_d)
 else:
@@ -510,7 +555,7 @@ pipelines = {
         },
         'ExtraTrees-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(sfm_ext_estimator)),
+                ('fs2', SelectFromModel(fs_ext_estimator)),
             ],
             'param_grid': [
                 {
@@ -521,9 +566,22 @@ pipelines = {
                 },
             ],
         },
+        'GRB-SFM-KBest': {
+            'steps': [
+                ('fs2', SelectFromModel(fs_grb_estimator)),
+            ],
+            'param_grid': [
+                {
+                    'fs2__estimator__n_estimators': FS_SFM_GRB_E,
+                    'fs2__estimator__max_depth': FS_SFM_GRB_D,
+                    'fs2__estimator__max_features': FS_SFM_GRB_F,
+                    'fs2__k': FS_SKB_K,
+                },
+            ],
+        },
         'SVM-RFE': {
             'steps': [
-                ('fs2', RFE(rfe_svm_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(fs_svm_estimator, verbose=args.fs_rfe_verbose)),
             ],
             'param_grid': [
                 {
@@ -536,13 +594,27 @@ pipelines = {
         },
         'ExtraTrees-RFE': {
             'steps': [
-                ('fs2', RFE(sfm_ext_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(fs_ext_estimator, verbose=args.fs_rfe_verbose)),
             ],
             'param_grid': [
                 {
                     'fs2__estimator__n_estimators': FS_RFE_EXT_E,
                     'fs2__estimator__max_depth': FS_RFE_EXT_D,
                     'fs2__estimator__class_weight': FS_RFE_EXT_CW,
+                    'fs2__step': FS_RFE_STEP,
+                    'fs2__n_features_to_select': FS_SKB_K,
+                },
+            ],
+        },
+        'GRB-RFE': {
+            'steps': [
+                ('clf', RFE(fs_grb_estimator, verbose=args.fs_rfe_verbose)),
+            ],
+            'param_grid': [
+                {
+                    'fs2__estimator__n_estimators': FS_RFE_GRB_E,
+                    'fs2__estimator__max_depth': FS_RFE_GRB_D,
+                    'fs2__estimator__max_features': FS_RFE_GRB_F,
                     'fs2__step': FS_RFE_STEP,
                     'fs2__n_features_to_select': FS_SKB_K,
                 },
@@ -729,6 +801,7 @@ params_feature_select = [
 params_with_strs = [
     'fs2__estimator__class_weight',
     'fs2__estimator__max_depth',
+    'fs2__estimator__max_features',
     'fs2__threshold',
     'clf__class_weight',
     'clf__kernel',
@@ -752,6 +825,7 @@ params_fixed_xticks = [
     'fs2__estimator__C',
     'fs2__estimator__class_weight',
     'fs2__estimator__max_depth',
+    'fs2__estimator__max_features',
     'fs2__threshold',
     'clf__C',
     'clf__class_weight',
@@ -928,14 +1002,14 @@ if args.analysis == 1:
                 # ), reverse=True)
                 print('Features:')
                 for _, feature in feature_ranks: print(feature)
-        for param_idx, param in enumerate(param_grid):
+        for param in param_grid:
             if '__' in param and len(param_grid[param]) > 1:
                 new_shape = (
                     len(param_grid[param]),
                     np.prod([len(v) for k,v in param_grid.items() if k != param])
                 )
                 if param in params_with_strs:
-                    # so None argsorts first instead of last (for strings and numbers)
+                    # make None argsort first instead of last (for both strs and nums)
                     param_values = np.ma.getdata(search.cv_results_['param_' + param])
                     param_values[param_values == None] = -np.Inf
                     xaxis_group_sorted_idxs = np.argsort(param_values.astype(str))
@@ -1027,13 +1101,53 @@ if args.analysis == 1:
         )
         plt.legend(loc='lower right', fontsize='small')
         plt.grid('on')
-    roc_aucs_cv, roc_aucs_te, bcrs_cv, bcrs_te, num_features = [], [], [], [], []
-    for split_result in split_results:
+    # plot roc curve
+    sns.set_palette(sns.color_palette('hls', 2))
+    plt.figure('Figure ' + str(args.analysis) + '-' + str(len(param_cv_scores) + 1))
+    plt.rcParams['font.size'] = 14
+    plt.title(
+        dataset_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+        'ROC Curve'
+    )
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.xlim([-0.01, 1.01])
+    plt.ylim([-0.01, 1.01])
+    tprs, roc_aucs_cv, roc_aucs_te, bcrs_cv, bcrs_te, num_features = [], [], [], [], [], []
+    mean_fpr = np.linspace(0, 1, 100)
+    for split_idx, split_result in enumerate(split_results):
         roc_aucs_cv.append(split_result['roc_auc_cv'])
         roc_aucs_te.append(split_result['roc_auc_te'])
         bcrs_cv.append(split_result['bcr_cv'])
         bcrs_te.append(split_result['bcr_te'])
         num_features.append(split_result['feature_idxs'].size)
+        tprs.append(np.interp(mean_fpr, split_result['fprs'], split_result['tprs']))
+        tprs[-1][0] = 0.0
+        plt.plot(
+            split_result['fprs'], split_result['tprs'], color='darkgrey', lw=1, alpha=0.2,
+            # label='ROC split %d (AUC = %0.4f)' % (split_idx + 1, split_result['roc_auc_te']),
+        )
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_roc_auc = np.mean(roc_aucs_te)
+    std_roc_auc = np.std(roc_aucs_te)
+    mean_num_features = np.mean(num_features)
+    std_num_features = np.std(num_features)
+    plt.plot(
+        mean_fpr, mean_tpr, lw=3, alpha=0.8,
+        label=r'Test Mean ROC (AUC = %0.4f $\pm$ %0.2f, Features = %d $\pm$ %d)' %
+        (mean_roc_auc, std_roc_auc, mean_num_features, std_num_features),
+    )
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    plt.fill_between(
+        mean_fpr, tprs_lower, tprs_upper,
+        color='grey', alpha=0.2, label=r'$\pm$ 1 std. dev.'
+    )
+    plt.plot([0, 1], [0, 1], linestyle='--', lw=3, alpha=0.2, label='Chance')
+    plt.legend(loc='lower right', fontsize='small')
+    plt.grid('off')
     print(
         'Dataset:', dataset_name,
         ' Mean ROC AUC (CV / Test): %.4f / %.4f' % (np.mean(roc_aucs_cv), np.mean(roc_aucs_te)),
@@ -1224,15 +1338,16 @@ elif args.analysis == 2:
         print('Features:')
         for _, feature in feature_ranks: print(feature)
     # plot grid search parameters vs cv perf metrics
+    num_figures = 0
     sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
-    for param_idx, param in enumerate(param_grid):
+    for param in param_grid:
         if '__' in param and len(param_grid[param]) > 1:
             new_shape = (
                 len(param_grid[param]),
                 np.prod([len(v) for k,v in param_grid.items() if k != param])
             )
             if param in params_with_strs:
-                # so None argsorts first instead of last (for strings and numbers)
+                # make None argsort first instead of last (for both strs and nums)
                 param_values = np.ma.getdata(search.cv_results_['param_' + param])
                 param_values[param_values == None] = -np.Inf
                 xaxis_group_sorted_idxs = np.argsort(param_values.astype(str))
@@ -1240,7 +1355,7 @@ elif args.analysis == 2:
                 xaxis_group_sorted_idxs = np.argsort(
                     np.ma.getdata(search.cv_results_['param_' + param])
                 )
-            plt.figure('Figure ' + str(args.analysis) + '-' + str(param_idx + 1))
+            plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
             plt.rcParams['font.size'] = 14
             if param in params_num_xticks:
                 x_axis = param_grid[param]
@@ -1286,13 +1401,14 @@ elif args.analysis == 2:
                 )
             plt.legend(loc='lower right', fontsize='small')
             plt.grid('on')
+            num_figures += 1
     # plot num top-ranked features selected vs test dataset perf metrics
     if args.dataset_te:
         dataset_te_basenames = natsorted(list(set(args.dataset_te) - set(args.dataset_tr)))
     else:
         dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.dataset_tr)))
     sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames)))
-    plt.figure('Figure ' + str(args.analysis))
+    plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
     plt.rcParams['font.size'] = 14
     plt.title(
         dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
@@ -1354,8 +1470,8 @@ elif args.analysis == 2:
             label=r'%s (ROC AUC = %0.4f, BCR = %0.4f)' % (
                 dataset_te_name,
                 np.max(roc_aucs_te), np.max(bcrs_te),
-                #np.mean(roc_aucs_te), np.std(roc_aucs_te),
-                #np.mean(bcrs_te), np.std(bcrs_te),
+                # np.mean(roc_aucs_te), np.std(roc_aucs_te),
+                # np.mean(bcrs_te), np.std(bcrs_te),
             ),
         )
         # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
@@ -1367,6 +1483,48 @@ elif args.analysis == 2:
         )
     plt.legend(loc='lower right', fontsize='small')
     plt.grid('on')
+    num_figures += 1
+    # plot roc curve
+    sns.set_palette(sns.color_palette('hls', 2))
+    plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
+    plt.rcParams['font.size'] = 14
+    plt.title(
+        dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+        'ROC Curve'
+    )
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.xlim([-0.01, 1.01])
+    plt.ylim([-0.01, 1.01])
+    for dataset_te_basename in dataset_te_basenames:
+        if (len(args.dataset_tr) == 1 and not bc_meth) or args.no_addon_te:
+            dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
+        else:
+            dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
+        eset_te_name = 'eset_' + dataset_te_name
+        if not base.exists(eset_te_name)[0]: continue
+        eset_te = robjects.globalenv[eset_te_name]
+        X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
+        y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
+        if args.flt_nzsd_feats:
+            X_te = X_te[:, nzsd_feature_idxs]
+        if args.flt_corr_cutoff:
+            X_te = X_te[:, corr_feature_idxs]
+        if hasattr(search, 'decision_function'):
+            y_score = search.decision_function(X_te)
+        else:
+            y_score = search.predict_proba(X_te)[:,1]
+        roc_auc_te = roc_auc_score(y_te, y_score)
+        fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
+        y_pred = search.predict(X_te)
+        bcr_te = bcr_score(y_te, y_pred)
+        plt.plot(
+            fpr, tpr, lw=3, alpha=0.8,
+            label=r'%s ROC (AUC = %0.4f, BCR = %0.4f)' % (dataset_te_name, roc_auc_te, bcr_te),
+        )
+        plt.plot([0, 1], [0, 1], linestyle='--', lw=3, alpha=0.2, label='Chance')
+    plt.legend(loc='lower right', fontsize='small')
+    plt.grid('off')
 elif args.analysis == 3:
     if args.data_type:
         data_types = [x for x in data_types if x in args.data_type]
