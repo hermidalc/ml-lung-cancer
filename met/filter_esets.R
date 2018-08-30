@@ -25,21 +25,6 @@ if (args$filter == "features") {
     if (is.null(args$feat_file)) stop("--feat-file option required")
     if (!file.exists(args$feat_file)) stop("Invalid feature file")
 }
-if (!is.null(args$dataset_tr) && !is.null(args$num_combo_tr)) {
-    dataset_tr_name_combos <- combn(intersect(dataset_names, args$dataset_tr), as.integer(args$num_combo_tr))
-} else if (!is.null(args$dataset_tr)) {
-    dataset_tr_name_combos <- combn(intersect(dataset_names, args$dataset_tr), length(args$dataset_tr))
-} else {
-    dataset_tr_name_combos <- combn(dataset_names, as.integer(args$num_combo_tr))
-}
-if (!is.null(args$dataset_tr)) {
-    dataset_names <- intersect(dataset_names, args$dataset_tr)
-}
-if (!is.null(args$dataset_te)) {
-    dataset_te_names <- intersect(dataset_names, args$datasets_te)
-} else {
-    dataset_te_names <- dataset_names
-}
 if (!is.null(args$data_type)) {
     data_types <- intersect(data_types, args$data_type)
 }
@@ -56,6 +41,9 @@ if (!is.null(args$bc_meth)) {
     bc_methods <- intersect(bc_methods, args$bc_meth)
 }
 if (args$filter == "common_features") {
+    if (!is.null(args$dataset_tr)) {
+        dataset_names <- intersect(dataset_names, args$dataset_tr)
+    }
     for (dataset_name in dataset_names) {
         for (data_type in data_types) {
             for (norm_meth in norm_methods) {
@@ -108,10 +96,25 @@ if (args$filter == "common_features") {
         }
     }
 } else if (args$filter == "features") {
+    if (!is.null(args$dataset_tr) && !is.null(args$num_combo_tr)) {
+        dataset_tr_name_combos <- combn(intersect(dataset_names, args$dataset_tr), as.integer(args$num_combo_tr))
+    } else if (!is.null(args$dataset_tr)) {
+        dataset_tr_name_combos <- combn(intersect(dataset_names, args$dataset_tr), length(args$dataset_tr))
+    } else {
+        dataset_tr_name_combos <- combn(dataset_names, as.integer(args$num_combo_tr))
+    }
+    if (!is.null(args$dataset_te)) {
+        dataset_te_names <- intersect(dataset_names, args$datasets_te)
+    } else {
+        dataset_te_names <- dataset_names
+    }
     cat("Reading ", basename(args$feat_file), ": ", sep="")
     feature_names <- unique(readLines(args$feat_file))
+    feature_names <- trimws(feature_names, which="both")
+    feature_names <- feature_names[feature_names != ""]
     cat(length(feature_names), "unique features\n")
-    filter_type <- strsplit(basename(args$feat_file), split="_", fixed=TRUE)[[1]][1]
+    feat_file_basename_parts <- strsplit(basename(args$feat_file), split="_", fixed=TRUE)[[1]]
+    filter_type <- paste(feat_file_basename_parts[1:length(feat_file_basename_parts) - 1], collapse="_")
     for (col in 1:ncol(dataset_tr_name_combos)) {
         for (data_type in data_types) {
             for (norm_meth in norm_methods) {
