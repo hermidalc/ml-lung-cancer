@@ -608,7 +608,7 @@ pipelines = {
         },
         'GRB-RFE': {
             'steps': [
-                ('clf', RFE(fs_grb_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(fs_grb_estimator, verbose=args.fs_rfe_verbose)),
             ],
             'param_grid': [
                 {
