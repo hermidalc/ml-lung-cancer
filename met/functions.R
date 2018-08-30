@@ -27,13 +27,13 @@ esetClassLabels <- function(eset, samples=NULL) {
 
 esetFeatureAnnot <- function(eset, annot=annot, features=NULL) {
     if (!is.null(features)) {
-        symbols <- as.character(featureData(eset)[c(features)][[annot]])
+        annots <- as.character(featureData(eset)[c(features)][[annot]])
     }
     else {
-        symbols <- as.character(featureData(eset)[[annot]])
+        annots <- as.character(featureData(eset)[[annot]])
     }
-    symbols[is.na(symbols)] <- ""
-    return(symbols)
+    annots[is.na(annots)] <- ""
+    return(annots)
 }
 
 dataNonZeroSdIdxs <- function(X, samples=FALSE) {
@@ -89,6 +89,28 @@ cfsFeatureIdxs <- function(X, y) {
     colnames(X) <- seq(1, ncol(X))
     feature_idxs <- FSelector::cfs(as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)))
     return(as.integer(feature_idxs) - 1)
+}
+
+gainRatioFeatureIdxs <- function(X, y) {
+    X <- as.data.frame(X)
+    colnames(X) <- seq(1, ncol(X))
+    results <- FSelector::gain.ratio(
+        as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)), unit="log2"
+    )
+    results <- results[results$attr_importance > 0, , drop=FALSE]
+    results <- results[order(results$attr_importance, decreasing=TRUE), , drop=FALSE]
+    return(as.integer(row.names(results)) - 1)
+}
+
+symUncertFeatureIdxs <- function(X, y) {
+    X <- as.data.frame(X)
+    colnames(X) <- seq(1, ncol(X))
+    results <- FSelector::symmetrical.uncertainty(
+        as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)), unit="log2"
+    )
+    results <- results[results$attr_importance > 0, , drop=FALSE]
+    results <- results[order(results$attr_importance, decreasing=TRUE), , drop=FALSE]
+    return(as.integer(row.names(results)) - 1)
 }
 
 relieffFeatureScore <- function(X, y, num.neighbors=10, sample.size=5) {
