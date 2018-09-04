@@ -39,7 +39,7 @@ libiconv \
 'icu=58.*' \
 lxml \
 natsort \
-mlxtend \
+mlxtend=0.13.0 \
 seaborn \
 bioconductor-biocinstaller \
 bioconductor-biobase \
