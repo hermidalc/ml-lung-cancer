@@ -18,7 +18,7 @@ from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
 from sklearn.base import clone
-from sklearn.feature_selection import f_classif, mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
+from sklearn.feature_selection import chi2, f_classif, mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
 from sklearn.model_selection import GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
@@ -56,8 +56,14 @@ parser.add_argument('--feat-type', type=str, nargs='+', help='dataset feature ty
 parser.add_argument('--prep-meth', type=str, nargs='+', help='dataset preprocess method')
 parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correction method')
 parser.add_argument('--filter-type', type=str, nargs='+', help='dataset filter type')
-parser.add_argument('--flt-nzsd-feats', default=False, action='store_true', help='filter nzsd features')
-parser.add_argument('--flt-corr-cutoff', type=float, help='correlation filter cutoff')
+parser.add_argument('--flt-zero-feats', default=False, action='store_true', help='filter zero features')
+parser.add_argument('--flt-zero-samples', default=False, action='store_true', help='filter zero samples')
+parser.add_argument('--flt-zsdev-feats', default=False, action='store_true', help='filter zero sd features')
+parser.add_argument('--flt-zsdev-samples', default=False, action='store_true', help='filter zero sd samples')
+parser.add_argument('--flt-ncorr-feats', default=False, action='store_true', help='filter non corr features')
+parser.add_argument('--flt-ncorr-feat-cutoff', type=float, help='filter non corr feature cutoff')
+parser.add_argument('--flt-ncorr-samples', default=False, action='store_true', help='filter non corr samples')
+parser.add_argument('--flt-ncorr-sample-cutoff', type=float, help='filter non corr sample cutoff')
 parser.add_argument('--no-addon-te', default=False, action='store_true', help='no add-on dataset te')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
 parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
@@ -159,8 +165,9 @@ filter_types = list(robjects.globalenv['filter_types'])
 base.source('functions.R')
 r_eset_class_labels = robjects.globalenv['esetClassLabels']
 r_eset_feature_annot = robjects.globalenv['esetFeatureAnnot']
-r_data_nzsd_idxs = robjects.globalenv['dataNonZeroSdIdxs']
-r_data_corr_idxs = robjects.globalenv['dataCorrIdxs']
+r_data_nzero_col_idxs = robjects.globalenv['dataNonZeroColIdxs']
+r_data_nsdev_col_idxs = robjects.globalenv['dataNonZeroSdColIdxs']
+r_data_corr_col_idxs = robjects.globalenv['dataCorrColIdxs']
 r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
 r_limma_pkm_feature_score = robjects.globalenv['limmaPkmFeatureScore']
 numpy2ri.activate()
@@ -228,6 +235,7 @@ def fit_pipeline(params, pipeline_order, X_tr, y_tr):
 if args.pipe_memory:
     limma_score_func = memory.cache(limma)
     limma_pkm_score_func = memory.cache(limma_pkm)
+    chi2_func = memory.cache(chi2)
     f_classif_func = memory.cache(f_classif)
     mi_classif_func = memory.cache(mutual_info_classif)
     fs_svm_estimator = CachedLinearSVC()
@@ -237,6 +245,7 @@ if args.pipe_memory:
 else:
     limma_score_func = limma
     limma_pkm_score_func = limma_pkm
+    chi2_func = chi2
     f_classif_func = f_classif
     mi_classif_func = mutual_info_classif
     fs_svm_estimator = LinearSVC()
@@ -514,6 +523,16 @@ pipelines = {
         'ANOVA-KBest': {
             'steps': [
                 ('fs2', SelectKBest(f_classif_func)),
+            ],
+            'param_grid': [
+                {
+                    'fs2__k': FS_SKB_K,
+                },
+            ],
+        },
+        'Chi2-KBest': {
+            'steps': [
+                ('fs2', SelectKBest(chi2_func)),
             ],
             'param_grid': [
                 {
@@ -887,19 +906,30 @@ if args.analysis == 1:
     eset = robjects.globalenv[eset_name]
     X = np.array(base.t(biobase.exprs(eset)), dtype=float)
     y = np.array(r_eset_class_labels(eset), dtype=int)
-    if args.flt_nzsd_feats:
-        nzsd_feature_idxs = np.array(r_data_nzsd_idxs(X, samples=False), dtype=int)
-        nzsd_sample_idxs = np.array(r_data_nzsd_idxs(X, samples=True), dtype=int)
-        X = X[np.ix_(nzsd_sample_idxs, nzsd_feature_idxs)]
-        y = y[nzsd_sample_idxs]
-    if args.flt_corr_cutoff:
+    if args.flt_zero_feats:
+        nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X), dtype=int)
+        X = X[:, nzero_feature_idxs]
+    if args.flt_zero_samples:
+        nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X.T), dtype=int)
+        X = X[nzero_sample_idxs, :]
+        y = y[nzero_sample_idxs]
+    if args.flt_zsdev_feats:
+        nsdev_feature_idxs = np.array(r_data_nsdev_col_idxs(X), dtype=int)
+        X = X[:, nsdev_feature_idxs]
+    if args.flt_zsdev_samples:
+        nsdev_sample_idxs = np.array(r_data_nsdev_col_idxs(X.T), dtype=int)
+        X = X[nsdev_sample_idxs, :]
+        y = y[nsdev_sample_idxs]
+    if args.flt_ncorr_feats:
         corr_feature_idxs = np.array(
-            r_data_corr_idxs(X, cutoff=args.flt_corr_cutoff, samples=False), dtype=int
+            r_data_corr_col_idxs(X, cutoff=args.flt_ncorr_feat_cutoff), dtype=int
         )
+        X = X[:, corr_feature_idxs]
+    if args.flt_ncorr_samples:
         corr_sample_idxs = np.array(
-            r_data_corr_idxs(X, cutoff=args.flt_corr_cutoff, samples=True), dtype=int
+            r_data_corr_col_idxs(X.T, cutoff=args.flt_ncorr_sample_cutoff), dtype=int
         )
-        X = X[np.ix_(corr_sample_idxs, corr_feature_idxs)]
+        X = X[corr_sample_idxs, :]
         y = y[corr_sample_idxs]
     pipe = Pipeline(sorted(
         pipelines['slr'][args.slr_meth]['steps'] +
@@ -1235,19 +1265,30 @@ elif args.analysis == 2:
     eset_tr = robjects.globalenv[eset_tr_name]
     X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
     y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
-    if args.flt_nzsd_feats:
-        nzsd_feature_idxs = np.array(r_data_nzsd_idxs(X_tr, samples=False), dtype=int)
-        nzsd_sample_idxs = np.array(r_data_nzsd_idxs(X_tr, samples=True), dtype=int)
-        X_tr = X_tr[np.ix_(nzsd_sample_idxs, nzsd_feature_idxs)]
-        y_tr = y_tr[nzsd_sample_idxs]
-    if args.flt_corr_cutoff:
+    if args.flt_zero_feats:
+        nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X_tr), dtype=int)
+        X_tr = X_tr[:, nzero_feature_idxs]
+    if args.flt_zero_samples:
+        nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X_tr.T), dtype=int)
+        X_tr = X_tr[nzero_sample_idxs, :]
+        y_tr = y_tr[nzero_sample_idxs]
+    if args.flt_zsdev_feats:
+        nsdev_feature_idxs = np.array(r_data_nsdev_col_idxs(X_tr), dtype=int)
+        X_tr = X_tr[:, nsdev_feature_idxs]
+    if args.flt_zsdev_samples:
+        nsdev_sample_idxs = np.array(r_data_nsdev_col_idxs(X_tr.T), dtype=int)
+        X_tr = X_tr[nsdev_sample_idxs, :]
+        y_tr = y_tr[nsdev_sample_idxs]
+    if args.flt_ncorr_feats:
         corr_feature_idxs = np.array(
-            r_data_corr_idxs(X_tr, cutoff=args.flt_corr_cutoff, samples=False), dtype=int
+            r_data_corr_col_idxs(X_tr, cutoff=args.flt_ncorr_feat_cutoff), dtype=int
         )
+        X_tr = X_tr[:, corr_feature_idxs]
+    if args.flt_ncorr_samples:
         corr_sample_idxs = np.array(
-            r_data_corr_idxs(X_tr, cutoff=args.flt_corr_cutoff, samples=True), dtype=int
+            r_data_corr_col_idxs(X_tr.T, cutoff=args.flt_ncorr_sample_cutoff), dtype=int
         )
-        X_tr = X_tr[np.ix_(corr_sample_idxs, corr_feature_idxs)]
+        X_tr = X_tr[corr_sample_idxs, :]
         y_tr = y_tr[corr_sample_idxs]
     pipe = Pipeline(sorted(
         pipelines['slr'][args.slr_meth]['steps'] +
@@ -1326,14 +1367,14 @@ elif args.analysis == 2:
     if weights.size > 0:
         feature_ranks = sorted(zip(weights, feature_idxs, feature_names), reverse=True)
         # feature_ranks = sorted(zip(weights, feature_idxs, feature_names,
-        #     r_eset_feature_annot(eset, annot='Description', features=(feature_idxs + 1))
+        #     r_eset_feature_annot(eset_tr, annot='Description', features=(feature_idxs + 1))
         # ), reverse=True)
         print('Feature Rankings:')
         for weight, _, feature in feature_ranks: print(feature, '\t', weight)
     else:
         feature_ranks = sorted(zip(feature_idxs, feature_names), reverse=True)
         # feature_ranks = sorted(zip(feature_idxs, feature_names,
-        #     r_eset_feature_annot(eset, annot='Description', features=(feature_idxs + 1))
+        #     r_eset_feature_annot(eset_tr, annot='Description', features=(feature_idxs + 1))
         # ), reverse=True)
         print('Features:')
         for _, feature in feature_ranks: print(feature)
@@ -1445,9 +1486,11 @@ elif args.analysis == 2:
         eset_te = robjects.globalenv[eset_te_name]
         X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
         y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-        if args.flt_nzsd_feats:
-            X_te = X_te[:, nzsd_feature_idxs]
-        if args.flt_corr_cutoff:
+        if args.flt_zero_feats:
+            X_te = X_te[:, nzero_feature_idxs]
+        if args.flt_zsdev_feats:
+            X_te = X_te[:, nsdev_feature_idxs]
+        if args.flt_ncorr_feats:
             X_te = X_te[:, corr_feature_idxs]
         roc_aucs_te, bcrs_te = [], []
         for num_features in range(1, len(ranked_feature_idxs) + 1):
@@ -1485,7 +1528,7 @@ elif args.analysis == 2:
     plt.grid('on')
     num_figures += 1
     # plot roc curve
-    sns.set_palette(sns.color_palette('hls', 2))
+    sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames) + 1))
     plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
     plt.rcParams['font.size'] = 14
     plt.title(
@@ -1506,9 +1549,11 @@ elif args.analysis == 2:
         eset_te = robjects.globalenv[eset_te_name]
         X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
         y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-        if args.flt_nzsd_feats:
-            X_te = X_te[:, nzsd_feature_idxs]
-        if args.flt_corr_cutoff:
+        if args.flt_zero_feats:
+            X_te = X_te[:, nzero_feature_idxs]
+        if args.flt_zsdev_feats:
+            X_te = X_te[:, nsdev_feature_idxs]
+        if args.flt_ncorr_feats:
             X_te = X_te[:, corr_feature_idxs]
         if hasattr(search, 'decision_function'):
             y_score = search.decision_function(X_te)
@@ -1522,7 +1567,7 @@ elif args.analysis == 2:
             fpr, tpr, lw=3, alpha=0.8,
             label=r'%s ROC (AUC = %0.4f, BCR = %0.4f)' % (dataset_te_name, roc_auc_te, bcr_te),
         )
-        plt.plot([0, 1], [0, 1], linestyle='--', lw=3, alpha=0.2, label='Chance')
+    plt.plot([0, 1], [0, 1], linestyle='--', lw=3, alpha=0.2, label='Chance')
     plt.legend(loc='lower right', fontsize='small')
     plt.grid('off')
 elif args.analysis == 3:
@@ -1686,28 +1731,38 @@ elif args.analysis == 3:
                 eset_tr = robjects.globalenv[eset_tr_name]
                 X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
                 y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
-                if args.flt_nzsd_feats:
-                    nzsd_feature_idxs = np.array(r_data_nzsd_idxs(X_tr, samples=False), dtype=int)
-                    nzsd_sample_idxs = np.array(r_data_nzsd_idxs(X_tr, samples=True), dtype=int)
-                    X_tr = X_tr[np.ix_(nzsd_sample_idxs, nzsd_feature_idxs)]
-                    y_tr = y_tr[nzsd_sample_idxs]
-                if args.flt_corr_cutoff:
-                    corr_feature_idxs = np.array(
-                        r_data_corr_idxs(X_tr, cutoff=args.flt_corr_cutoff, samples=False), dtype=int
-                    )
-                    corr_sample_idxs = np.array(
-                        r_data_corr_idxs(X_tr, cutoff=args.flt_corr_cutoff, samples=True), dtype=int
-                    )
-                    X_tr = X_tr[np.ix_(corr_sample_idxs, corr_feature_idxs)]
-                    y_tr = y_tr[corr_sample_idxs]
                 base.load('data/' + eset_te_name + '.Rda')
                 eset_te = robjects.globalenv[eset_te_name]
                 X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-                if args.flt_nzsd_feats:
-                    X_te = X_te[:, nzsd_feature_idxs]
-                if args.flt_corr_cutoff:
+                if args.flt_zero_feats:
+                    nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X_tr), dtype=int)
+                    X_tr = X_tr[:, nzero_feature_idxs]
+                    X_te = X_te[:, nzero_feature_idxs]
+                if args.flt_zero_samples:
+                    nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X_tr.T), dtype=int)
+                    X_tr = X_tr[nzero_sample_idxs, :]
+                    y_tr = y_tr[nzero_sample_idxs]
+                if args.flt_zsdev_feats:
+                    nsdev_feature_idxs = np.array(r_data_nsdev_col_idxs(X_tr), dtype=int)
+                    X_tr = X_tr[:, nsdev_feature_idxs]
+                    X_te = X_te[:, nsdev_feature_idxs]
+                if args.flt_zsdev_samples:
+                    nsdev_sample_idxs = np.array(r_data_nsdev_col_idxs(X_tr.T), dtype=int)
+                    X_tr = X_tr[nsdev_sample_idxs, :]
+                    y_tr = y_tr[nsdev_sample_idxs]
+                if args.flt_ncorr_feats:
+                    corr_feature_idxs = np.array(
+                        r_data_corr_col_idxs(X_tr, cutoff=args.flt_ncorr_feat_cutoff), dtype=int
+                    )
+                    X_tr = X_tr[:, corr_feature_idxs]
                     X_te = X_te[:, corr_feature_idxs]
+                if args.flt_ncorr_samples:
+                    corr_sample_idxs = np.array(
+                        r_data_corr_col_idxs(X_tr.T, cutoff=args.flt_ncorr_sample_cutoff), dtype=int
+                    )
+                    X_tr = X_tr[corr_sample_idxs, :]
+                    y_tr = y_tr[corr_sample_idxs]
                 if args.scv_type == 'grid':
                     param_grid_idx = 0
                     param_grid, param_grid_data = [], []

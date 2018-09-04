@@ -36,20 +36,16 @@ esetFeatureAnnot <- function(eset, annot=annot, features=NULL) {
     return(annots)
 }
 
-dataNonZeroSdIdxs <- function(X, samples=FALSE) {
-    if (samples) {
-        return(as.integer(which(sapply(as.data.frame(t(X)), function(c) sd(c) != 0))) - 1)
-    } else {
-        return(as.integer(which(sapply(as.data.frame(X), function(c) sd(c) != 0))) - 1)
-    }
+dataNonZeroColIdxs <- function(X) {
+    return(as.integer(which(colSums(X) > 0)) - 1)
 }
 
-dataCorrIdxs <- function(X, cutoff=0.5, samples=FALSE) {
-    if (samples) {
-        return(sort(caret::findCorrelation(cor(t(X)), cutoff=cutoff)) - 1)
-    } else {
-        return(sort(caret::findCorrelation(cor(X), cutoff=cutoff)) - 1)
-    }
+dataNonZeroSdColIdxs <- function(X) {
+    return(as.integer(which(sapply(as.data.frame(X), function(c) sd(c) != 0))) - 1)
+}
+
+dataCorrColIdxs <- function(X, cutoff=0.5) {
+    return(sort(caret::findCorrelation(cor(X), cutoff=cutoff)) - 1)
 }
 
 limmaFeatureScore <- function(X, y) {
