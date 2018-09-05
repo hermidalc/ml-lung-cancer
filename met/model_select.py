@@ -61,11 +61,15 @@ parser.add_argument('--filt-zero-samples', default=False, action='store_true', h
 parser.add_argument('--filt-zsdv-feats', default=False, action='store_true', help='filter zero sd features')
 parser.add_argument('--filt-zsdv-samples', default=False, action='store_true', help='filter zero sd samples')
 parser.add_argument('--filt-nzvr-feats', default=False, action='store_true', help='filter near zero var features')
+parser.add_argument('--filt-nzvr-feat-freq-cut', type=float, help='filter near zero var features freq cutoff')
+parser.add_argument('--filt-nzvr-feat-uniq-cut', type=int, help='filter near zero var features uniq cutoff')
 parser.add_argument('--filt-nzvr-samples', default=False, action='store_true', help='filter near zero var samples')
-parser.add_argument('--filt-ncorr-feats', default=False, action='store_true', help='filter non corr features')
-parser.add_argument('--filt-ncorr-feat-cutoff', type=float, help='filter non corr feature cutoff')
-parser.add_argument('--filt-ncorr-samples', default=False, action='store_true', help='filter non corr samples')
-parser.add_argument('--filt-ncorr-sample-cutoff', type=float, help='filter non corr sample cutoff')
+parser.add_argument('--filt-nzvr-sample-freq-cut', type=float, help='filter near zero var sample freq cutoff')
+parser.add_argument('--filt-nzvr-sample-uniq-cut', type=int, help='filter near zero var sample uniq cutoff')
+parser.add_argument('--filt-ncor-feats', default=False, action='store_true', help='filter non corr features')
+parser.add_argument('--filt-ncor-feat-cut', type=float, help='filter non corr feature cutoff')
+parser.add_argument('--filt-ncor-samples', default=False, action='store_true', help='filter non corr samples')
+parser.add_argument('--filt-ncor-sample-cut', type=float, help='filter non corr sample cutoff')
 parser.add_argument('--no-addon-te', default=False, action='store_true', help='no add-on dataset te')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
 parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
@@ -924,20 +928,24 @@ if args.analysis == 1:
         X = X[nzsd_sample_idxs, :]
         y = y[nzsd_sample_idxs]
     if args.filt_nzvr_feats:
-        nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(X), dtype=int)
+        nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
+            X, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
+        ), dtype=int)
         X = X[:, nzvr_feature_idxs]
     if args.filt_nzvr_samples:
-        nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(X.T), dtype=int)
+        nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(
+            X.T, freqCut=args.filt_nzvr_sample_freq_cut, uniqueCut=args.filt_nzvr_sample_uniq_cut
+        ), dtype=int)
         X = X[nzvr_sample_idxs, :]
         y = y[nzvr_sample_idxs]
-    if args.filt_ncorr_feats:
+    if args.filt_ncor_feats:
         corr_feature_idxs = np.array(
-            r_data_corr_col_idxs(X, cutoff=args.filt_ncorr_feat_cutoff), dtype=int
+            r_data_corr_col_idxs(X, cutoff=args.filt_ncor_feat_cut), dtype=int
         )
         X = X[:, corr_feature_idxs]
-    if args.filt_ncorr_samples:
+    if args.filt_ncor_samples:
         corr_sample_idxs = np.array(
-            r_data_corr_col_idxs(X.T, cutoff=args.filt_ncorr_sample_cutoff), dtype=int
+            r_data_corr_col_idxs(X.T, cutoff=args.filt_ncor_sample_cut), dtype=int
         )
         X = X[corr_sample_idxs, :]
         y = y[corr_sample_idxs]
@@ -1290,20 +1298,24 @@ elif args.analysis == 2:
         X_tr = X_tr[nzsd_sample_idxs, :]
         y_tr = y_tr[nzsd_sample_idxs]
     if args.filt_nzvr_feats:
-        nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(X_tr), dtype=int)
+        nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
+            X_tr, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
+        ), dtype=int)
         X_tr = X_tr[:, nzvr_feature_idxs]
     if args.filt_nzvr_samples:
-        nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(X_tr.T), dtype=int)
+        nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(
+            X_tr.T, freqCut=args.filt_nzvr_sample_freq_cut, uniqueCut=args.filt_nzvr_sample_uniq_cut
+        ), dtype=int)
         X_tr = X_tr[nzvr_sample_idxs, :]
         y_tr = y_tr[nzvr_sample_idxs]
-    if args.filt_ncorr_feats:
+    if args.filt_ncor_feats:
         corr_feature_idxs = np.array(
-            r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncorr_feat_cutoff), dtype=int
+            r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncor_feat_cut), dtype=int
         )
         X_tr = X_tr[:, corr_feature_idxs]
-    if args.filt_ncorr_samples:
+    if args.filt_ncor_samples:
         corr_sample_idxs = np.array(
-            r_data_corr_col_idxs(X_tr.T, cutoff=args.filt_ncorr_sample_cutoff), dtype=int
+            r_data_corr_col_idxs(X_tr.T, cutoff=args.filt_ncor_sample_cut), dtype=int
         )
         X_tr = X_tr[corr_sample_idxs, :]
         y_tr = y_tr[corr_sample_idxs]
@@ -1509,7 +1521,7 @@ elif args.analysis == 2:
             X_te = X_te[:, nzsd_feature_idxs]
         if args.filt_nzvr_feats:
             X_te = X_te[:, nzvr_feature_idxs]
-        if args.filt_ncorr_feats:
+        if args.filt_ncor_feats:
             X_te = X_te[:, corr_feature_idxs]
         roc_aucs_te, bcrs_te = [], []
         for num_features in range(1, len(ranked_feature_idxs) + 1):
@@ -1574,7 +1586,7 @@ elif args.analysis == 2:
             X_te = X_te[:, nzsd_feature_idxs]
         if args.filt_nzvr_feats:
             X_te = X_te[:, nzvr_feature_idxs]
-        if args.filt_ncorr_feats:
+        if args.filt_ncor_feats:
             X_te = X_te[:, corr_feature_idxs]
         if hasattr(search, 'decision_function'):
             y_score = search.decision_function(X_te)
@@ -1773,22 +1785,26 @@ elif args.analysis == 3:
                     X_tr = X_tr[nzsd_sample_idxs, :]
                     y_tr = y_tr[nzsd_sample_idxs]
                 if args.filt_nzvr_feats:
-                    nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(X_tr), dtype=int)
+                    nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
+                        X_tr, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
+                    ), dtype=int)
                     X_tr = X_tr[:, nzvr_feature_idxs]
                     X_te = X_te[:, nzvr_feature_idxs]
                 if args.filt_nzvr_samples:
-                    nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(X_tr.T), dtype=int)
+                    nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(
+                        X_tr.T, freqCut=args.filt_nzvr_sample_freq_cut, uniqueCut=args.filt_nzvr_sample_uniq_cut
+                    ), dtype=int)
                     X_tr = X_tr[nzvr_sample_idxs, :]
                     y_tr = y_tr[nzvr_sample_idxs]
-                if args.filt_ncorr_feats:
+                if args.filt_ncor_feats:
                     corr_feature_idxs = np.array(
-                        r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncorr_feat_cutoff), dtype=int
+                        r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncor_feat_cut), dtype=int
                     )
                     X_tr = X_tr[:, corr_feature_idxs]
                     X_te = X_te[:, corr_feature_idxs]
-                if args.filt_ncorr_samples:
+                if args.filt_ncor_samples:
                     corr_sample_idxs = np.array(
-                        r_data_corr_col_idxs(X_tr.T, cutoff=args.filt_ncorr_sample_cutoff), dtype=int
+                        r_data_corr_col_idxs(X_tr.T, cutoff=args.filt_ncor_sample_cut), dtype=int
                     )
                     X_tr = X_tr[corr_sample_idxs, :]
                     y_tr = y_tr[corr_sample_idxs]
