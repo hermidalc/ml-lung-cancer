@@ -44,6 +44,10 @@ dataNonZeroSdColIdxs <- function(X) {
     return(as.integer(which(sapply(as.data.frame(X), function(c) sd(c) != 0))) - 1)
 }
 
+dataNonZeroVarColIdxs <- function(X, freqCut=95/5, uniqueCut=5) {
+    return(sort(caret::nearZeroVar(X, freqCut=freqCut, uniqueCut=uniqueCut)) - 1)
+}
+
 dataCorrColIdxs <- function(X, cutoff=0.5) {
     return(sort(caret::findCorrelation(cor(X), cutoff=cutoff)) - 1)
 }
