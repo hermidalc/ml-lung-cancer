@@ -3,13 +3,13 @@ set.seed(1982)
 
 filterEset <- function(eset, features=NULL, samples=NULL) {
     if (!is.null(features) & !is.null(samples)) {
-        return(eset[c(features),c(samples)])
+        return(eset[c(features), c(samples)])
     }
     else if (!is.null(features)) {
         return(eset[c(features),])
     }
     else if (!is.null(samples)) {
-        return(eset[,c(samples)])
+        return(eset[, c(samples)])
     }
     else {
         return(eset)
@@ -25,12 +25,12 @@ esetClassLabels <- function(eset, samples=NULL) {
     }
 }
 
-esetFeatureAnnot <- function(eset, annot=annot, features=NULL) {
+esetFeatureAnnots <- function(eset, annots=annots, features=NULL) {
     if (!is.null(features)) {
-        annots <- as.character(featureData(eset)[c(features)][[annot]])
+        annots <- as.matrix(fData(eset)[c(features), c(annots), drop=FALSE])
     }
     else {
-        annots <- as.character(featureData(eset)[[annot]])
+        annots <- as.matrix(fData(eset)[, c(annots), drop=FALSE])
     }
     annots[is.na(annots)] <- ""
     return(annots)

@@ -147,6 +147,7 @@ parser.add_argument('--scv-refit', type=str, default='roc_auc', help='scv refit 
 parser.add_argument('--scv-n-iter', type=int, default=100, help='randomized scv num iterations')
 parser.add_argument('--num-cores', type=int, default=-1, help='num parallel cores')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
+parser.add_argument('--show-annots', type=str, nargs='+', help='show annotations')
 parser.add_argument('--save-figs', default=False, action='store_true', help='save figures')
 parser.add_argument('--show-figs', default=False, action='store_true', help='show figures')
 parser.add_argument('--save-model', default=False, action='store_true', help='save model')
@@ -170,7 +171,7 @@ bc_methods = list(robjects.globalenv['bc_methods'])
 filt_types = list(robjects.globalenv['filt_types'])
 base.source('functions.R')
 r_eset_class_labels = robjects.globalenv['esetClassLabels']
-r_eset_feature_annot = robjects.globalenv['esetFeatureAnnot']
+r_eset_feature_annots = robjects.globalenv['esetFeatureAnnots']
 r_data_nzero_col_idxs = robjects.globalenv['dataNonZeroColIdxs']
 r_data_nzsd_col_idxs = robjects.globalenv['dataNonZeroSdColIdxs']
 r_data_nzvr_col_idxs = robjects.globalenv['dataNonZeroVarColIdxs']
@@ -1037,19 +1038,25 @@ if args.analysis == 1:
         )
         if args.verbose > 0:
             if weights.size > 0:
-                feature_ranks = sorted(zip(weights, feature_idxs, feature_names), reverse=True)
-                # feature_ranks = sorted(zip(weights, feature_idxs, feature_names,
-                #     r_eset_feature_annot(eset, annot='Description', features=(feature_idxs + 1))
-                # ), reverse=True)
                 print('Feature Rankings:')
-                for weight, _, feature in feature_ranks: print(feature, '\t', weight)
+                if args.show_annots:
+                    feature_ranks = sorted(zip(weights, feature_idxs, feature_names,
+                        r_eset_feature_annots(eset, annot=args.show_annots, features=(feature_idxs + 1))
+                    ), reverse=True)
+                    for weight, _, feature, annot in feature_ranks: print(feature, '\t', weight, '\t', annot)
+                else:
+                    feature_ranks = sorted(zip(weights, feature_idxs, feature_names), reverse=True)
+                    for weight, _, feature in feature_ranks: print(feature, '\t', weight)
             else:
-                feature_ranks = sorted(zip(feature_idxs, feature_names), reverse=True)
-                # feature_ranks = sorted(zip(feature_idxs, feature_names,
-                #     r_eset_feature_annot(eset, annot='Description', features=(feature_idxs + 1))
-                # ), reverse=True)
                 print('Features:')
-                for _, feature in feature_ranks: print(feature)
+                if args.show_annots:
+                    feature_ranks = sorted(zip(feature_idxs, feature_names,
+                        r_eset_feature_annots(eset, annot=args.show_annots, features=(feature_idxs + 1))
+                    ), reverse=True)
+                    for _, feature, annot in feature_ranks: print(feature, '\t', annot)
+                else:
+                    feature_ranks = sorted(zip(feature_idxs, feature_names), reverse=True)
+                    for _, feature in feature_ranks: print(feature)
         for param in param_grid:
             if '__' in param and len(param_grid[param]) > 1:
                 new_shape = (
@@ -1394,19 +1401,25 @@ elif args.analysis == 2:
     ))
     print('Best Params:', search.best_params_)
     if weights.size > 0:
-        feature_ranks = sorted(zip(weights, feature_idxs, feature_names), reverse=True)
-        # feature_ranks = sorted(zip(weights, feature_idxs, feature_names,
-        #     r_eset_feature_annot(eset_tr, annot='Description', features=(feature_idxs + 1))
-        # ), reverse=True)
         print('Feature Rankings:')
-        for weight, _, feature in feature_ranks: print(feature, '\t', weight)
+        if args.show_annots:
+            feature_ranks = sorted(zip(weights, feature_idxs, feature_names,
+                r_eset_feature_annots(eset_tr, annot=args.show_annots, features=(feature_idxs + 1))
+            ), reverse=True)
+            for weight, _, feature, annot in feature_ranks: print(feature, '\t', weight, '\t', annot)
+        else:
+            feature_ranks = sorted(zip(weights, feature_idxs, feature_names), reverse=True)
+            for weight, _, feature in feature_ranks: print(feature, '\t', weight)
     else:
-        feature_ranks = sorted(zip(feature_idxs, feature_names), reverse=True)
-        # feature_ranks = sorted(zip(feature_idxs, feature_names,
-        #     r_eset_feature_annot(eset_tr, annot='Description', features=(feature_idxs + 1))
-        # ), reverse=True)
         print('Features:')
-        for _, feature in feature_ranks: print(feature)
+        if args.show_annots:
+            feature_ranks = sorted(zip(feature_idxs, feature_names,
+                r_eset_feature_annots(eset_tr, annot=args.show_annots, features=(feature_idxs + 1))
+            ), reverse=True)
+            for _, feature, annot in feature_ranks: print(feature, '\t', annot)
+        else:
+            feature_ranks = sorted(zip(feature_idxs, feature_names), reverse=True)
+            for _, feature in feature_ranks: print(feature)
     # plot grid search parameters vs cv perf metrics
     num_figures = 0
     sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
@@ -1489,10 +1502,7 @@ elif args.analysis == 2:
     x_axis = range(1, feature_idxs.size + 1)
     plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
     plt.xticks(x_axis)
-    if weights.size > 0:
-        ranked_feature_idxs = [x for _, x, _ in feature_ranks]
-    else:
-        ranked_feature_idxs = [x for x, _ in feature_ranks]
+    ranked_feature_idxs = [f[1 if weights.size > 0 else 0] for f in feature_ranks]
     pipe = Pipeline(
         pipelines['slr'][args.slr_meth]['steps'] +
         pipelines['clf'][args.clf_meth]['steps']
