@@ -55,17 +55,17 @@ parser.add_argument('--norm-meth', type=str, nargs='+', help='normalization meth
 parser.add_argument('--feat-type', type=str, nargs='+', help='dataset feature type')
 parser.add_argument('--prep-meth', type=str, nargs='+', help='dataset preprocess method')
 parser.add_argument('--bc-meth', type=str, nargs='+', help='batch effect correction method')
-parser.add_argument('--filter-type', type=str, nargs='+', help='dataset filter type')
-parser.add_argument('--flt-zero-feats', default=False, action='store_true', help='filter zero features')
-parser.add_argument('--flt-zero-samples', default=False, action='store_true', help='filter zero samples')
-parser.add_argument('--flt-zsdv-feats', default=False, action='store_true', help='filter zero sd features')
-parser.add_argument('--flt-zsdv-samples', default=False, action='store_true', help='filter zero sd samples')
-parser.add_argument('--flt-nzvr-feats', default=False, action='store_true', help='filter near zero var features')
-parser.add_argument('--flt-nzvr-samples', default=False, action='store_true', help='filter near zero var samples')
-parser.add_argument('--flt-ncorr-feats', default=False, action='store_true', help='filter non corr features')
-parser.add_argument('--flt-ncorr-feat-cutoff', type=float, help='filter non corr feature cutoff')
-parser.add_argument('--flt-ncorr-samples', default=False, action='store_true', help='filter non corr samples')
-parser.add_argument('--flt-ncorr-sample-cutoff', type=float, help='filter non corr sample cutoff')
+parser.add_argument('--filt-type', type=str, nargs='+', help='dataset filter type')
+parser.add_argument('--filt-zero-feats', default=False, action='store_true', help='filter zero features')
+parser.add_argument('--filt-zero-samples', default=False, action='store_true', help='filter zero samples')
+parser.add_argument('--filt-zsdv-feats', default=False, action='store_true', help='filter zero sd features')
+parser.add_argument('--filt-zsdv-samples', default=False, action='store_true', help='filter zero sd samples')
+parser.add_argument('--filt-nzvr-feats', default=False, action='store_true', help='filter near zero var features')
+parser.add_argument('--filt-nzvr-samples', default=False, action='store_true', help='filter near zero var samples')
+parser.add_argument('--filt-ncorr-feats', default=False, action='store_true', help='filter non corr features')
+parser.add_argument('--filt-ncorr-feat-cutoff', type=float, help='filter non corr feature cutoff')
+parser.add_argument('--filt-ncorr-samples', default=False, action='store_true', help='filter non corr samples')
+parser.add_argument('--filt-ncorr-sample-cutoff', type=float, help='filter non corr sample cutoff')
 parser.add_argument('--no-addon-te', default=False, action='store_true', help='no add-on dataset te')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
 parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
@@ -163,7 +163,7 @@ norm_methods = list(robjects.globalenv['norm_methods'])
 feat_types = list(robjects.globalenv['feat_types'])
 prep_methods = list(robjects.globalenv['prep_methods'])
 bc_methods = list(robjects.globalenv['bc_methods'])
-filter_types = list(robjects.globalenv['filter_types'])
+filt_types = list(robjects.globalenv['filt_types'])
 base.source('functions.R')
 r_eset_class_labels = robjects.globalenv['esetClassLabels']
 r_eset_feature_annot = robjects.globalenv['esetFeatureAnnot']
@@ -887,11 +887,11 @@ if args.analysis == 1:
         prep_steps.append(bc_meth)
     else:
         bc_meth = None
-    if args.filter_type and args.filter_type[0] not in ('None', 'none'):
-        filter_type = [x for x in filter_types if x in args.filter_type][0]
-        prep_steps.append(filter_type)
+    if args.filt_type and args.filt_type[0] not in ('None', 'none'):
+        filt_type = [x for x in filt_types if x in args.filt_type][0]
+        prep_steps.append(filt_type)
     else:
-        filter_type = None
+        filt_type = None
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
@@ -909,35 +909,35 @@ if args.analysis == 1:
     eset = robjects.globalenv[eset_name]
     X = np.array(base.t(biobase.exprs(eset)), dtype=float)
     y = np.array(r_eset_class_labels(eset), dtype=int)
-    if args.flt_zero_feats:
+    if args.filt_zero_feats:
         nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X), dtype=int)
         X = X[:, nzero_feature_idxs]
-    if args.flt_zero_samples:
+    if args.filt_zero_samples:
         nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X.T), dtype=int)
         X = X[nzero_sample_idxs, :]
         y = y[nzero_sample_idxs]
-    if args.flt_zsdv_feats:
+    if args.filt_zsdv_feats:
         nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X), dtype=int)
         X = X[:, nzsd_feature_idxs]
-    if args.flt_zsdv_samples:
+    if args.filt_zsdv_samples:
         nzsd_sample_idxs = np.array(r_data_nzsd_col_idxs(X.T), dtype=int)
         X = X[nzsd_sample_idxs, :]
         y = y[nzsd_sample_idxs]
-    if args.flt_nzvr_feats:
+    if args.filt_nzvr_feats:
         nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(X), dtype=int)
         X = X[:, nzvr_feature_idxs]
-    if args.flt_nzvr_samples:
+    if args.filt_nzvr_samples:
         nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(X.T), dtype=int)
         X = X[nzvr_sample_idxs, :]
         y = y[nzvr_sample_idxs]
-    if args.flt_ncorr_feats:
+    if args.filt_ncorr_feats:
         corr_feature_idxs = np.array(
-            r_data_corr_col_idxs(X, cutoff=args.flt_ncorr_feat_cutoff), dtype=int
+            r_data_corr_col_idxs(X, cutoff=args.filt_ncorr_feat_cutoff), dtype=int
         )
         X = X[:, corr_feature_idxs]
-    if args.flt_ncorr_samples:
+    if args.filt_ncorr_samples:
         corr_sample_idxs = np.array(
-            r_data_corr_col_idxs(X.T, cutoff=args.flt_ncorr_sample_cutoff), dtype=int
+            r_data_corr_col_idxs(X.T, cutoff=args.filt_ncorr_sample_cutoff), dtype=int
         )
         X = X[corr_sample_idxs, :]
         y = y[corr_sample_idxs]
@@ -1253,11 +1253,11 @@ elif args.analysis == 2:
         prep_steps.append(bc_meth)
     else:
         bc_meth = None
-    if args.filter_type and args.filter_type[0] not in ('None', 'none'):
-        filter_type = [x for x in filter_types if x in args.filter_type][0]
-        prep_steps.append(filter_type)
+    if args.filt_type and args.filt_type[0] not in ('None', 'none'):
+        filt_type = [x for x in filt_types if x in args.filt_type][0]
+        prep_steps.append(filt_type)
     else:
-        filter_type = None
+        filt_type = None
     args.fs_meth = args.fs_meth[0]
     args.slr_meth = args.slr_meth[0]
     args.clf_meth = args.clf_meth[0]
@@ -1275,35 +1275,35 @@ elif args.analysis == 2:
     eset_tr = robjects.globalenv[eset_tr_name]
     X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
     y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
-    if args.flt_zero_feats:
+    if args.filt_zero_feats:
         nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X_tr), dtype=int)
         X_tr = X_tr[:, nzero_feature_idxs]
-    if args.flt_zero_samples:
+    if args.filt_zero_samples:
         nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X_tr.T), dtype=int)
         X_tr = X_tr[nzero_sample_idxs, :]
         y_tr = y_tr[nzero_sample_idxs]
-    if args.flt_zsdv_feats:
+    if args.filt_zsdv_feats:
         nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X_tr), dtype=int)
         X_tr = X_tr[:, nzsd_feature_idxs]
-    if args.flt_zsdv_samples:
+    if args.filt_zsdv_samples:
         nzsd_sample_idxs = np.array(r_data_nzsd_col_idxs(X_tr.T), dtype=int)
         X_tr = X_tr[nzsd_sample_idxs, :]
         y_tr = y_tr[nzsd_sample_idxs]
-    if args.flt_nzvr_feats:
+    if args.filt_nzvr_feats:
         nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(X_tr), dtype=int)
         X_tr = X_tr[:, nzvr_feature_idxs]
-    if args.flt_nzvr_samples:
+    if args.filt_nzvr_samples:
         nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(X_tr.T), dtype=int)
         X_tr = X_tr[nzvr_sample_idxs, :]
         y_tr = y_tr[nzvr_sample_idxs]
-    if args.flt_ncorr_feats:
+    if args.filt_ncorr_feats:
         corr_feature_idxs = np.array(
-            r_data_corr_col_idxs(X_tr, cutoff=args.flt_ncorr_feat_cutoff), dtype=int
+            r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncorr_feat_cutoff), dtype=int
         )
         X_tr = X_tr[:, corr_feature_idxs]
-    if args.flt_ncorr_samples:
+    if args.filt_ncorr_samples:
         corr_sample_idxs = np.array(
-            r_data_corr_col_idxs(X_tr.T, cutoff=args.flt_ncorr_sample_cutoff), dtype=int
+            r_data_corr_col_idxs(X_tr.T, cutoff=args.filt_ncorr_sample_cutoff), dtype=int
         )
         X_tr = X_tr[corr_sample_idxs, :]
         y_tr = y_tr[corr_sample_idxs]
@@ -1503,13 +1503,13 @@ elif args.analysis == 2:
         eset_te = robjects.globalenv[eset_te_name]
         X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
         y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-        if args.flt_zero_feats:
+        if args.filt_zero_feats:
             X_te = X_te[:, nzero_feature_idxs]
-        if args.flt_zsdv_feats:
+        if args.filt_zsdv_feats:
             X_te = X_te[:, nzsd_feature_idxs]
-        if args.flt_nzvr_feats:
+        if args.filt_nzvr_feats:
             X_te = X_te[:, nzvr_feature_idxs]
-        if args.flt_ncorr_feats:
+        if args.filt_ncorr_feats:
             X_te = X_te[:, corr_feature_idxs]
         roc_aucs_te, bcrs_te = [], []
         for num_features in range(1, len(ranked_feature_idxs) + 1):
@@ -1568,13 +1568,13 @@ elif args.analysis == 2:
         eset_te = robjects.globalenv[eset_te_name]
         X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
         y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-        if args.flt_zero_feats:
+        if args.filt_zero_feats:
             X_te = X_te[:, nzero_feature_idxs]
-        if args.flt_zsdv_feats:
+        if args.filt_zsdv_feats:
             X_te = X_te[:, nzsd_feature_idxs]
-        if args.flt_nzvr_feats:
+        if args.filt_nzvr_feats:
             X_te = X_te[:, nzvr_feature_idxs]
-        if args.flt_ncorr_feats:
+        if args.filt_ncorr_feats:
             X_te = X_te[:, corr_feature_idxs]
         if hasattr(search, 'decision_function'):
             y_score = search.decision_function(X_te)
@@ -1602,18 +1602,18 @@ elif args.analysis == 3:
         prep_methods = [x for x in prep_methods if x in args.prep_meth]
     if args.bc_meth:
         bc_methods = [x for x in bc_methods if x in args.bc_meth]
-    if args.filter_type:
-        filter_types = [x for x in filter_types if x in args.filter_type]
+    if args.filt_type:
+        filt_types = [x for x in filt_types if x in args.filt_type]
     prep_groups, prep_group_info = [], []
     for data_type in data_types:
         for norm_meth in norm_methods:
             for feat_type in feat_types:
                 for prep_meth in prep_methods:
                     for bc_meth in bc_methods:
-                        for filter_type in filter_types:
+                        for filt_type in filt_types:
                             prep_groups.append([
                                 x for x in [
-                                    data_type, norm_meth, feat_type, prep_meth, bc_meth, filter_type
+                                    data_type, norm_meth, feat_type, prep_meth, bc_meth, filt_type
                                 ] if x not in ('None', 'none')
                             ])
                             prep_group_info.append({
@@ -1756,39 +1756,39 @@ elif args.analysis == 3:
                 eset_te = robjects.globalenv[eset_te_name]
                 X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
                 y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-                if args.flt_zero_feats:
+                if args.filt_zero_feats:
                     nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X_tr), dtype=int)
                     X_tr = X_tr[:, nzero_feature_idxs]
                     X_te = X_te[:, nzero_feature_idxs]
-                if args.flt_zero_samples:
+                if args.filt_zero_samples:
                     nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X_tr.T), dtype=int)
                     X_tr = X_tr[nzero_sample_idxs, :]
                     y_tr = y_tr[nzero_sample_idxs]
-                if args.flt_zsdv_feats:
+                if args.filt_zsdv_feats:
                     nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X_tr), dtype=int)
                     X_tr = X_tr[:, nzsd_feature_idxs]
                     X_te = X_te[:, nzsd_feature_idxs]
-                if args.flt_zsdv_samples:
+                if args.filt_zsdv_samples:
                     nzsd_sample_idxs = np.array(r_data_nzsd_col_idxs(X_tr.T), dtype=int)
                     X_tr = X_tr[nzsd_sample_idxs, :]
                     y_tr = y_tr[nzsd_sample_idxs]
-                if args.flt_nzvr_feats:
+                if args.filt_nzvr_feats:
                     nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(X_tr), dtype=int)
                     X_tr = X_tr[:, nzvr_feature_idxs]
                     X_te = X_te[:, nzvr_feature_idxs]
-                if args.flt_nzvr_samples:
+                if args.filt_nzvr_samples:
                     nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(X_tr.T), dtype=int)
                     X_tr = X_tr[nzvr_sample_idxs, :]
                     y_tr = y_tr[nzvr_sample_idxs]
-                if args.flt_ncorr_feats:
+                if args.filt_ncorr_feats:
                     corr_feature_idxs = np.array(
-                        r_data_corr_col_idxs(X_tr, cutoff=args.flt_ncorr_feat_cutoff), dtype=int
+                        r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncorr_feat_cutoff), dtype=int
                     )
                     X_tr = X_tr[:, corr_feature_idxs]
                     X_te = X_te[:, corr_feature_idxs]
-                if args.flt_ncorr_samples:
+                if args.filt_ncorr_samples:
                     corr_sample_idxs = np.array(
-                        r_data_corr_col_idxs(X_tr.T, cutoff=args.flt_ncorr_sample_cutoff), dtype=int
+                        r_data_corr_col_idxs(X_tr.T, cutoff=args.filt_ncorr_sample_cutoff), dtype=int
                     )
                     X_tr = X_tr[corr_sample_idxs, :]
                     y_tr = y_tr[corr_sample_idxs]

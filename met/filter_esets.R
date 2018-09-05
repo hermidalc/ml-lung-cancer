@@ -84,12 +84,12 @@ if (args$filter == "common_features") {
                     }
                     eset_name <- paste0(c("eset", dataset_name, suffixes), collapse="_")
                     if (exists(eset_name)) {
-                        eset_flt_name <- paste0(c(eset_name, "cff"), collapse="_")
-                        cat("Creating:", eset_flt_name, "\n")
-                        eset_flt <- get(eset_name)
-                        eset_flt <- eset_flt[common_feature_names,]
-                        assign(eset_flt_name, eset_flt)
-                        save(list=eset_flt_name, file=paste0("data/", eset_flt_name, ".Rda"))
+                        eset_filt_name <- paste0(c(eset_name, "cff"), collapse="_")
+                        cat("Creating:", eset_filt_name, "\n")
+                        eset_filt <- get(eset_name)
+                        eset_filt <- eset_filt[common_feature_names,]
+                        assign(eset_filt_name, eset_filt)
+                        save(list=eset_filt_name, file=paste0("data/", eset_filt_name, ".Rda"))
                     }
                 }
             }
@@ -114,7 +114,7 @@ if (args$filter == "common_features") {
     feature_names <- feature_names[feature_names != ""]
     cat(length(feature_names), "unique features\n")
     feat_file_basename_parts <- strsplit(basename(args$feat_file), split="_", fixed=TRUE)[[1]]
-    filter_type <- paste(feat_file_basename_parts[1:length(feat_file_basename_parts) - 1], collapse="_")
+    filt_type <- paste(feat_file_basename_parts[1:length(feat_file_basename_parts) - 1], collapse="_")
     for (col in 1:ncol(dataset_tr_name_combos)) {
         for (data_type in data_types) {
             for (norm_meth in norm_methods) {
@@ -148,8 +148,8 @@ if (args$filter == "common_features") {
                                     c("eset", dataset_tr_name_combos[,col], suffixes_tr, "tr"),
                                     collapse="_"
                                 )
-                                eset_tr_flt_name <- paste0(
-                                    c("eset", dataset_tr_name_combos[,col], suffixes_tr, filter_type, "tr"),
+                                eset_tr_filt_name <- paste0(
+                                    c("eset", dataset_tr_name_combos[,col], suffixes_tr, filt_type, "tr"),
                                     collapse="_"
                                 )
                             }
@@ -157,7 +157,7 @@ if (args$filter == "common_features") {
                                 eset_tr_name <- paste0(
                                     c("eset", dataset_tr_name_combos[,col], suffixes_tr), collapse="_"
                                 )
-                                eset_tr_flt_name <- paste0(c(eset_tr_name, filter_type), collapse="_")
+                                eset_tr_filt_name <- paste0(c(eset_tr_name, filt_type), collapse="_")
                             }
                             eset_tr_file <- paste0("data/", eset_tr_name, ".Rda")
                             if (!exists(eset_tr_name)) {
@@ -169,25 +169,25 @@ if (args$filter == "common_features") {
                                     next
                                 }
                                 if (args$load_only) next
-                                cat("Creating:", eset_tr_flt_name, "\n")
-                                eset_tr_flt <- get(eset_tr_name)
-                                eset_tr_flt <- eset_tr_flt[feature_names,]
-                                assign(eset_tr_flt_name, eset_tr_flt)
-                                save(list=eset_tr_flt_name, file=paste0("data/", eset_tr_flt_name, ".Rda"))
-                                remove(list=c(eset_tr_flt_name))
+                                cat("Creating:", eset_tr_filt_name, "\n")
+                                eset_tr_filt <- get(eset_tr_name)
+                                eset_tr_filt <- eset_tr_filt[feature_names,]
+                                assign(eset_tr_filt_name, eset_tr_filt)
+                                save(list=eset_tr_filt_name, file=paste0("data/", eset_tr_filt_name, ".Rda"))
+                                remove(list=c(eset_tr_filt_name))
                             }
                             for (dataset_te_name in setdiff(dataset_te_names, dataset_tr_name_combos[,col])) {
                                 if (length(dataset_tr_name_combos[,col]) > 1 || bc_meth != "none") {
                                     eset_te_name <- paste0(
                                         c(eset_tr_name, dataset_te_name, "te"), collapse="_"
                                     )
-                                    eset_te_flt_name <- paste0(
-                                        c(eset_tr_flt_name, dataset_te_name, "te"), collapse="_"
+                                    eset_te_filt_name <- paste0(
+                                        c(eset_tr_filt_name, dataset_te_name, "te"), collapse="_"
                                     )
                                 }
                                 else {
                                     eset_te_name <- paste0(c("eset", dataset_te_name, suffixes_te), collapse="_")
-                                    eset_te_flt_name <- paste0(c(eset_te_name, filter_type), collapse="_")
+                                    eset_te_filt_name <- paste0(c(eset_te_name, filt_type), collapse="_")
                                 }
                                 eset_te_file <- paste0("data/", eset_te_name, ".Rda")
                                 if (!exists(eset_te_name)) {
@@ -199,12 +199,12 @@ if (args$filter == "common_features") {
                                         next
                                     }
                                     if (args$load_only) next
-                                    cat("Creating:", eset_te_flt_name, "\n")
-                                    eset_te_flt <- get(eset_te_name)
-                                    eset_te_flt <- eset_te_flt[feature_names,]
-                                    assign(eset_te_flt_name, eset_te_flt)
-                                    save(list=eset_te_flt_name, file=paste0("data/", eset_te_flt_name, ".Rda"))
-                                    remove(list=c(eset_te_flt_name))
+                                    cat("Creating:", eset_te_filt_name, "\n")
+                                    eset_te_filt <- get(eset_te_name)
+                                    eset_te_filt <- eset_te_filt[feature_names,]
+                                    assign(eset_te_filt_name, eset_te_filt)
+                                    save(list=eset_te_filt_name, file=paste0("data/", eset_te_filt_name, ".Rda"))
+                                    remove(list=c(eset_te_filt_name))
                                 }
                             }
                         }

@@ -32,7 +32,7 @@ bc_methods <- c(
     "stica1",
     "svd"
 )
-filter_types <- c(
+filt_types <- c(
     "none"
 )
 common_pheno_names <- c(
