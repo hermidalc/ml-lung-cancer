@@ -117,6 +117,8 @@ parser.add_argument('--fs-rank-meth', type=str, default='mean_weights', help='fs
 parser.add_argument('--clf-svm-c', type=float, nargs='+', help='clf svm c')
 parser.add_argument('--clf-svm-cw', type=str, nargs='+', help='clf svm class weight')
 parser.add_argument('--clf-svm-kern', type=str, nargs='+', help='clf svm kernel')
+parser.add_argument('--clf-svm-deg', type=int, nargs='+', help='clf svm poly degree')
+parser.add_argument('--clf-svm-g', type=float, nargs='+', help='clf svm gamma')
 parser.add_argument('--clf-svm-cache', type=int, default=2000, help='libsvm cache size')
 parser.add_argument('--clf-knn-k', type=int, nargs='+', help='clf knn neighbors')
 parser.add_argument('--clf-knn-k-max', type=int, default=10, help='clf knn neighbors max')
@@ -400,6 +402,14 @@ if args.clf_svm_kern:
     CLF_SVM_KERN = sorted(args.clf_svm_kern)
 else:
     CLF_SVM_KERN = ['linear', 'poly', 'rbf', 'sigmoid']
+if args.clf_svm_deg:
+    CLF_SVM_DEG = sorted(args.clf_svm_deg)
+else:
+    CLF_SVM_DEG = np.linspace(2, 5, 4, dtype=int)
+if args.clf_svm_g:
+    CLF_SVM_G = sorted(args.clf_svm_g)
+else:
+    CLF_SVM_G = np.logspace(-9, 3, 13)
 if args.clf_knn_k:
     CLF_KNN_K = sorted(args.clf_knn_k)
 else:
@@ -680,7 +690,7 @@ pipelines = {
         },
     },
     'clf': {
-        'LinearSVC': {
+        'LinearSVM': {
             'steps': [
                 ('clf', LinearSVC()),
             ],
@@ -691,15 +701,17 @@ pipelines = {
                 },
             ],
         },
-        'SVC': {
+        'KernelSVM': {
             'steps': [
                 ('clf', SVC(cache_size=args.clf_svm_cache)),
             ],
             'param_grid': [
                 {
-                    'clf__kernel': CLF_SVM_KERN,
                     'clf__C': CLF_SVM_C,
                     'clf__class_weight': CLF_SVM_CW,
+                    'clf__kernel': CLF_SVM_KERN,
+                    'clf__degree': CLF_SVM_DEG,
+                    'clf__gamma': CLF_SVM_G,
                 },
             ],
         },
@@ -845,6 +857,7 @@ params_num_xticks = [
     'fs2__n_neighbors',
     'fs2__sample_size',
     'fs2__n_features_to_select',
+    'clf__degree',
     'clf__n_neighbors',
     'clf__n_estimators',
 ]
@@ -858,6 +871,7 @@ params_fixed_xticks = [
     'clf__C',
     'clf__class_weight',
     'clf__kernel',
+    'clf__gamma',
     'clf__weights',
     'clf__max_depth',
     'clf__base_estimator__C',
