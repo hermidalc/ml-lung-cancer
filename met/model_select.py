@@ -19,7 +19,9 @@ from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
 from sklearn.base import clone
-from sklearn.feature_selection import chi2, f_classif, mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE
+from sklearn.feature_selection import (
+    chi2, f_classif, mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE, VarianceThreshold
+)
 from sklearn.model_selection import GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
@@ -28,7 +30,9 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import RBF
-from sklearn.ensemble import AdaBoostClassifier, ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import (
+    AdaBoostClassifier, ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
+)
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, RobustScaler, StandardScaler
@@ -77,6 +81,7 @@ parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr min')
 parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
+parser.add_argument('--fs-vrt-thres', type=float, nargs='+', help='fs vrt threshold')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-max', type=int, default=1000, help='fs skb k select max')
 parser.add_argument('--fs-skb-lim-off', default=False, action='store_true', help='skb turn off sample limit')
@@ -226,7 +231,7 @@ def fit_pipeline(params, pipeline_order, X_tr, y_tr):
     if args.scv_verbose == 0: print('.', end='', flush=True)
     return pipe
 
-# config
+# cached functions
 if args.pipe_memory:
     limma_score_func = memory.cache(limma)
     limma_pkm_score_func = memory.cache(limma_pkm)
@@ -271,6 +276,10 @@ if args.slr_mms_fr_min and args.slr_mms_fr_max:
     SLR_MMS_FR = list(zip(args.slr_mms_fr_min, args.slr_mms_fr_max))
 else:
     SLR_MMS_FR = [(0,1)]
+if args.fs_vrt_thres:
+    FS_VRT_THRES = sorted(args.fs_vrt_thres)
+else:
+    FS_VRT_THRES = 0.
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
 else:
@@ -566,6 +575,16 @@ pipelines = {
             'param_grid': [
                 {
                     'fs1__k': FS_SKB_K,
+                },
+            ],
+        },
+        'VarianceThreshold': {
+            'steps': [
+                ('fs2', VarianceThreshold()),
+            ],
+            'param_grid': [
+                {
+                    'fs2__threshold': FS_VRT_THRES,
                 },
             ],
         },
