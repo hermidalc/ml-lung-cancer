@@ -215,22 +215,6 @@ def limma_pkm(X, y):
     f, pv = r_limma_pkm_feature_score(X, y)
     return np.array(f), np.array(pv)
 
-# bcr performance metric scoring function
-def bcr_score(y_true, y_pred):
-    tp = np.sum(np.logical_and(y_pred == 1, y_true == 1))
-    tn = np.sum(np.logical_and(y_pred == 0, y_true == 0))
-    fp = np.sum(np.logical_and(y_pred == 1, y_true == 0))
-    fn = np.sum(np.logical_and(y_pred == 0, y_true == 1))
-    mes1 = (tp + fn)
-    mes2 = (tn + fp)
-    # if only one class
-    if mes2 == 0:
-        return tp / mes1
-    elif mes1 == 0:
-        return tn / mes2
-    else:
-        return (tp / mes1 + tn / mes2) / 2
-
 # parallel pipeline fit function
 def fit_pipeline(params, pipeline_order, X_tr, y_tr):
     pipe_steps = sorted([
@@ -263,6 +247,22 @@ else:
     fs_ext_estimator = ExtraTreesClassifier()
     fs_grb_estimator = GradientBoostingClassifier()
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False)
+
+# bcr performance metric scoring function
+def bcr_score(y_true, y_pred):
+    tp = np.sum(np.logical_and(y_pred == 1, y_true == 1))
+    tn = np.sum(np.logical_and(y_pred == 0, y_true == 0))
+    fp = np.sum(np.logical_and(y_pred == 1, y_true == 0))
+    fn = np.sum(np.logical_and(y_pred == 0, y_true == 1))
+    mes1 = (tp + fn)
+    mes2 = (tn + fp)
+    # if only one class
+    if mes2 == 0:
+        return tp / mes1
+    elif mes1 == 0:
+        return tn / mes2
+    else:
+        return (tp / mes1 + tn / mes2) / 2
 
 scv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
