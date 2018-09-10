@@ -541,21 +541,21 @@ pipelines = {
         },
         'ANOVA-KBest': {
             'steps': [
-                ('fs2', SelectKBest(f_classif_func)),
+                ('fs1', SelectKBest(f_classif_func)),
             ],
             'param_grid': [
                 {
-                    'fs2__k': FS_SKB_K,
+                    'fs1__k': FS_SKB_K,
                 },
             ],
         },
         'Chi2-KBest': {
             'steps': [
-                ('fs2', SelectKBest(chi2_func)),
+                ('fs1', SelectKBest(chi2_func)),
             ],
             'param_grid': [
                 {
-                    'fs2__k': FS_SKB_K,
+                    'fs1__k': FS_SKB_K,
                 },
             ],
         },
