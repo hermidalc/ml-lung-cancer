@@ -1571,132 +1571,130 @@ elif args.analysis == 2:
         dataset_te_basenames = natsorted(list(set(args.dataset_te) - set(args.dataset_tr)))
     else:
         dataset_te_basenames = natsorted(list(set(dataset_names) - set(args.dataset_tr)))
-    if not dataset_te_basenames:
-        if args.pipe_memory: rmtree(cachedir)
-        quit()
-    sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames)))
-    plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
-    plt.rcParams['font.size'] = 14
-    plt.title(
-        dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
-        'Effect of Number of Top-Ranked Features Selected on Test Performance Metrics'
-    )
-    plt.xlabel('Number of top-ranked features selected')
-    plt.ylabel('Test Score')
-    x_axis = range(1, feature_idxs.size + 1)
-    plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
-    plt.xticks(x_axis)
-    ranked_feature_idxs = [r[0] for r in feature_ranks]
-    pipe = Pipeline(
-        pipelines['slr'][args.slr_meth]['steps'] +
-        pipelines['clf'][args.clf_meth]['steps']
-    )
-    pipe.set_params(
-        **{ k: v for k, v in search.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
-    )
-    if args.verbose > 1:
-        print('Pipeline:')
-        pprint(vars(pipe))
-    for dataset_te_basename in dataset_te_basenames:
-        if (len(args.dataset_tr) == 1 and not bc_meth) or args.no_addon_te:
-            dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
-        else:
-            dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
-        eset_te_name = 'eset_' + dataset_te_name
-        eset_te_file = 'data/' + eset_te_name + '.Rda'
-        if not path.isfile(eset_te_file): continue
-        base.load(eset_te_file)
-        eset_te = robjects.globalenv[eset_te_name]
-        X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
-        y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-        if args.filt_zero_feats:
-            X_te = X_te[:, nzero_feature_idxs]
-        if args.filt_zsdv_feats:
-            X_te = X_te[:, nzsd_feature_idxs]
-        if args.filt_nzvr_feats:
-            X_te = X_te[:, nzvr_feature_idxs]
-        if args.filt_ncor_feats:
-            X_te = X_te[:, corr_feature_idxs]
-        roc_aucs_te, bcrs_te = [], []
-        for num_features in range(1, len(ranked_feature_idxs) + 1):
-            top_feature_idxs = ranked_feature_idxs[:num_features]
-            top_feature_names = ranked_feature_idxs[:num_features]
-            pipe.fit(X_tr[:,top_feature_idxs], y_tr)
-            if hasattr(pipe, 'decision_function'):
-                y_score = pipe.decision_function(X_te[:,top_feature_idxs])
+    if dataset_te_basenames:
+        sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames)))
+        plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
+        plt.rcParams['font.size'] = 14
+        plt.title(
+            dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+            'Effect of Number of Top-Ranked Features Selected on Test Performance Metrics'
+        )
+        plt.xlabel('Number of top-ranked features selected')
+        plt.ylabel('Test Score')
+        x_axis = range(1, feature_idxs.size + 1)
+        plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+        plt.xticks(x_axis)
+        ranked_feature_idxs = [r[0] for r in feature_ranks]
+        pipe = Pipeline(
+            pipelines['slr'][args.slr_meth]['steps'] +
+            pipelines['clf'][args.clf_meth]['steps']
+        )
+        pipe.set_params(
+            **{ k: v for k, v in search.best_params_.items() if k.startswith('slr') or k.startswith('clf') }
+        )
+        if args.verbose > 1:
+            print('Pipeline:')
+            pprint(vars(pipe))
+        for dataset_te_basename in dataset_te_basenames:
+            if (len(args.dataset_tr) == 1 and not bc_meth) or args.no_addon_te:
+                dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
             else:
-                y_score = pipe.predict_proba(X_te[:,top_feature_idxs])[:,1]
+                dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
+            eset_te_name = 'eset_' + dataset_te_name
+            eset_te_file = 'data/' + eset_te_name + '.Rda'
+            if not path.isfile(eset_te_file): continue
+            base.load(eset_te_file)
+            eset_te = robjects.globalenv[eset_te_name]
+            X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
+            y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
+            if args.filt_zero_feats:
+                X_te = X_te[:, nzero_feature_idxs]
+            if args.filt_zsdv_feats:
+                X_te = X_te[:, nzsd_feature_idxs]
+            if args.filt_nzvr_feats:
+                X_te = X_te[:, nzvr_feature_idxs]
+            if args.filt_ncor_feats:
+                X_te = X_te[:, corr_feature_idxs]
+            roc_aucs_te, bcrs_te = [], []
+            for num_features in range(1, len(ranked_feature_idxs) + 1):
+                top_feature_idxs = ranked_feature_idxs[:num_features]
+                top_feature_names = ranked_feature_idxs[:num_features]
+                pipe.fit(X_tr[:,top_feature_idxs], y_tr)
+                if hasattr(pipe, 'decision_function'):
+                    y_score = pipe.decision_function(X_te[:,top_feature_idxs])
+                else:
+                    y_score = pipe.predict_proba(X_te[:,top_feature_idxs])[:,1]
+                roc_auc_te = roc_auc_score(y_te, y_score)
+                fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
+                y_pred = pipe.predict(X_te[:,top_feature_idxs])
+                bcr_te = bcr_score(y_te, y_pred)
+                roc_aucs_te.append(roc_auc_te)
+                bcrs_te.append(bcr_te)
+            plt.plot(
+                x_axis, roc_aucs_te, lw=2, alpha=0.8,
+                # label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, BCR = %0.4f $\pm$ %0.2f)' % (
+                label=r'%s (ROC AUC = %0.4f, BCR = %0.4f)' % (
+                    dataset_te_name,
+                    np.max(roc_aucs_te), np.max(bcrs_te),
+                    # np.mean(roc_aucs_te), np.std(roc_aucs_te),
+                    # np.mean(bcrs_te), np.std(bcrs_te),
+                ),
+            )
+            # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
+            # print summary info
+            print(
+                'Test: %3s' % dataset_te_name,
+                ' ROC AUC: %.4f' % np.max(roc_aucs_te),
+                ' BCR: %.4f' % np.max(bcrs_te),
+            )
+        plt.legend(loc='lower right', fontsize='small')
+        plt.grid('on')
+        num_figures += 1
+        # plot roc curve
+        sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames) + 1))
+        plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
+        plt.rcParams['font.size'] = 14
+        plt.title(
+            dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
+            'ROC Curve'
+        )
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.xlim([-0.01, 1.01])
+        plt.ylim([-0.01, 1.01])
+        for dataset_te_basename in dataset_te_basenames:
+            if (len(args.dataset_tr) == 1 and not bc_meth) or args.no_addon_te:
+                dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
+            else:
+                dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
+            eset_te_name = 'eset_' + dataset_te_name
+            if not base.exists(eset_te_name)[0]: continue
+            eset_te = robjects.globalenv[eset_te_name]
+            X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
+            y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
+            if args.filt_zero_feats:
+                X_te = X_te[:, nzero_feature_idxs]
+            if args.filt_zsdv_feats:
+                X_te = X_te[:, nzsd_feature_idxs]
+            if args.filt_nzvr_feats:
+                X_te = X_te[:, nzvr_feature_idxs]
+            if args.filt_ncor_feats:
+                X_te = X_te[:, corr_feature_idxs]
+            if hasattr(search, 'decision_function'):
+                y_score = search.decision_function(X_te)
+            else:
+                y_score = search.predict_proba(X_te)[:,1]
             roc_auc_te = roc_auc_score(y_te, y_score)
             fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-            y_pred = pipe.predict(X_te[:,top_feature_idxs])
+            y_pred = search.predict(X_te)
             bcr_te = bcr_score(y_te, y_pred)
-            roc_aucs_te.append(roc_auc_te)
-            bcrs_te.append(bcr_te)
-        plt.plot(
-            x_axis, roc_aucs_te, lw=2, alpha=0.8,
-            # label=r'%s (ROC AUC = %0.4f $\pm$ %0.2f, BCR = %0.4f $\pm$ %0.2f)' % (
-            label=r'%s (ROC AUC = %0.4f, BCR = %0.4f)' % (
-                dataset_te_name,
-                np.max(roc_aucs_te), np.max(bcrs_te),
-                # np.mean(roc_aucs_te), np.std(roc_aucs_te),
-                # np.mean(bcrs_te), np.std(bcrs_te),
-            ),
-        )
-        # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
-        # print summary info
-        print(
-            'Test: %3s' % dataset_te_name,
-            ' ROC AUC: %.4f' % np.max(roc_aucs_te),
-            ' BCR: %.4f' % np.max(bcrs_te),
-        )
-    plt.legend(loc='lower right', fontsize='small')
-    plt.grid('on')
-    num_figures += 1
-    # plot roc curve
-    sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames) + 1))
-    plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
-    plt.rcParams['font.size'] = 14
-    plt.title(
-        dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
-        'ROC Curve'
-    )
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.xlim([-0.01, 1.01])
-    plt.ylim([-0.01, 1.01])
-    for dataset_te_basename in dataset_te_basenames:
-        if (len(args.dataset_tr) == 1 and not bc_meth) or args.no_addon_te:
-            dataset_te_name = '_'.join([dataset_te_basename] + [x for x in prep_steps if x != 'mrg'])
-        else:
-            dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
-        eset_te_name = 'eset_' + dataset_te_name
-        if not base.exists(eset_te_name)[0]: continue
-        eset_te = robjects.globalenv[eset_te_name]
-        X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
-        y_te = np.array(r_eset_class_labels(eset_te), dtype=int)
-        if args.filt_zero_feats:
-            X_te = X_te[:, nzero_feature_idxs]
-        if args.filt_zsdv_feats:
-            X_te = X_te[:, nzsd_feature_idxs]
-        if args.filt_nzvr_feats:
-            X_te = X_te[:, nzvr_feature_idxs]
-        if args.filt_ncor_feats:
-            X_te = X_te[:, corr_feature_idxs]
-        if hasattr(search, 'decision_function'):
-            y_score = search.decision_function(X_te)
-        else:
-            y_score = search.predict_proba(X_te)[:,1]
-        roc_auc_te = roc_auc_score(y_te, y_score)
-        fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
-        y_pred = search.predict(X_te)
-        bcr_te = bcr_score(y_te, y_pred)
-        plt.plot(
-            fpr, tpr, lw=3, alpha=0.8,
-            label=r'%s ROC (AUC = %0.4f, BCR = %0.4f)' % (dataset_te_name, roc_auc_te, bcr_te),
-        )
-    plt.plot([0, 1], [0, 1], linestyle='--', lw=3, alpha=0.2, label='Chance')
-    plt.legend(loc='lower right', fontsize='small')
-    plt.grid('off')
+            plt.plot(
+                fpr, tpr, lw=3, alpha=0.8,
+                label=r'%s ROC (AUC = %0.4f, BCR = %0.4f)' % (dataset_te_name, roc_auc_te, bcr_te),
+            )
+        plt.plot([0, 1], [0, 1], linestyle='--', lw=3, alpha=0.2, label='Chance')
+        plt.legend(loc='lower right', fontsize='small')
+        plt.grid('off')
 elif args.analysis == 3:
     if args.data_type:
         data_types = [x for x in data_types if x in args.data_type]
