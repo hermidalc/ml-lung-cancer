@@ -94,6 +94,7 @@ parser.add_argument('--fs-sfm-ext-e', type=int, nargs='+', help='fs sfm ext n es
 parser.add_argument('--fs-sfm-ext-e-max', type=int, default=50, help='fs sfm ext n estimators max')
 parser.add_argument('--fs-sfm-ext-d', type=int, nargs='+', help='fs sfm ext max depth')
 parser.add_argument('--fs-sfm-ext-d-max', type=int, default=10, help='fs sfm ext max depth max')
+parser.add_argument('--fs-sfm-ext-f', type=str, nargs='+', help='fs sfm ext max features')
 parser.add_argument('--fs-sfm-ext-cw', type=str, nargs='+', help='fs sfm ext class weight')
 parser.add_argument('--fs-sfm-grb-e', type=int, nargs='+', help='fs sfm grb n estimators')
 parser.add_argument('--fs-sfm-grb-e-max', type=int, default=200, help='fs sfm grb n estimators max')
@@ -132,6 +133,7 @@ parser.add_argument('--clf-ext-e', type=int, nargs='+', help='clf ext n estimato
 parser.add_argument('--clf-ext-e-max', type=int, default=50, help='clf ext n estimators max')
 parser.add_argument('--clf-ext-d', type=int, nargs='+', help='clf ext max depth')
 parser.add_argument('--clf-ext-d-max', type=int, default=10, help='clf ext max depth max')
+parser.add_argument('--clf-ext-f', type=str, nargs='+', help='clf ext max features')
 parser.add_argument('--clf-ext-cw', type=str, nargs='+', help='clf ext class weight')
 parser.add_argument('--clf-ada-e', type=int, nargs='+', help='clf ada n estimators')
 parser.add_argument('--clf-ada-e-max', type=int, default=200, help='clf ada n estimators max')
@@ -319,6 +321,13 @@ if args.fs_sfm_ext_d:
     )
 else:
     FS_SFM_EXT_D = [None] + list(range(1, args.fs_sfm_ext_d_max + 1, 1))
+if args.fs_sfm_ext_f:
+    FS_SFM_EXT_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_ext_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_EXT_F = [None, 'auto', 'log2', 'sqrt']
 if args.fs_sfm_ext_cw:
     FS_SFM_EXT_CW = sorted(
         [None if a in ('None', 'none') else a for a in args.fs_sfm_ext_cw],
@@ -439,6 +448,13 @@ if args.clf_ext_d:
     )
 else:
     CLF_EXT_D = [None] + list(range(1, args.clf_ext_d_max + 1, 1))
+if args.clf_ext_f:
+    CLF_EXT_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_ext_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    CLF_EXT_F = [None, 'auto', 'log2', 'sqrt']
 if args.clf_ext_cw:
     CLF_EXT_CW = sorted(
         [None if a in ('None', 'none') else a for a in args.clf_ext_cw],
@@ -619,6 +635,7 @@ pipelines = {
                 {
                     'fs2__estimator__n_estimators': FS_SFM_EXT_E,
                     'fs2__estimator__max_depth': FS_SFM_EXT_D,
+                    'fs2__estimator__max_features': FS_SFM_EXT_F,
                     'fs2__estimator__class_weight': FS_SFM_EXT_CW,
                     'fs2__k': FS_SKB_K,
                 },
@@ -765,6 +782,7 @@ pipelines = {
                 {
                     'clf__n_estimators': CLF_EXT_E,
                     'clf__max_depth': CLF_EXT_D,
+                    'clf__max_features': CLF_EXT_F,
                     'clf__class_weight': CLF_EXT_CW,
                 },
             ],
