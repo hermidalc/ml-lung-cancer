@@ -428,6 +428,7 @@ pipelines = {
                 {
                     'fs2__estimator__n_estimators': FS_SFM_EXT_E,
                     'fs2__estimator__max_depth': FS_SFM_EXT_D,
+                    'fs2__estimator__max_features': FS_SFM_EXT_F,
                     'fs2__estimator__class_weight': FS_SFM_EXT_CW,
                     'fs2__k': FS_SKB_K,
                 },
