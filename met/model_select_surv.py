@@ -1320,7 +1320,7 @@ elif args.analysis == 2:
                     mean_scores_cv_max_idxs, np.arange(std_scores_cv.shape[1])
                 ]
             elif args.scv_h_plt_meth == 'all':
-                all_split_scores_cv = np.array([])
+                all_scores_cv = np.array([])
                 for split_idx in range(search.n_splits_):
                     split_scores_cv = np.transpose(np.reshape(
                         search.cv_results_[
@@ -1328,12 +1328,12 @@ elif args.analysis == 2:
                         ][param_values_cv_sorted_idxs],
                         new_shape
                     ))
-                    if all_split_scores_cv.size > 0:
-                        all_split_scores_cv = np.vstack((all_split_scores_cv, split_scores_cv))
+                    if all_scores_cv.size > 0:
+                        all_scores_cv = np.vstack((all_scores_cv, split_scores_cv))
                     else:
-                        all_split_scores_cv = split_scores_cv
-                mean_scores_cv = np.mean(all_split_scores_cv, axis=0)
-                std_scores_cv = np.std(all_split_scores_cv, axis=0)
+                        all_scores_cv = split_scores_cv
+                mean_scores_cv = np.mean(all_scores_cv, axis=0)
+                std_scores_cv = np.std(all_scores_cv, axis=0)
             if metric_idx == 0:
                 label = r'$\pm$ 1 std. dev.'
             else:
