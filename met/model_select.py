@@ -107,6 +107,7 @@ parser.add_argument('--fs-rfe-ext-e', type=int, nargs='+', help='fs rfe ext n es
 parser.add_argument('--fs-rfe-ext-e-max', type=int, default=50, help='fs rfe ext n estimators max')
 parser.add_argument('--fs-rfe-ext-d', type=int, nargs='+', help='fs rfe ext max depth')
 parser.add_argument('--fs-rfe-ext-d-max', type=int, default=10, help='fs rfe ext max depth max')
+parser.add_argument('--fs-rfe-ext-f', type=str, nargs='+', help='fs rfe ext max features')
 parser.add_argument('--fs-rfe-ext-cw', type=str, nargs='+', help='fs rfe ext class weight')
 parser.add_argument('--fs-rfe-grb-e', type=int, nargs='+', help='fs rfe grb n estimators')
 parser.add_argument('--fs-rfe-grb-e-max', type=int, default=200, help='fs rfe grb n estimators max')
@@ -129,6 +130,16 @@ parser.add_argument('--clf-svm-cache', type=int, default=2000, help='libsvm cach
 parser.add_argument('--clf-knn-k', type=int, nargs='+', help='clf knn neighbors')
 parser.add_argument('--clf-knn-k-max', type=int, default=10, help='clf knn neighbors max')
 parser.add_argument('--clf-knn-w', type=str, nargs='+', help='clf knn weights')
+parser.add_argument('--clf-dt-d', type=int, nargs='+', help='clf dt max depth')
+parser.add_argument('--clf-dt-d-max', type=int, default=10, help='clf dt max depth max')
+parser.add_argument('--clf-dt-f', type=str, nargs='+', help='clf dt max features')
+parser.add_argument('--clf-dt-cw', type=str, nargs='+', help='clf dt class weight')
+parser.add_argument('--clf-rf-e', type=int, nargs='+', help='clf rf n estimators')
+parser.add_argument('--clf-rf-e-max', type=int, default=50, help='clf rf n estimators max')
+parser.add_argument('--clf-rf-d', type=int, nargs='+', help='clf rf max depth')
+parser.add_argument('--clf-rf-d-max', type=int, default=10, help='clf rf max depth max')
+parser.add_argument('--clf-rf-f', type=str, nargs='+', help='clf rf max features')
+parser.add_argument('--clf-rf-cw', type=str, nargs='+', help='clf rf class weight')
 parser.add_argument('--clf-ext-e', type=int, nargs='+', help='clf ext n estimators')
 parser.add_argument('--clf-ext-e-max', type=int, default=50, help='clf ext n estimators max')
 parser.add_argument('--clf-ext-d', type=int, nargs='+', help='clf ext max depth')
@@ -334,7 +345,7 @@ if args.fs_sfm_ext_cw:
         key=lambda x: (x is not None, x)
     )
 else:
-    FS_SFM_EXT_CW = [None, 'balanced']
+    FS_SFM_EXT_CW = [None, 'balanced', 'balanced_subsample']
 if args.fs_sfm_grb_e:
     FS_SFM_GRB_E = sorted(args.fs_sfm_grb_e)
 else:
@@ -372,13 +383,20 @@ if args.fs_rfe_ext_d:
     )
 else:
     FS_RFE_EXT_D = [None] + list(range(1, args.fs_rfe_ext_d_max + 1, 1))
+if args.fs_rfe_ext_f:
+    FS_RFE_EXT_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_ext_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_EXT_F = [None, 'auto', 'log2', 'sqrt']
 if args.fs_rfe_ext_cw:
     FS_RFE_EXT_CW = sorted(
         [None if a in ('None', 'none') else a for a in args.fs_rfe_ext_cw],
         key=lambda x: (x is not None, x)
     )
 else:
-    FS_RFE_EXT_CW = [None, 'balanced']
+    FS_RFE_EXT_CW = [None, 'balanced', 'balanced_subsample']
 if args.fs_rfe_grb_e:
     FS_RFE_GRB_E = sorted(args.fs_rfe_grb_e)
 else:
@@ -437,6 +455,52 @@ if args.clf_knn_w:
     CLF_KNN_W = sorted(args.clf_knn_w)
 else:
     CLF_KNN_W = ['distance', 'uniform']
+if args.clf_dt_d:
+    CLF_DT_D = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_dt_d],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    CLF_DT_D = [None] + list(range(1, args.clf_dt_d_max + 1, 1))
+if args.clf_dt_f:
+    CLF_DT_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_dt_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    CLF_DT_F = [None, 'auto', 'log2', 'sqrt']
+if args.clf_dt_cw:
+    CLF_DT_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_dt_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    CLF_DT_CW = [None, 'balanced']
+if args.clf_rf_e:
+    CLF_RF_E = sorted(args.clf_rf_e)
+else:
+    CLF_RF_E = list(range(5, args.clf_rf_e_max + 1, 5))
+if args.clf_rf_d:
+    CLF_RF_D = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_rf_d],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    CLF_RF_D = [None] + list(range(1, args.clf_rf_d_max + 1, 1))
+if args.clf_rf_f:
+    CLF_RF_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_rf_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    CLF_RF_F = [None, 'auto', 'log2', 'sqrt']
+if args.clf_rf_cw:
+    CLF_RF_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.clf_rf_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    CLF_RF_CW = [None, 'balanced']
 if args.clf_ext_e:
     CLF_EXT_E = sorted(args.clf_ext_e)
 else:
@@ -461,7 +525,7 @@ if args.clf_ext_cw:
         key=lambda x: (x is not None, x)
     )
 else:
-    CLF_EXT_CW = [None, 'balanced']
+    CLF_EXT_CW = [None, 'balanced', 'balanced_subsample']
 if args.clf_ada_e:
     CLF_ADA_E = sorted(args.clf_ada_e)
 else:
@@ -675,6 +739,7 @@ pipelines = {
                 {
                     'fs2__estimator__n_estimators': FS_RFE_EXT_E,
                     'fs2__estimator__max_depth': FS_RFE_EXT_D,
+                    'fs2__estimator__max_features': FS_RFE_EXT_F,
                     'fs2__estimator__class_weight': FS_RFE_EXT_CW,
                     'fs2__step': FS_RFE_STEP,
                     'fs2__n_features_to_select': FS_SKB_K,
@@ -769,8 +834,22 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'clf__max_depth': CLF_EXT_D,
-                    'clf__class_weight': CLF_EXT_CW,
+                    'clf__max_depth': CLF_DT_D,
+                    'clf__max_features': CLF_DT_F,
+                    'clf__class_weight': CLF_DT_CW,
+                },
+            ],
+        },
+        'RandomForest': {
+            'steps': [
+                ('clf', RandomForestClassifier()),
+            ],
+            'param_grid': [
+                {
+                    'clf__n_estimators': CLF_RF_E,
+                    'clf__max_depth': CLF_RF_D,
+                    'clf__max_features': CLF_RF_F,
+                    'clf__class_weight': CLF_RF_CW,
                 },
             ],
         },
@@ -783,18 +862,6 @@ pipelines = {
                     'clf__n_estimators': CLF_EXT_E,
                     'clf__max_depth': CLF_EXT_D,
                     'clf__max_features': CLF_EXT_F,
-                    'clf__class_weight': CLF_EXT_CW,
-                },
-            ],
-        },
-        'RandomForest': {
-            'steps': [
-                ('clf', RandomForestClassifier()),
-            ],
-            'param_grid': [
-                {
-                    'clf__n_estimators': CLF_EXT_E,
-                    'clf__max_depth': CLF_EXT_D,
                     'clf__class_weight': CLF_EXT_CW,
                 },
             ],
