@@ -56,7 +56,7 @@ conda install -c sebp scikit-survival
 
 4. Setup for rJava (used by Biocomb and FSelector R packages)
 
-In .bashrc/.bash_profile:
+In ~/.javarc:
 ```bash
 JAVA_HOME=/usr/lib/jvm/java
 export JAVA_HOME
@@ -66,7 +66,7 @@ export LD_LIBRARY_PATH
 ```
 Then run:
 ```bash
-source .bashrc
+source ~/.javarc
 R CMD javareconf
 ```
 
