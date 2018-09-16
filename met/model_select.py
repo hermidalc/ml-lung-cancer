@@ -691,7 +691,7 @@ pipelines = {
                 },
             ],
         },
-        'ExtraTrees-SFM-KBest': {
+        'EXT-SFM-KBest': {
             'steps': [
                 ('fs2', SelectFromModel(fs_ext_estimator)),
             ],
@@ -731,7 +731,7 @@ pipelines = {
                 },
             ],
         },
-        'ExtraTrees-RFE': {
+        'EXT-RFE': {
             'steps': [
                 ('fs2', RFE(fs_ext_estimator, verbose=args.fs_rfe_verbose)),
             ],
