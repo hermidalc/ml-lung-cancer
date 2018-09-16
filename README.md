@@ -61,7 +61,7 @@ In .bashrc/.bash_profile:
 JAVA_HOME=/usr/lib/jvm/java
 export JAVA_HOME
 
-LD_LIBRARY_PATH=/usr/lib/jvm/java/jre/lib/amd64:/usr/lib/jvm/java/jre/lib/amd64/server
+LD_LIBRARY_PATH=/usr/lib/jvm/java/lib:/usr/lib/jvm/java/lib/server
 export LD_LIBRARY_PATH
 ```
 Then run:
