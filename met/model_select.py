@@ -1070,7 +1070,7 @@ if args.analysis == 1:
         **pipelines['clf'][args.clf_meth]['param_grid'][0],
     }
     if args.fs_meth == 'Limma-KBest':
-        if norm_meth and norm_meth == 'pkm':
+        if norm_meth and norm_meth in ['pkm', 'ppm']:
             pipe.set_params(fs1__score_func=limma_pkm_score_func)
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
@@ -1468,7 +1468,7 @@ elif args.analysis == 2:
         **pipelines['clf'][args.clf_meth]['param_grid'][0],
     }
     if args.fs_meth == 'Limma-KBest':
-        if norm_meth and norm_meth == 'pkm':
+        if norm_meth and norm_meth in ['pkm', 'ppm']:
             pipe.set_params(fs1__score_func=limma_pkm_score_func)
         else:
             pipe.set_params(fs1__score_func=limma_score_func)
@@ -1806,7 +1806,7 @@ elif args.analysis == 3:
                                 ] if x not in ('None', 'none')
                             ])
                             prep_group_info.append({
-                                'pkm': True if norm_meth == 'pkm' else False,
+                                'pkm': True if norm_meth in ['pkm', 'ppm'] else False,
                                 'mrg': True if prep_meth == 'mrg' else False,
                                 'bcm': True if bc_meth not in ('None', 'none') else False,
                             })
