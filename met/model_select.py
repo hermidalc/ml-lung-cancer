@@ -178,8 +178,8 @@ parser.add_argument('--pipe-memory', default=False, action='store_true', help='t
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--verbose', type=int, default=0, help='program verbosity')
 args = parser.parse_args()
-if args.test_size > 1.0: args.test_size = int(args.test_size)
-if args.scv_size > 1.0: args.scv_size = int(args.scv_size)
+if args.test_size >= 1.0: args.test_size = int(args.test_size)
+if args.scv_size >= 1.0: args.scv_size = int(args.scv_size)
 
 base = importr('base')
 biobase = importr('Biobase')
@@ -1726,12 +1726,6 @@ elif args.analysis == 2:
                 ),
             )
             # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
-            # print summary info
-            print(
-                'Test: %3s' % dataset_te_name,
-                ' ROC AUC: %.4f' % np.max(roc_aucs_te),
-                ' BCR: %.4f' % np.max(bcrs_te),
-            )
         plt.legend(loc='lower right', fontsize='small')
         plt.grid('on')
         num_figures += 1
@@ -1776,6 +1770,12 @@ elif args.analysis == 2:
             plt.plot(
                 fpr, tpr, lw=3, alpha=0.8,
                 label=r'%s ROC (AUC = %0.4f, BCR = %0.4f)' % (dataset_te_name, roc_auc_te, bcr_te),
+            )
+            # print summary info
+            print(
+                'Test: %3s' % dataset_te_name,
+                ' ROC AUC: %.4f' % roc_auc_te,
+                ' BCR: %.4f' % bcr_te,
             )
         plt.plot([0, 1], [0, 1], linestyle='--', lw=3, alpha=0.2, label='Chance')
         plt.legend(loc='lower right', fontsize='small')
