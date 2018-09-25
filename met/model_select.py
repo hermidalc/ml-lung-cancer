@@ -125,7 +125,7 @@ parser.add_argument('--clf-svm-c', type=float, nargs='+', help='clf svm c')
 parser.add_argument('--clf-svm-cw', type=str, nargs='+', help='clf svm class weight')
 parser.add_argument('--clf-svm-kern', type=str, nargs='+', help='clf svm kernel')
 parser.add_argument('--clf-svm-deg', type=int, nargs='+', help='clf svm poly degree')
-parser.add_argument('--clf-svm-g', type=float, nargs='+', help='clf svm gamma')
+parser.add_argument('--clf-svm-g', type=str, nargs='+', help='clf svm gamma')
 parser.add_argument('--clf-svm-cache', type=int, default=2000, help='libsvm cache size')
 parser.add_argument('--clf-knn-k', type=int, nargs='+', help='clf knn neighbors')
 parser.add_argument('--clf-knn-k-max', type=int, default=10, help='clf knn neighbors max')
@@ -1144,7 +1144,7 @@ if args.analysis == 1:
             ' Features: %3s' % feature_idxs.size,
             ' Params:', search.best_params_,
         )
-        if args.verbose > 0:
+        if args.verbose > 1:
             if weights.size > 0:
                 print('Feature Rankings:')
                 if args.show_annots:

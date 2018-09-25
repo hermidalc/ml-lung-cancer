@@ -845,7 +845,7 @@ if args.analysis == 1:
             ' Features: %3s' % feature_idxs.size,
             ' Params:', search.best_params_,
         )
-        if args.verbose > 0:
+        if args.verbose > 1:
             if weights.size > 0:
                 print('Feature Rankings:')
                 if args.show_annots:
