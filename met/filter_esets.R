@@ -171,7 +171,13 @@ if (args$filter == "common_features") {
                                 if (args$load_only) next
                                 cat("Creating:", eset_tr_filt_name, "\n")
                                 eset_tr_filt <- get(eset_tr_name)
-                                eset_tr_filt <- eset_tr_filt[feature_names,]
+                                common_feature_names <- intersect(featureNames(eset_tr_filt), feature_names)
+                                cat(
+                                    "  Filter:",
+                                    length(common_feature_names), "/", length(feature_names),
+                                    "features\n"
+                                )
+                                eset_tr_filt <- eset_tr_filt[common_feature_names,]
                                 assign(eset_tr_filt_name, eset_tr_filt)
                                 save(list=eset_tr_filt_name, file=paste0("data/", eset_tr_filt_name, ".Rda"))
                                 remove(list=c(eset_tr_filt_name))
@@ -201,7 +207,13 @@ if (args$filter == "common_features") {
                                     if (args$load_only) next
                                     cat("Creating:", eset_te_filt_name, "\n")
                                     eset_te_filt <- get(eset_te_name)
-                                    eset_te_filt <- eset_te_filt[feature_names,]
+                                    common_feature_names <- intersect(featureNames(eset_te_filt), feature_names)
+                                    cat(
+                                        "  Filter:",
+                                        length(common_feature_names), "/", length(feature_names),
+                                        "features\n"
+                                    )
+                                    eset_te_filt <- eset_te_filt[common_feature_names,]
                                     assign(eset_te_filt_name, eset_te_filt)
                                     save(list=eset_te_filt_name, file=paste0("data/", eset_te_filt_name, ".Rda"))
                                     remove(list=c(eset_te_filt_name))
