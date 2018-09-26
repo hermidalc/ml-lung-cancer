@@ -83,7 +83,8 @@ parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr mi
 parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
 parser.add_argument('--fs-vrt-thres', type=float, nargs='+', help='fs vrt threshold')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
-parser.add_argument('--fs-skb-k-max', type=int, default=1000, help='fs skb k select max')
+parser.add_argument('--fs-skb-k-min', type=int, default=1, help='fs skb k select min')
+parser.add_argument('--fs-skb-k-max', type=int, default=100, help='fs skb k select max')
 parser.add_argument('--fs-skb-lim-off', default=False, action='store_true', help='skb turn off sample limit')
 parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
 parser.add_argument('--fs-sfm-svm-thres', type=float, nargs='+', help='fs sfm svm threshold')
@@ -297,7 +298,7 @@ else:
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
 else:
-    FS_SKB_K = list(range(1, args.fs_skb_k_max + 1, 1))
+    FS_SKB_K = list(range(args.fs_skb_k_min, args.fs_skb_k_max + 1, 1))
 if args.fs_sfp_p:
     FS_SFP_P = sorted(args.fs_sfp_p)
 else:
