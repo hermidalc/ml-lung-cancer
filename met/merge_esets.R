@@ -1,11 +1,12 @@
 #!/usr/bin/env Rscript
 
+options(warn=1)
 suppressPackageStartupMessages(library("argparse"))
 suppressPackageStartupMessages(library("Biobase"))
 source("config.R")
 
 parser <- ArgumentParser()
-parser$add_argument("--datasets-tr", type="character", nargs="+", help="dataset tr")
+parser$add_argument("--dataset-tr", type="character", nargs="+", help="dataset tr")
 parser$add_argument("--num-combo-tr", type="integer", help="num tr datasets to combine")
 parser$add_argument("--data-type", type="character", nargs="+", help="data type")
 parser$add_argument("--norm-meth", type="character", nargs="+", help="normalization method")
@@ -13,12 +14,12 @@ parser$add_argument("--feat-type", type="character", nargs="+", help="feature ty
 parser$add_argument("--load-only", action="store_true", default=FALSE, help="show search and eset load only")
 args <- parser$parse_args()
 if (!is.null(args$dataset_tr)) {
-    dataset_names <- intersect(dataset_names, args$datasets_tr)
+    dataset_names <- intersect(dataset_names, args$dataset_tr)
 }
-if (!is.null(args$datasets_tr) && !is.null(args$num_combo)) {
-    dataset_tr_name_combos <- combn(intersect(dataset_names, args$datasets_tr), as.integer(args$num_combo))
-} else if (!is.null(args$datasets_tr)) {
-    dataset_tr_name_combos <- combn(intersect(dataset_names, args$datasets_tr), length(args$datasets_tr))
+if (!is.null(args$dataset_tr) && !is.null(args$num_combo)) {
+    dataset_tr_name_combos <- combn(intersect(dataset_names, args$dataset_tr), as.integer(args$num_combo))
+} else if (!is.null(args$dataset_tr)) {
+    dataset_tr_name_combos <- combn(intersect(dataset_names, args$dataset_tr), length(args$dataset_tr))
 } else {
     if (is.null(args$num_combo)) stop("--num-combo-tr option required")
     dataset_tr_name_combos <- combn(dataset_names, as.integer(args$num_combo))
