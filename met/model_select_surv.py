@@ -117,6 +117,7 @@ parser.add_argument('--load-only', default=False, action='store_true', help='sho
 parser.add_argument('--num-cores', type=int, default=-1, help='num parallel cores')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
+parser.add_argument('--random-seed', type=int, default=19825791, help='random state seed')
 parser.add_argument('--verbose', type=int, default=0, help='program verbosity')
 args = parser.parse_args()
 if args.test_size >= 1.0: args.test_size = int(args.test_size)
@@ -197,20 +198,20 @@ if args.pipe_memory:
     chi2_func = memory.cache(chi2)
     f_classif_func = memory.cache(f_classif)
     mi_classif_func = memory.cache(mutual_info_classif)
-    fs_svm_estimator = CachedLinearSVC()
-    fs_ext_estimator = CachedExtraTreesClassifier()
-    fs_grb_estimator = CachedGradientBoostingClassifier()
-    sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False)
+    fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
+    fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
+    fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
+    sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 else:
     limma_score_func = limma
     limma_pkm_score_func = limma_pkm
     chi2_func = chi2
     f_classif_func = f_classif
     mi_classif_func = mutual_info_classif
-    fs_svm_estimator = LinearSVC()
-    fs_ext_estimator = ExtraTreesClassifier()
-    fs_grb_estimator = GradientBoostingClassifier()
-    sfm_svm_estimator = LinearSVC(penalty='l1', dual=False)
+    fs_svm_estimator = LinearSVC(random_state=args.random_seed)
+    fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)
+    fs_grb_estimator = GradientBoostingClassifier(random_state=args.random_seed)
+    sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 
 scv_scoring = c_index_score
 
@@ -554,7 +555,7 @@ pipelines = {
         },
         'FastLinearSurvivalSVM': {
             'steps': [
-                ('srv', FastSurvivalSVM()),
+                ('srv', FastSurvivalSVM(random_state=args.random_seed)),
             ],
             'param_grid': [
                 {
@@ -569,7 +570,7 @@ pipelines = {
         },
         'FastKernelSurvivalSVM': {
             'steps': [
-                ('srv', FastKernelSurvivalSVM()),
+                ('srv', FastKernelSurvivalSVM(random_state=args.random_seed)),
             ],
             'param_grid': [
                 {
@@ -587,7 +588,7 @@ pipelines = {
         },
         'LinearSurvivalSVM': {
             'steps': [
-                ('srv', NaiveSurvivalSVM()),
+                ('srv', NaiveSurvivalSVM(random_state=args.random_seed)),
             ],
             'param_grid': [
                 {
@@ -611,7 +612,7 @@ pipelines = {
         },
         'GRBSurvival': {
             'steps': [
-                ('srv', GradientBoostingSurvivalAnalysis()),
+                ('srv', GradientBoostingSurvivalAnalysis(random_state=args.random_seed)),
             ],
             'param_grid': [
                 {
@@ -624,7 +625,7 @@ pipelines = {
         },
         'CWGRBSurvival': {
             'steps': [
-                ('srv', ComponentwiseGradientBoostingSurvivalAnalysis()),
+                ('srv', ComponentwiseGradientBoostingSurvivalAnalysis(random_state=args.random_seed)),
             ],
             'param_grid': [
                 {
@@ -787,16 +788,19 @@ if args.analysis == 1:
             ))
     if args.scv_type == 'grid':
         search = GridSearchCV(
-            pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+            cv=StratifiedShuffleSplit(
+                n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
+            ),
         )
     elif args.scv_type == 'rand':
         search = RandomizedSearchCV(
-            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-            n_iter=args.scv_n_iter,
+            n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
+                n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
+            ),
         )
     if args.verbose > 0:
         print('Pipeline:')
@@ -807,7 +811,9 @@ if args.analysis == 1:
     split_num = 1
     split_results = []
     param_scores_cv = {}
-    sss = StratifiedShuffleSplit(n_splits=args.test_splits, test_size=args.test_size)
+    sss = StratifiedShuffleSplit(
+        n_splits=args.test_splits, test_size=args.test_size, random_state=args.random_seed
+    )
     for tr_idxs, te_idxs in sss.split(X, y):
         search.fit(X[tr_idxs], y[tr_idxs])
         feature_idxs = np.arange(X[tr_idxs].shape[1])
@@ -1185,16 +1191,19 @@ elif args.analysis == 2:
             ))
     if args.scv_type == 'grid':
         search = GridSearchCV(
-            pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+            cv=StratifiedShuffleSplit(
+                n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
+            ),
         )
     elif args.scv_type == 'rand':
         search = RandomizedSearchCV(
-            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-            cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-            n_iter=args.scv_n_iter,
+            n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
+                n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
+            ),
         )
     if args.verbose > 0:
         print('Pipeline:')
@@ -1732,9 +1741,11 @@ elif args.analysis == 3:
                                             param_grid_data.append(params_data)
                     search = GridSearchCV(
                         Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-                        param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-                        cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+                        param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
                         error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+                        cv=StratifiedShuffleSplit(
+                            n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
+                        ),
                     )
                 elif args.scv_type == 'rand':
                     pipe = Pipeline(sorted(
@@ -1763,10 +1774,11 @@ elif args.analysis == 3:
                                 param_grid[param]
                             ))
                     search = RandomizedSearchCV(
-                        pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit,
-                        cv=StratifiedShuffleSplit(n_splits=args.scv_splits, test_size=args.scv_size), iid=False,
+                        pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
                         error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
-                        n_iter=args.scv_n_iter,
+                        n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
+                            n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
+                        ),
                     )
                     if args.verbose > 0:
                         print('Pipeline:')
