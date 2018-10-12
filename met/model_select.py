@@ -904,7 +904,7 @@ pipelines = {
         },
         'GaussianProcess': {
             'steps': [
-                ('clf', GaussianProcessClassifier(random_state=args.random_seed),
+                ('clf', GaussianProcessClassifier(random_state=args.random_seed)),
             ],
             'param_grid': [
                 { },
@@ -1838,8 +1838,8 @@ elif args.analysis == 3:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(args.dataset_tr), len(args.dataset_tr))]
     else:
         dataset_tr_combos = [list(x) for x in combinations(natsorted(dataset_names), args.num_combo_tr)]
-    # determine which data combinations will be used
-    num_dataset_pairs = 0
+    # determine which datasets will be used
+    num_datasets = 0
     dataset_tr_combos_subset, prep_groups_subset = [], []
     for dataset_tr_combo in dataset_tr_combos:
         dataset_tr_basename = '_'.join(dataset_tr_combo)
@@ -1855,10 +1855,10 @@ elif args.analysis == 3:
             if args.load_only: print(dataset_tr_name)
             dataset_tr_combos_subset.append(dataset_tr_combo)
             prep_groups_subset.append(prep_steps)
-            num_dataset_pairs += 1
+            num_datasets += 1
     dataset_tr_combos = [x for x in dataset_tr_combos if x in dataset_tr_combos_subset]
     prep_groups = [x for x in prep_groups if x in prep_groups_subset]
-    print('Num dataset pairs:', num_dataset_pairs)
+    print('Num datasets:', num_datasets)
     if args.load_only:
         if args.pipe_memory: rmtree(cachedir)
         quit()
@@ -1897,7 +1897,7 @@ elif args.analysis == 3:
             ], (len(dataset_tr_combos), len(prep_groups)))
         ]),
     }
-    dataset_counter = 1
+    dataset_num = 1
     for tr_idx, dataset_tr_combo in enumerate(dataset_tr_combos):
         dataset_tr_basename = '_'.join(dataset_tr_combo)
         for pr_idx, prep_steps in enumerate(prep_groups):
@@ -1909,7 +1909,6 @@ elif args.analysis == 3:
             eset_tr_name = 'eset_' + dataset_tr_name
             eset_tr_file = 'data/' + eset_tr_name + '.Rda'
             if not path.isfile(eset_tr_file): continue
-            print(str(dataset_counter), ': ', dataset_tr_name, sep='')
             base.load('data/' + eset_tr_name + '.Rda')
             eset_tr = robjects.globalenv[eset_tr_name]
             X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
@@ -1950,6 +1949,8 @@ elif args.analysis == 3:
                 )
                 X_tr = X_tr[corr_sample_idxs, :]
                 y_tr = y_tr[corr_sample_idxs]
+            print(str(dataset_num), ':', end=' ')
+            print(dataset_tr_name, X_tr.shape, y_tr.shape)
             if args.scv_type == 'grid':
                 param_grid_idx = 0
                 param_grid, param_grid_data = [], []
@@ -1965,12 +1966,12 @@ elif args.analysis == 3:
                     for fs_params in fs_meth_pipeline['param_grid']:
                         for param in fs_params:
                             if param in params_feature_select:
-                                param_grid[param] = list(filter(
+                                fs_params[param] = list(filter(
                                     lambda x: x <= min(
                                         X_tr.shape[1],
                                         args.fs_skb_k_max if args.fs_skb_lim_off else y_tr.shape[0]
                                     ),
-                                    param_grid[param]
+                                    fs_params[param]
                                 ))
                         for slr_idx, slr_meth in enumerate(pipelines['slr']):
                             for slr_params in pipelines['slr'][slr_meth]['param_grid']:
@@ -2083,7 +2084,7 @@ elif args.analysis == 3:
             print('Best Params (Test):', best_params_te)
             print('ROC AUC (Test): %.4f' % best_roc_auc_te, ' BCR (Test): %.4f' % best_bcr_te)
             base.remove(eset_tr_name)
-            dataset_counter += 1
+            dataset_num += 1
             # flush cache with each tr/te pair run (can grow too big if not)
             if args.pipe_memory: memory.clear(warn=False)
     makedirs(args.results_dir, mode=0o755, exist_ok=True)
@@ -2104,7 +2105,7 @@ elif args.analysis == 3:
             'x_axis_labels': prep_methods,
             'x_ticks_rotation': 15,
             'x_axis_title': 'Preprocessing Method',
-            'lines_title': 'Train Dataset',
+            'lines_title': 'Dataset',
             'title_sub': title_sub,
             'results': results['tr_pr'],
             'line_names': dataset_tr_basenames,
@@ -2114,7 +2115,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
             'x_axis_labels': dataset_tr_basenames,
-            'x_axis_title': 'Train Dataset',
+            'x_axis_title': 'Dataset',
             'lines_title': 'Preprocessing Method',
             'title_sub': title_sub,
             'results': results['tr_pr'].T,
@@ -2127,7 +2128,7 @@ elif args.analysis == 3:
             'x_axis': range(1, len(list(pipelines['fs'].keys())) + 1),
             'x_axis_labels': list(pipelines['fs'].keys()),
             'x_axis_title': 'Feature Selection Method',
-            'lines_title': 'Train Dataset',
+            'lines_title': 'Dataset',
             'title_sub': title_sub,
             'results': results['tr_fs'],
             'line_names': dataset_tr_basenames,
@@ -2137,7 +2138,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
             'x_axis_labels': dataset_tr_basenames,
-            'x_axis_title': 'Train Dataset',
+            'x_axis_title': 'Dataset',
             'lines_title': 'Feature Selection Method',
             'title_sub': title_sub,
             'results': results['tr_fs'].T,
@@ -2150,7 +2151,7 @@ elif args.analysis == 3:
             'x_axis': range(1, len(list(pipelines['clf'].keys())) + 1),
             'x_axis_labels': list(pipelines['clf'].keys()),
             'x_axis_title': 'Classifier Algorithm',
-            'lines_title': 'Train Dataset',
+            'lines_title': 'Dataset',
             'title_sub': title_sub,
             'results': results['tr_clf'],
             'line_names': dataset_tr_basenames,
@@ -2160,7 +2161,7 @@ elif args.analysis == 3:
         {
             'x_axis': range(1, len(dataset_tr_basenames) + 1),
             'x_axis_labels': dataset_tr_basenames,
-            'x_axis_title': 'Train Dataset',
+            'x_axis_title': 'Dataset',
             'lines_title': 'Classifier Algorithm',
             'title_sub': title_sub,
             'results': results['tr_clf'].T,
@@ -2258,24 +2259,6 @@ elif args.analysis == 3:
         for metric_idx, metric in enumerate(sorted(scv_scoring.keys(), reverse=True)):
             metric_title = metric.replace('_', ' ').upper()
             figure_name = 'Figure ' + str(args.analysis) + '-' + str(figure_idx + 1) + '-' + str(metric_idx + 1)
-            plt.figure(figure_name + 'A')
-            plt.rcParams['font.size'] = 14
-            plt.title(
-                'Effect of ' + figure['x_axis_title'] + ' on Train CV ' +
-                metric_title + ' for each ' + figure['lines_title'] + '\n' +
-                figure['title_sub']
-            )
-            plt.xlabel(figure['x_axis_title'])
-            plt.ylabel(metric_title)
-            if 'x_ticks_rotation' in figure and len(figure['x_axis']) > 7:
-                plt.xticks(
-                    figure['x_axis'], figure['x_axis_labels'],
-                    fontsize='x-small', rotation=figure['x_ticks_rotation'],
-                )
-            else:
-                plt.xticks(figure['x_axis'], figure['x_axis_labels'], fontsize='small')
-            if len(figure['x_axis']) > 20:
-                plt.xlim([ min(figure['x_axis']) - 1, max(figure['x_axis']) + 1 ])
             plt.figure(figure_name + 'B')
             plt.rcParams['font.size'] = 14
             plt.title(
@@ -2389,7 +2372,7 @@ elif args.analysis == 4:
         dataset_te_basenames = [x for x in natsorted(dataset_names) if x in args.dataset_te]
     else:
         dataset_te_basenames = dataset_names
-    # determine which data combinations will be used
+    # determine which dataset combinations will be used
     num_dataset_pairs = 0
     dataset_tr_combos_subset, dataset_te_basenames_subset, prep_groups_subset = [], [], []
     for dataset_tr_combo in dataset_tr_combos:
@@ -2475,7 +2458,7 @@ elif args.analysis == 4:
             ], (len(dataset_te_basenames), len(dataset_tr_combos)))
         ]),
     }
-    dataset_pair_counter = 1
+    dataset_pair_num = 1
     for tr_idx, dataset_tr_combo in enumerate(dataset_tr_combos):
         dataset_tr_basename = '_'.join(dataset_tr_combo)
         for te_idx, dataset_te_basename in enumerate(dataset_te_basenames):
@@ -2495,7 +2478,6 @@ elif args.analysis == 4:
                 eset_tr_file = 'data/' + eset_tr_name + '.Rda'
                 eset_te_file = 'data/' + eset_te_name + '.Rda'
                 if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
-                print(str(dataset_pair_counter), ': ', dataset_tr_name, ' -> ', dataset_te_name, sep='')
                 base.load('data/' + eset_tr_name + '.Rda')
                 eset_tr = robjects.globalenv[eset_tr_name]
                 X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
@@ -2544,6 +2526,8 @@ elif args.analysis == 4:
                     )
                     X_tr = X_tr[corr_sample_idxs, :]
                     y_tr = y_tr[corr_sample_idxs]
+                print(str(dataset_pair_num), ':', end=' ')
+                print(dataset_tr_name, X_tr.shape, y_tr.shape, '->', dataset_te_name, X_te.shape, y_te.shape)
                 if args.scv_type == 'grid':
                     param_grid_idx = 0
                     param_grid, param_grid_data = [], []
@@ -2559,12 +2543,12 @@ elif args.analysis == 4:
                         for fs_params in fs_meth_pipeline['param_grid']:
                             for param in fs_params:
                                 if param in params_feature_select:
-                                    param_grid[param] = list(filter(
+                                    fs_params[param] = list(filter(
                                         lambda x: x <= min(
                                             X_tr.shape[1],
                                             args.fs_skb_k_max if args.fs_skb_lim_off else y_tr.shape[0]
                                         ),
-                                        param_grid[param]
+                                        fs_params[param]
                                     ))
                             for slr_idx, slr_meth in enumerate(pipelines['slr']):
                                 for slr_params in pipelines['slr'][slr_meth]['param_grid']:
@@ -2727,7 +2711,7 @@ elif args.analysis == 4:
                     ' BCR (CV / Test): %.4f / %.4f' % (best_bcr_cv, best_bcr_te))
                 base.remove(eset_tr_name)
                 base.remove(eset_te_name)
-                dataset_pair_counter += 1
+                dataset_pair_num += 1
                 # flush cache with each tr/te pair run (can grow too big if not)
                 if args.pipe_memory: memory.clear(warn=False)
     makedirs(args.results_dir, mode=0o755, exist_ok=True)
