@@ -630,6 +630,16 @@ pipelines = {
                 { },
             ],
         },
+        'VarianceThreshold': {
+            'steps': [
+                ('fs2', VarianceThreshold()),
+            ],
+            'param_grid': [
+                {
+                    'fs2__threshold': FS_VRT_THRES,
+                },
+            ],
+        },
         'ANOVA-KBest': {
             'steps': [
                 ('fs1', SelectKBest(f_classif_func)),
@@ -657,16 +667,6 @@ pipelines = {
             'param_grid': [
                 {
                     'fs1__k': FS_SKB_K,
-                },
-            ],
-        },
-        'VarianceThreshold': {
-            'steps': [
-                ('fs2', VarianceThreshold()),
-            ],
-            'param_grid': [
-                {
-                    'fs2__threshold': FS_VRT_THRES,
                 },
             ],
         },
