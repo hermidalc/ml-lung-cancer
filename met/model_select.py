@@ -1949,7 +1949,7 @@ elif args.analysis == 3:
                 )
                 X_tr = X_tr[corr_sample_idxs, :]
                 y_tr = y_tr[corr_sample_idxs]
-            print(str(dataset_num), ':', end=' ')
+            print(str(dataset_num), ':', sep='', end=' ')
             print(dataset_tr_name, X_tr.shape, y_tr.shape)
             if args.scv_type == 'grid':
                 param_grid_idx = 0
@@ -2526,7 +2526,7 @@ elif args.analysis == 4:
                     )
                     X_tr = X_tr[corr_sample_idxs, :]
                     y_tr = y_tr[corr_sample_idxs]
-                print(str(dataset_pair_num), ':', end=' ')
+                print(str(dataset_pair_num), ':', sep='', end=' ')
                 print(dataset_tr_name, X_tr.shape, y_tr.shape, '->', dataset_te_name, X_te.shape, y_te.shape)
                 if args.scv_type == 'grid':
                     param_grid_idx = 0
