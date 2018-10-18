@@ -169,7 +169,7 @@ class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
 class CachedGradientBoostingClassifier(CachedFitMixin, GradientBoostingClassifier):
     pass
 
-# limma feature selection scoring function
+# feature selection scoring functions
 def limma(X, y):
     f, pv = r_limma_feature_score(X, y)
     return np.array(f), np.array(pv)
@@ -177,6 +177,20 @@ def limma(X, y):
 def limma_pkm(X, y):
     f, pv = r_limma_pkm_feature_score(X, y)
     return np.array(f), np.array(pv)
+
+def coxph_score(X, y):
+    srv = CoxPHSurvivalAnalysis()
+    scores = np.zeros(X.shape[1])
+    for j in range(X.shape[1]):
+        scores[j] = srv.fit(X[:,[j]], y).score(X[:,[j]], y)
+    return scores
+
+def coxnet_score(X, y):
+    srv = CoxnetSurvivalAnalysis()
+    scores = np.zeros(X.shape[1])
+    for j in range(X.shape[1]):
+        scores[j] = srv.fit(X[:,[j]], y).score(X[:,[j]], y)
+    return scores
 
 # c-index performance metric scoring function
 def c_index_score(srv, X, y):
@@ -200,6 +214,8 @@ if args.pipe_memory:
     chi2_func = memory.cache(chi2)
     f_classif_func = memory.cache(f_classif)
     mi_classif_func = memory.cache(mutual_info_classif)
+    coxph_score_func = memory.cache(coxph_score)
+    coxnet_score_func = memory.cache(coxnet_score)
     fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
     fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
@@ -210,6 +226,8 @@ else:
     chi2_func = chi2
     f_classif_func = f_classif
     mi_classif_func = mutual_info_classif
+    coxph_score_func = coxph_score
+    coxnet_score_func = coxnet_score
     fs_svm_estimator = LinearSVC(random_state=args.random_seed)
     fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = GradientBoostingClassifier(random_state=args.random_seed)
@@ -362,6 +380,16 @@ pipelines = {
                 { },
             ],
         },
+        'VarianceThreshold': {
+            'steps': [
+                ('fs2', VarianceThreshold()),
+            ],
+            'param_grid': [
+                {
+                    'fs2__threshold': FS_VRT_THRES,
+                },
+            ],
+        },
         'ANOVA-KBest': {
             'steps': [
                 ('fs1', SelectKBest(f_classif_func)),
@@ -392,16 +420,6 @@ pipelines = {
                 },
             ],
         },
-        'VarianceThreshold': {
-            'steps': [
-                ('fs2', VarianceThreshold()),
-            ],
-            'param_grid': [
-                {
-                    'fs2__threshold': FS_VRT_THRES,
-                },
-            ],
-        },
         'MI-KBest': {
             'steps': [
                 ('fs2', SelectKBest(mi_classif_func)),
@@ -409,6 +427,26 @@ pipelines = {
             'param_grid': [
                 {
                     'fs2__k': FS_SKB_K,
+                },
+            ],
+        },
+        'CoxPH-KBest: {
+            'steps': [
+                ('fs1', SelectKBest(coxph_score_func)),
+            ],
+            'param_grid': [
+                {
+                    'fs1__k': FS_SKB_K,
+                },
+            ],
+        },
+        'Coxnet-KBest: {
+            'steps': [
+                ('fs1', SelectKBest(coxnet_score_func)),
+            ],
+            'param_grid': [
+                {
+                    'fs1__k': FS_SKB_K,
                 },
             ],
         },
@@ -601,6 +639,20 @@ pipelines = {
         'KernelSurvivalSVM': {
             'steps': [
                 ('srv', HingeLossSurvivalSVM()),
+            ],
+            'param_grid': [
+                {
+                    'srv__alpha': SRV_SVM_A,
+                    'srv__kernel': SRV_SVM_KERN,
+                    'srv__degree': SRV_SVM_DEG,
+                    'srv__gamma': SRV_SVM_G,
+                    'srv__pairs': SRV_SVM_PAIR,
+                },
+            ],
+        },
+        'MinlipSurvival': {
+            'steps': [
+                ('srv', MinlipSurvivalAnalysis()),
             ],
             'param_grid': [
                 {
