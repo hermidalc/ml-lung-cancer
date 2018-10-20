@@ -1260,11 +1260,11 @@ if args.analysis == 1:
         plt.rcParams['font.size'] = 14
         if param in params_num_xticks:
             x_axis = param_grid[param]
-            plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+            plt.xlim([ min(x_axis) - 0.1, max(x_axis) + 0.1 ])
             plt.xticks(x_axis)
         elif param in params_fixed_xticks:
             x_axis = range(len(param_grid[param]))
-            plt.xticks(x_axis, param_grid[param])
+            plt.xticks(x_axis, [str(p) for p in param_grid[param]])
         plt.title(
             dataset_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
             'Effect of ' + param + ' on CV Performance Metrics'
@@ -1598,11 +1598,11 @@ elif args.analysis == 2:
         plt.rcParams['font.size'] = 14
         if param in params_num_xticks:
             x_axis = param_grid[param]
-            plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+            plt.xlim([ min(x_axis) - 0.1, max(x_axis) + 0.1 ])
             plt.xticks(x_axis)
         elif param in params_fixed_xticks:
             x_axis = range(len(param_grid[param]))
-            plt.xticks(x_axis, param_grid[param])
+            plt.xticks(x_axis, [str(p) for p in param_grid[param]])
         plt.title(
             dataset_tr_name + ' ' + args.clf_meth + ' Classifier (' + args.fs_meth + ' Feature Selection)\n' +
             'Effect of ' + param + ' on CV Performance Metrics'
@@ -1679,7 +1679,7 @@ elif args.analysis == 2:
         plt.xlabel('Number of top-ranked features selected')
         plt.ylabel('Test Score')
         x_axis = range(1, feature_idxs.size + 1)
-        plt.xlim([ min(x_axis) - 0.5, max(x_axis) + 0.5 ])
+        plt.xlim([ min(x_axis) - 0.1, max(x_axis) + 0.1 ])
         plt.xticks(x_axis)
         ranked_feature_idxs = [r[0] for r in feature_ranks]
         pipe = Pipeline(
