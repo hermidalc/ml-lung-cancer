@@ -40,7 +40,7 @@ lxml \
 natsort \
 rpy2 \
 seaborn
-conda install -c conda-forge mlxtend=0.13.0
+conda install -c conda-forge python-language-server mlxtend=0.13.0
 conda install -c sebp scikit-survival
 ```
 
