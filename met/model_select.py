@@ -1294,7 +1294,7 @@ if args.analysis == 1:
             color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
         )
         plt.legend(loc='lower right', fontsize='small')
-        plt.grid('on')
+        plt.grid(True)
     # plot roc curve
     sns.set_palette(sns.color_palette('hls', 2))
     plt.figure('Figure ' + str(args.analysis) + '-' + str(len(param_scores_cv) + 1))
@@ -1341,7 +1341,7 @@ if args.analysis == 1:
     )
     plt.plot([0, 1], [0, 1], linestyle='--', lw=3, alpha=0.2, label='Chance')
     plt.legend(loc='lower right', fontsize='small')
-    plt.grid('off')
+    plt.grid(False)
     print(
         'Dataset:', dataset_name,
         ' Mean ROC AUC (CV / Test): %.4f / %.4f' % (np.mean(roc_aucs_cv), np.mean(roc_aucs_te)),
@@ -1661,7 +1661,7 @@ elif args.analysis == 2:
                 color='grey', alpha=0.2, label=label,
             )
             plt.legend(loc='lower right', fontsize='small')
-            plt.grid('on')
+            plt.grid(True)
             num_figures += 1
     # plot num top-ranked features selected vs test dataset perf metrics
     if args.dataset_te:
@@ -1739,7 +1739,7 @@ elif args.analysis == 2:
             )
             # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
         plt.legend(loc='lower right', fontsize='small')
-        plt.grid('on')
+        plt.grid(True)
         num_figures += 1
         # plot roc curve
         sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames) + 1))
@@ -1791,7 +1791,7 @@ elif args.analysis == 2:
             )
         plt.plot([0, 1], [0, 1], linestyle='--', lw=3, alpha=0.2, label='Chance')
         plt.legend(loc='lower right', fontsize='small')
-        plt.grid('off')
+        plt.grid(False)
 elif args.analysis == 3:
     if args.data_type:
         data_types = [x for x in data_types if x in args.data_type]
@@ -2318,7 +2318,7 @@ elif args.analysis == 3:
                     )
             plt.figure(figure_name + 'B')
             plt.legend(**legend_kwargs)
-            plt.grid('on')
+            plt.grid(True)
             if args.save_figs:
                 dump(plt.figure(figure_name + 'B'),
                     args.results_dir + '/' + (figure_name + 'B').replace(' ', '_').lower() + '.pkl')
@@ -3054,10 +3054,10 @@ elif args.analysis == 4:
                     )
             plt.figure(figure_name + 'A')
             plt.legend(**legend_kwargs)
-            plt.grid('on')
+            plt.grid(True)
             plt.figure(figure_name + 'B')
             plt.legend(**legend_kwargs)
-            plt.grid('on')
+            plt.grid(True)
             if args.save_figs:
                 dump(plt.figure(figure_name + 'A'),
                     args.results_dir + '/' + (figure_name + 'A').replace(' ', '_').lower() + '.pkl')
