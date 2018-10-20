@@ -430,7 +430,7 @@ pipelines = {
                 },
             ],
         },
-        'CoxPH-KBest: {
+        'CoxPH-KBest': {
             'steps': [
                 ('fs1', SelectKBest(coxph_score_func)),
             ],
@@ -440,7 +440,7 @@ pipelines = {
                 },
             ],
         },
-        'Coxnet-KBest: {
+        'Coxnet-KBest': {
             'steps': [
                 ('fs1', SelectKBest(coxnet_score_func)),
             ],
