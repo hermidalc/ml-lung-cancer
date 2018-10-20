@@ -8,94 +8,75 @@
 sudo dnf install -y libxml-devel libxml2-devel mesa-libGL-devel mesa-libGLU-devel gcc-gfortran
 ```
 
-2. Install Anaconda3 5.0.1
+2. Install Anaconda3 5.2.0
 
 https://www.anaconda.com/download/
 https://docs.anaconda.com/anaconda/install/linux
 
-3. Setup Conda Environment and Install R, Rpy2, Bioconductor, Limma, etc.
+```bash
+bash ~/Downloads/Anaconda3-5.2.0-Linux-x86_64.sh
+```
+
+3. Install Conda Packages
 
 ```bash
-conda config --add channels conda-forge
-conda config --add channels bioconda
-conda install -v -y \
+conda install \
+r-base=3.5.1 \
 r-essentials \
 r-devtools \
 r-argparse \
 r-lintr \
-r-pamr \
+r-lme4 \
 r-minqa \
 r-nloptr \
 r-rcppeigen \
-r-lme4 \
-r-corpcor \
 r-rgl \
-r-statmod \
-r-mlr \
-r-caret \
+r-rjava \
+r-xml \
 autopep8 \
-rpy2 \
+libgfortran \
 libiconv \
-'icu=58.*' \
 lxml \
 natsort \
-mlxtend=0.13.0 \
-seaborn \
-bioconductor-biocinstaller \
-bioconductor-biobase \
-bioconductor-affyplm \
-bioconductor-simpleaffy \
-bioconductor-limma \
-bioconductor-sva \
-bioconductor-vsn \
-bioconductor-gcrma \
-bioconductor-impute \
-bioconductor-edger
+rpy2 \
+seaborn
+conda install -c conda-forge mlxtend=0.13.0
 conda install -c sebp scikit-survival
 ```
 
-4. Setup for rJava (used by Biocomb and FSelector R packages)
-
-In ~/.javarc:
-```bash
-JAVA_HOME=/usr/lib/jvm/java
-export JAVA_HOME
-
-LD_LIBRARY_PATH=/usr/lib/jvm/java/lib:/usr/lib/jvm/java/lib/server
-export LD_LIBRARY_PATH
-```
-Then run:
-```bash
-source ~/.javarc
-R CMD javareconf
-```
-
-5. Install CRAN Packages (not available via Conda)
+4. Install CRAN and Bioconductor Packages (not available/working via Conda)
 
 ```R
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
-install.packages("rJava", type="source")
+source("https://bioconductor.org/biocLite.R")
+install.packages("corpcor")
+install.packages("pamr")
+install.packages("mlr")
+install.packages("statmod")
 install.packages("FSelector")
 install.packages("FSelectorRcpp")
 install.packages("Biocomb")
-install.packages("bapred")
-install.packages("WGCNA")
-```
-
-6. Install Bioconductor Packages (not available via Conda)
-
-```R
-source("https://bioconductor.org/biocLite.R")
+biocLite("Biobase", suppressUpdates=TRUE)
+biocLite("affyio", suppressUpdates=TRUE)
+biocLite("affy", suppressUpdates=TRUE)
+biocLite("gcrma", suppressUpdates=TRUE)
+biocLite("affyPLM", suppressUpdates=TRUE)
+biocLite("impute", suppressUpdates=TRUE)
+biocLite("limma", suppressUpdates=TRUE)
+biocLite("edgeR", suppressUpdates=TRUE)
+biocLite("sva", suppressUpdates=TRUE)
+biocLite("pvca", suppressUpdates=TRUE)
+biocLite("JADE", suppressUpdates=TRUE)
+biocLite("MLSeq", suppressUpdates=TRUE)
 biocLite("hgu133plus2.db", suppressUpdates=TRUE)
 biocLite("hgu133plus2cdf", suppressUpdates=TRUE)
 biocLite("hgu133plus2probe", suppressUpdates=TRUE)
 biocLite("GO.db", suppressUpdates=TRUE)
-biocLite("pvca", suppressUpdates=TRUE)
-biocLite("JADE", suppressUpdates=TRUE)
-biocLite("MLSeq", suppressUpdates=TRUE)
+install.packages("bapred")
+install.packages("WGCNA")
 ```
 
-7. Install Brainarray Custom Microarray Annotation DBs and CDFs
+5. Install Brainarray Custom Microarray Annotation DBs and CDFs
 
 ```R
 library(devtools)
