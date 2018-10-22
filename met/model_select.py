@@ -1294,7 +1294,7 @@ if args.analysis == 1:
             color='grey', alpha=0.2, #label=r'$\pm$ 1 std. dev.'
         )
         plt.legend(loc='lower right', fontsize='small')
-        plt.grid(True)
+        plt.grid(True, alpha=0.3)
     # plot roc curve
     sns.set_palette(sns.color_palette('hls', 2))
     plt.figure('Figure ' + str(args.analysis) + '-' + str(len(param_scores_cv) + 1))
@@ -1661,7 +1661,7 @@ elif args.analysis == 2:
                 color='grey', alpha=0.2, label=label,
             )
             plt.legend(loc='lower right', fontsize='small')
-            plt.grid(True)
+            plt.grid(True, alpha=0.3)
             num_figures += 1
     # plot num top-ranked features selected vs test dataset perf metrics
     if args.dataset_te:
@@ -1739,7 +1739,7 @@ elif args.analysis == 2:
             )
             # plt.plot(x_axis, bcrs_te, lw=2, alpha=0.8)
         plt.legend(loc='lower right', fontsize='small')
-        plt.grid(True)
+        plt.grid(True, alpha=0.3)
         num_figures += 1
         # plot roc curve
         sns.set_palette(sns.color_palette('hls', len(dataset_te_basenames) + 1))
@@ -2318,7 +2318,7 @@ elif args.analysis == 3:
                     )
             plt.figure(figure_name + 'B')
             plt.legend(**legend_kwargs)
-            plt.grid(True)
+            plt.grid(True, alpha=0.3)
             if args.save_figs:
                 dump(plt.figure(figure_name + 'B'),
                     args.results_dir + '/' + (figure_name + 'B').replace(' ', '_').lower() + '.pkl')
@@ -3054,10 +3054,10 @@ elif args.analysis == 4:
                     )
             plt.figure(figure_name + 'A')
             plt.legend(**legend_kwargs)
-            plt.grid(True)
+            plt.grid(True, alpha=0.3)
             plt.figure(figure_name + 'B')
             plt.legend(**legend_kwargs)
-            plt.grid(True)
+            plt.grid(True, alpha=0.3)
             if args.save_figs:
                 dump(plt.figure(figure_name + 'A'),
                     args.results_dir + '/' + (figure_name + 'A').replace(' ', '_').lower() + '.pkl')
