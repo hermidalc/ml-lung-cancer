@@ -89,10 +89,17 @@ parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
 parser.add_argument('--fs-sfm-svm-thres', type=float, nargs='+', help='fs sfm svm threshold')
 parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
 parser.add_argument('--fs-sfm-svm-cw', type=str, nargs='+', help='fs sfm svm class weight')
+parser.add_argument('--fs-sfm-rf-thres', type=float, nargs='+', help='fs sfm rf threshold')
+parser.add_argument('--fs-sfm-rf-e', type=int, nargs='+', help='fs sfm rf n estimators')
+parser.add_argument('--fs-sfm-rf-e-max', type=int, default=50, help='fs sfm rf n estimators max')
+parser.add_argument('--fs-sfm-rf-d', type=str, nargs='+', help='fs sfm rf max depth')
+parser.add_argument('--fs-sfm-rf-d-max', type=int, default=10, help='fs sfm rf max depth max')
+parser.add_argument('--fs-sfm-rf-f', type=str, nargs='+', help='fs sfm rf max features')
+parser.add_argument('--fs-sfm-rf-cw', type=str, nargs='+', help='fs sfm rf class weight')
 parser.add_argument('--fs-sfm-ext-thres', type=float, nargs='+', help='fs sfm ext threshold')
 parser.add_argument('--fs-sfm-ext-e', type=int, nargs='+', help='fs sfm ext n estimators')
 parser.add_argument('--fs-sfm-ext-e-max', type=int, default=50, help='fs sfm ext n estimators max')
-parser.add_argument('--fs-sfm-ext-d', type=int, nargs='+', help='fs sfm ext max depth')
+parser.add_argument('--fs-sfm-ext-d', type=str, nargs='+', help='fs sfm ext max depth')
 parser.add_argument('--fs-sfm-ext-d-max', type=int, default=10, help='fs sfm ext max depth max')
 parser.add_argument('--fs-sfm-ext-f', type=str, nargs='+', help='fs sfm ext max features')
 parser.add_argument('--fs-sfm-ext-cw', type=str, nargs='+', help='fs sfm ext class weight')
@@ -103,9 +110,15 @@ parser.add_argument('--fs-sfm-grb-d-max', type=int, default=10, help='fs sfm grb
 parser.add_argument('--fs-sfm-grb-f', type=str, nargs='+', help='fs sfm grb max features')
 parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
 parser.add_argument('--fs-rfe-svm-cw', type=str, nargs='+', help='fs rfe svm class weight')
+parser.add_argument('--fs-rfe-rf-e', type=int, nargs='+', help='fs rfe rf n estimators')
+parser.add_argument('--fs-rfe-rf-e-max', type=int, default=50, help='fs rfe rf n estimators max')
+parser.add_argument('--fs-rfe-rf-d', type=str, nargs='+', help='fs rfe rf max depth')
+parser.add_argument('--fs-rfe-rf-d-max', type=int, default=10, help='fs rfe rf max depth max')
+parser.add_argument('--fs-rfe-rf-f', type=str, nargs='+', help='fs rfe rf max features')
+parser.add_argument('--fs-rfe-rf-cw', type=str, nargs='+', help='fs rfe rf class weight')
 parser.add_argument('--fs-rfe-ext-e', type=int, nargs='+', help='fs rfe ext n estimators')
 parser.add_argument('--fs-rfe-ext-e-max', type=int, default=50, help='fs rfe ext n estimators max')
-parser.add_argument('--fs-rfe-ext-d', type=int, nargs='+', help='fs rfe ext max depth')
+parser.add_argument('--fs-rfe-ext-d', type=str, nargs='+', help='fs rfe ext max depth')
 parser.add_argument('--fs-rfe-ext-d-max', type=int, default=10, help='fs rfe ext max depth max')
 parser.add_argument('--fs-rfe-ext-f', type=str, nargs='+', help='fs rfe ext max features')
 parser.add_argument('--fs-rfe-ext-cw', type=str, nargs='+', help='fs rfe ext class weight')
@@ -130,19 +143,19 @@ parser.add_argument('--clf-svm-cache', type=int, default=2000, help='libsvm cach
 parser.add_argument('--clf-knn-k', type=int, nargs='+', help='clf knn neighbors')
 parser.add_argument('--clf-knn-k-max', type=int, default=10, help='clf knn neighbors max')
 parser.add_argument('--clf-knn-w', type=str, nargs='+', help='clf knn weights')
-parser.add_argument('--clf-dt-d', type=int, nargs='+', help='clf dt max depth')
+parser.add_argument('--clf-dt-d', type=str, nargs='+', help='clf dt max depth')
 parser.add_argument('--clf-dt-d-max', type=int, default=10, help='clf dt max depth max')
 parser.add_argument('--clf-dt-f', type=str, nargs='+', help='clf dt max features')
 parser.add_argument('--clf-dt-cw', type=str, nargs='+', help='clf dt class weight')
 parser.add_argument('--clf-rf-e', type=int, nargs='+', help='clf rf n estimators')
 parser.add_argument('--clf-rf-e-max', type=int, default=50, help='clf rf n estimators max')
-parser.add_argument('--clf-rf-d', type=int, nargs='+', help='clf rf max depth')
+parser.add_argument('--clf-rf-d', type=str, nargs='+', help='clf rf max depth')
 parser.add_argument('--clf-rf-d-max', type=int, default=10, help='clf rf max depth max')
 parser.add_argument('--clf-rf-f', type=str, nargs='+', help='clf rf max features')
 parser.add_argument('--clf-rf-cw', type=str, nargs='+', help='clf rf class weight')
 parser.add_argument('--clf-ext-e', type=int, nargs='+', help='clf ext n estimators')
 parser.add_argument('--clf-ext-e-max', type=int, default=50, help='clf ext n estimators max')
-parser.add_argument('--clf-ext-d', type=int, nargs='+', help='clf ext max depth')
+parser.add_argument('--clf-ext-d', type=str, nargs='+', help='clf ext max depth')
 parser.add_argument('--clf-ext-d-max', type=int, default=10, help='clf ext max depth max')
 parser.add_argument('--clf-ext-f', type=str, nargs='+', help='clf ext max features')
 parser.add_argument('--clf-ext-cw', type=str, nargs='+', help='clf ext class weight')
@@ -177,6 +190,7 @@ parser.add_argument('--num-cores', type=int, default=-1, help='num parallel core
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--random-seed', type=int, default=19825791, help='random state seed')
+parser.add_argument('--jvm-heap-size', type=int, default=1000, help='rjava jvm heap size')
 parser.add_argument('--verbose', type=int, default=0, help='program verbosity')
 args = parser.parse_args()
 if args.test_size >= 1.0: args.test_size = int(args.test_size)
@@ -185,6 +199,8 @@ if args.scv_size >= 1.0: args.scv_size = int(args.scv_size)
 base = importr('base')
 biobase = importr('Biobase')
 base.source('config.R')
+robjects.r('set.seed(' + str(args.random_seed) + ')')
+base.options('java.parameters="-Xmx' + str(args.jvm_heap_size) + 'm"')
 dataset_names = list(robjects.globalenv['dataset_names'])
 data_types = list(robjects.globalenv['data_types'])
 norm_methods = list(robjects.globalenv['norm_methods'])
@@ -218,6 +234,9 @@ class CachedFitMixin:
         return self
 
 class CachedLinearSVC(CachedFitMixin, LinearSVC):
+    pass
+
+class CachedRandomForestClassifier(CachedFitMixin, RandomForestClassifier):
     pass
 
 class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
@@ -254,6 +273,7 @@ if args.pipe_memory:
     f_classif_func = memory.cache(f_classif)
     mi_classif_func = memory.cache(mutual_info_classif)
     fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
+    fs_rf_estimator = CachedRandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
@@ -264,6 +284,7 @@ else:
     f_classif_func = f_classif
     mi_classif_func = mutual_info_classif
     fs_svm_estimator = LinearSVC(random_state=args.random_seed)
+    fs_rf_estimator = RandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = GradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
@@ -318,6 +339,35 @@ if args.fs_sfm_svm_cw:
     )
 else:
     FS_SFM_SVM_CW = [None, 'balanced']
+if args.fs_sfm_rf_thres:
+    FS_SFM_RF_THRES = sorted(args.fs_sfm_rf_thres)
+else:
+    FS_SFM_RF_THRES = np.logspace(-11, -5, 7)
+if args.fs_sfm_rf_e:
+    FS_SFM_RF_E = sorted(args.fs_sfm_rf_e)
+else:
+    FS_SFM_RF_E = list(range(5, args.fs_sfm_rf_e_max + 1, 5))
+if args.fs_sfm_rf_d:
+    FS_SFM_RF_D = sorted(
+        [None if a in ('None', 'none') else int(a) for a in args.fs_sfm_rf_d],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_RF_D = [None] + list(range(1, args.fs_sfm_rf_d_max + 1, 1))
+if args.fs_sfm_rf_f:
+    FS_SFM_RF_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_rf_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_RF_F = [None, 'auto', 'log2', 'sqrt']
+if args.fs_sfm_rf_cw:
+    FS_SFM_RF_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_rf_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_RF_CW = [None, 'balanced', 'balanced_subsample']
 if args.fs_sfm_ext_thres:
     FS_SFM_EXT_THRES = sorted(args.fs_sfm_ext_thres)
 else:
@@ -328,7 +378,7 @@ else:
     FS_SFM_EXT_E = list(range(5, args.fs_sfm_ext_e_max + 1, 5))
 if args.fs_sfm_ext_d:
     FS_SFM_EXT_D = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_sfm_ext_d],
+        [None if a in ('None', 'none') else int(a) for a in args.fs_sfm_ext_d],
         key=lambda x: (x is not None, x)
     )
 else:
@@ -373,13 +423,38 @@ if args.fs_rfe_svm_cw:
     )
 else:
     FS_RFE_SVM_CW = [None, 'balanced']
+if args.fs_rfe_rf_e:
+    FS_RFE_RF_E = sorted(args.fs_rfe_rf_e)
+else:
+    FS_RFE_RF_E = list(range(5, args.fs_rfe_rf_e_max + 1, 5))
+if args.fs_rfe_rf_d:
+    FS_RFE_RF_D = sorted(
+        [None if a in ('None', 'none') else int(a) for a in args.fs_rfe_rf_d],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_RF_D = [None] + list(range(1, args.fs_rfe_rf_d_max + 1, 1))
+if args.fs_rfe_rf_f:
+    FS_RFE_RF_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_rf_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_RF_F = [None, 'auto', 'log2', 'sqrt']
+if args.fs_rfe_rf_cw:
+    FS_RFE_RF_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_rf_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_RF_CW = [None, 'balanced', 'balanced_subsample']
 if args.fs_rfe_ext_e:
     FS_RFE_EXT_E = sorted(args.fs_rfe_ext_e)
 else:
     FS_RFE_EXT_E = list(range(5, args.fs_rfe_ext_e_max + 1, 5))
 if args.fs_rfe_ext_d:
     FS_RFE_EXT_D = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_rfe_ext_d],
+        [None if a in ('None', 'none') else int(a) for a in args.fs_rfe_ext_d],
         key=lambda x: (x is not None, x)
     )
 else:
@@ -458,7 +533,7 @@ else:
     CLF_KNN_W = ['distance', 'uniform']
 if args.clf_dt_d:
     CLF_DT_D = sorted(
-        [None if a in ('None', 'none') else a for a in args.clf_dt_d],
+        [None if a in ('None', 'none') else int(a) for a in args.clf_dt_d],
         key=lambda x: (x is not None, x)
     )
 else:
@@ -483,7 +558,7 @@ else:
     CLF_RF_E = list(range(5, args.clf_rf_e_max + 1, 5))
 if args.clf_rf_d:
     CLF_RF_D = sorted(
-        [None if a in ('None', 'none') else a for a in args.clf_rf_d],
+        [None if a in ('None', 'none') else int(a) for a in args.clf_rf_d],
         key=lambda x: (x is not None, x)
     )
 else:
@@ -508,7 +583,7 @@ else:
     CLF_EXT_E = list(range(5, args.clf_ext_e_max + 1, 5))
 if args.clf_ext_d:
     CLF_EXT_D = sorted(
-        [None if a in ('None', 'none') else a for a in args.clf_ext_d],
+        [None if a in ('None', 'none') else int(a) for a in args.clf_ext_d],
         key=lambda x: (x is not None, x)
     )
 else:
@@ -692,6 +767,20 @@ pipelines = {
                 },
             ],
         },
+        'RF-SFM-KBest': {
+            'steps': [
+                ('fs2', SelectFromModel(fs_rf_estimator)),
+            ],
+            'param_grid': [
+                {
+                    'fs2__estimator__n_estimators': FS_SFM_RF_E,
+                    'fs2__estimator__max_depth': FS_SFM_RF_D,
+                    'fs2__estimator__max_features': FS_SFM_RF_F,
+                    'fs2__estimator__class_weight': FS_SFM_RF_CW,
+                    'fs2__k': FS_SKB_K,
+                },
+            ],
+        },
         'EXT-SFM-KBest': {
             'steps': [
                 ('fs2', SelectFromModel(fs_ext_estimator)),
@@ -727,6 +816,21 @@ pipelines = {
                 {
                     'fs2__estimator__C': FS_RFE_SVM_C,
                     'fs2__estimator__class_weight': FS_RFE_SVM_CW,
+                    'fs2__step': FS_RFE_STEP,
+                    'fs2__n_features_to_select': FS_SKB_K,
+                },
+            ],
+        },
+        'RF-RFE': {
+            'steps': [
+                ('fs2', RFE(fs_rf_estimator, verbose=args.fs_rfe_verbose)),
+            ],
+            'param_grid': [
+                {
+                    'fs2__estimator__n_estimators': FS_RFE_RF_E,
+                    'fs2__estimator__max_depth': FS_RFE_RF_D,
+                    'fs2__estimator__max_features': FS_RFE_RF_F,
+                    'fs2__estimator__class_weight': FS_RFE_RF_CW,
                     'fs2__step': FS_RFE_STEP,
                     'fs2__n_features_to_select': FS_SKB_K,
                 },
@@ -1325,7 +1429,7 @@ if args.analysis == 1:
     mean_tpr[-1] = 1.0
     mean_roc_auc = np.mean(roc_aucs_te)
     std_roc_auc = np.std(roc_aucs_te)
-    mean_num_features = np.mean(num_features)
+    mean_num_features = round(np.mean(num_features))
     std_num_features = np.std(num_features)
     plt.plot(
         mean_fpr, mean_tpr, lw=3, alpha=0.8,
@@ -1346,7 +1450,7 @@ if args.analysis == 1:
         'Dataset:', dataset_name,
         ' Mean ROC AUC (CV / Test): %.4f / %.4f' % (np.mean(roc_aucs_cv), np.mean(roc_aucs_te)),
         ' Mean BCR (CV / Test): %.4f / %.4f' % (np.mean(bcrs_cv), np.mean(bcrs_te)),
-        ' Mean Features: %3d' % np.mean(num_features),
+        ' Mean Features: %3d' % round(np.mean(num_features)),
     )
     # calculate overall best ranked features
     feature_idxs = []
@@ -1996,7 +2100,7 @@ elif args.analysis == 3:
                                         param_grid_data.append(params_data)
                 search = GridSearchCV(
                     Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-                    param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+                    param_grid=param_grid, scoring=scv_scoring, refit=False, iid=False,
                     error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
                     cv=StratifiedShuffleSplit(
                         n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -2029,7 +2133,7 @@ elif args.analysis == 3:
                             param_grid[param]
                         ))
                 search = RandomizedSearchCV(
-                    pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+                    pipe, param_distributions=param_grid, scoring=scv_scoring, refit=False, iid=False,
                     error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
                     n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                         n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -2573,7 +2677,7 @@ elif args.analysis == 4:
                                             param_grid_data.append(params_data)
                     search = GridSearchCV(
                         Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-                        param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+                        param_grid=param_grid, scoring=scv_scoring, refit=False, iid=False,
                         error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
                         cv=StratifiedShuffleSplit(
                             n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -2606,7 +2710,7 @@ elif args.analysis == 4:
                                 param_grid[param]
                             ))
                     search = RandomizedSearchCV(
-                        pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+                        pipe, param_distributions=param_grid, scoring=scv_scoring, refit=False, iid=False,
                         error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
                         n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                             n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed

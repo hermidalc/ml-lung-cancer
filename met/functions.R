@@ -1,5 +1,4 @@
 suppressPackageStartupMessages(library("Biobase"))
-set.seed(19825791)
 
 filterEset <- function(eset, features=NULL, samples=NULL) {
     if (!is.null(features) & !is.null(samples)) {
