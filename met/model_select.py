@@ -82,8 +82,9 @@ parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr mi
 parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
 parser.add_argument('--fs-vrt-thres', type=float, nargs='+', help='fs vrt threshold')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
-parser.add_argument('--fs-skb-k-min', type=int, default=1, help='fs skb k select min')
-parser.add_argument('--fs-skb-k-max', type=int, default=100, help='fs skb k select max')
+parser.add_argument('--fs-skb-k-min', type=int, default=1, help='fs skb k min')
+parser.add_argument('--fs-skb-k-max', type=int, default=100, help='fs skb k max')
+parser.add_argument('--fs-skb-k-step', type=int, default=1, help='fs skb k step')
 parser.add_argument('--fs-skb-lim-off', default=False, action='store_true', help='skb turn off sample limit')
 parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
 parser.add_argument('--fs-sfm-svm-thres', type=float, nargs='+', help='fs sfm svm threshold')
@@ -200,7 +201,7 @@ base = importr('base')
 biobase = importr('Biobase')
 base.source('config.R')
 robjects.r('set.seed(' + str(args.random_seed) + ')')
-base.options('java.parameters="-Xmx' + str(args.jvm_heap_size) + 'm"')
+robjects.r('options(\'java.parameters\'="-Xmx' + str(args.jvm_heap_size) + 'm")')
 dataset_names = list(robjects.globalenv['dataset_names'])
 data_types = list(robjects.globalenv['data_types'])
 norm_methods = list(robjects.globalenv['norm_methods'])
@@ -318,8 +319,10 @@ else:
     FS_VRT_THRES = 0.
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
+elif args.fs_skb_k_min == 1:
+    FS_SKB_K = [1] + list(range(0, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))[1:]
 else:
-    FS_SKB_K = list(range(args.fs_skb_k_min, args.fs_skb_k_max + 1, 1))
+    FS_SKB_K = list(range(args.fs_skb_k_min, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))
 if args.fs_sfp_p:
     FS_SFP_P = sorted(args.fs_sfp_p)
 else:

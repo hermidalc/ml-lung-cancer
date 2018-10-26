@@ -79,8 +79,9 @@ parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr mi
 parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
 parser.add_argument('--fs-vrt-thres', type=float, nargs='+', help='fs vrt threshold')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
-parser.add_argument('--fs-skb-k-min', type=int, default=1, help='fs skb k select min')
-parser.add_argument('--fs-skb-k-max', type=int, default=100, help='fs skb k select max')
+parser.add_argument('--fs-skb-k-min', type=int, default=1, help='fs skb k min')
+parser.add_argument('--fs-skb-k-max', type=int, default=100, help='fs skb k max')
+parser.add_argument('--fs-skb-k-step', type=int, default=1, help='fs skb k step')
 parser.add_argument('--fs-skb-lim-off', default=False, action='store_true', help='skb turn off sample limit')
 parser.add_argument('--srv-cxph-a', type=int, nargs='+', help='srv coxph alpha')
 parser.add_argument('--srv-cxnt-na', type=int, nargs='+', help='srv coxnet num alphas')
@@ -120,6 +121,7 @@ parser.add_argument('--num-cores', type=int, default=-1, help='num parallel core
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--random-seed', type=int, default=19825791, help='random state seed')
+parser.add_argument('--jvm-heap-size', type=int, default=1000, help='rjava jvm heap size')
 parser.add_argument('--verbose', type=int, default=0, help='program verbosity')
 args = parser.parse_args()
 if args.test_size >= 1.0: args.test_size = int(args.test_size)
@@ -128,6 +130,8 @@ if args.scv_size >= 1.0: args.scv_size = int(args.scv_size)
 base = importr('base')
 biobase = importr('Biobase')
 base.source('config.R')
+robjects.r('set.seed(' + str(args.random_seed) + ')')
+robjects.r('options(\'java.parameters\'="-Xmx' + str(args.jvm_heap_size) + 'm")')
 dataset_names = list(robjects.globalenv['dataset_names'])
 data_types = list(robjects.globalenv['data_types'])
 norm_methods = list(robjects.globalenv['norm_methods'])
@@ -242,8 +246,10 @@ else:
     SLR_MMS_FR = [(0,1)]
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
+elif args.fs_skb_k_min == 1:
+    FS_SKB_K = [1] + list(range(0, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))[1:]
 else:
-    FS_SKB_K = list(range(args.fs_skb_k_min, args.fs_skb_k_max + 1, 1))
+    FS_SKB_K = list(range(args.fs_skb_k_min, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))
 if args.fs_vrt_thres:
     FS_VRT_THRES = sorted(args.fs_vrt_thres)
 else:
@@ -1078,7 +1084,7 @@ if args.analysis == 1:
     mean_tpr[-1] = 1.0
     mean_roc_auc = np.mean(roc_aucs_te)
     std_roc_auc = np.std(roc_aucs_te)
-    mean_num_features = np.mean(num_features)
+    mean_num_features = round(np.mean(num_features))
     std_num_features = np.std(num_features)
     plt.plot(
         mean_fpr, mean_tpr, lw=3, alpha=0.8,
@@ -1099,7 +1105,7 @@ if args.analysis == 1:
         'Dataset:', dataset_name,
         ' Mean ROC AUC (CV / Test): %.4f / %.4f' % (np.mean(roc_aucs_cv), np.mean(roc_aucs_te)),
         ' Mean BCR (CV / Test): %.4f / %.4f' % (np.mean(bcrs_cv), np.mean(bcrs_te)),
-        ' Mean Features: %3d' % np.mean(num_features),
+        ' Mean Features: %3d' % round(np.mean(num_features)),
     )
     # calculate overall best ranked features
     feature_idxs = []
@@ -1749,7 +1755,7 @@ elif args.analysis == 3:
                                         param_grid_data.append(params_data)
                 search = GridSearchCV(
                     Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-                    param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+                    param_grid=param_grid, scoring=scv_scoring, refit=False, iid=False,
                     error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
                     cv=StratifiedShuffleSplit(
                         n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -1782,7 +1788,7 @@ elif args.analysis == 3:
                             param_grid[param]
                         ))
                 search = RandomizedSearchCV(
-                    pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+                    pipe, param_distributions=param_grid, scoring=scv_scoring, refit=False, iid=False,
                     error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
                     n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                         n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -2326,7 +2332,7 @@ elif args.analysis == 4:
                                             param_grid_data.append(params_data)
                     search = GridSearchCV(
                         Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
-                        param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+                        param_grid=param_grid, scoring=scv_scoring, refit=False, iid=False,
                         error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
                         cv=StratifiedShuffleSplit(
                             n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -2359,7 +2365,7 @@ elif args.analysis == 4:
                                 param_grid[param]
                             ))
                     search = RandomizedSearchCV(
-                        pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+                        pipe, param_distributions=param_grid, scoring=scv_scoring, refit=False, iid=False,
                         error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
                         n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                             n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
