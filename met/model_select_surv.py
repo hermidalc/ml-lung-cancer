@@ -246,7 +246,7 @@ else:
     SLR_MMS_FR = [(0,1)]
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
-elif args.fs_skb_k_min == 1:
+elif args.fs_skb_k_min == 1 and args.fs_skb_k_step > 1:
     FS_SKB_K = [1] + list(range(0, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))[1:]
 else:
     FS_SKB_K = list(range(args.fs_skb_k_min, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))

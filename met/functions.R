@@ -60,7 +60,7 @@ limmaFeatureScore <- function(X, y) {
     fit.contrasts <- contrasts.fit(fit, contrast.matrix)
     fit.b <- eBayes(fit.contrasts)
     results <- topTableF(fit.b, number=Inf, adjust.method="BH")
-    results <- results[order(as.integer(row.names(results))),]
+    results <- results[order(as.integer(row.names(results))), , drop=FALSE]
     return(list(results$F, results$adj.P.Val))
 }
 
@@ -73,14 +73,14 @@ limmaPkmFeatureScore <- function(X, y) {
     fit.contrasts <- contrasts.fit(fit, contrast.matrix)
     fit.b <- eBayes(fit.contrasts, trend=TRUE)
     results <- topTableF(fit.b, number=Inf, adjust.method="BH")
-    results <- results[order(as.integer(row.names(results))),]
+    results <- results[order(as.integer(row.names(results))), , drop=FALSE]
     return(list(results$F, results$adj.P.Val))
 }
 
 fcbfFeatureIdxs <- function(X, y, threshold=0) {
     results <- Biocomb::select.fast.filter(cbind(X, as.factor(y)), disc.method="MDL", threshold=threshold)
-    results <- results[order(results$Information.Gain, decreasing=TRUE), , drop=FALSE]
-    return(results$NumberFeature - 1)
+    results <- results[order(results$NumberFeature), , drop=FALSE]
+    return(list(results$NumberFeature - 1, results$Information.Gain))
 }
 
 cfsFeatureIdxs <- function(X, y) {
@@ -97,8 +97,8 @@ gainRatioFeatureIdxs <- function(X, y) {
         as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)), unit="log2"
     )
     results <- results[results$attr_importance > 0, , drop=FALSE]
-    results <- results[order(results$attr_importance, decreasing=TRUE), , drop=FALSE]
-    return(as.integer(row.names(results)) - 1)
+    results <- results[order(as.integer(row.names(results))), , drop=FALSE]
+    return(list(as.integer(row.names(results)) - 1, results$attr_importance))
 }
 
 symUncertFeatureIdxs <- function(X, y) {
@@ -108,8 +108,8 @@ symUncertFeatureIdxs <- function(X, y) {
         as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)), unit="log2"
     )
     results <- results[results$attr_importance > 0, , drop=FALSE]
-    results <- results[order(results$attr_importance, decreasing=TRUE), , drop=FALSE]
-    return(as.integer(row.names(results)) - 1)
+    results <- results[order(as.integer(row.names(results))), , drop=FALSE]
+    return(list(as.integer(row.names(results)) - 1, results$attr_importance))
 }
 
 relieffFeatureScore <- function(X, y, num.neighbors=10, sample.size=5) {

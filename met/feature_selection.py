@@ -19,10 +19,11 @@ r_relieff_feature_score = robjects.globalenv['relieffFeatureScore']
 numpy2ri.activate()
 
 def fcbf_feature_idxs(X, y, threshold=0):
-    return np.array(r_fcbf_feature_idxs(X, y, threshold=threshold), dtype=int)
+    idxs, scores = r_fcbf_feature_idxs(X, y, threshold=threshold)
+    return np.array(idxs, dtype=int), np.array(scores, dtype=float)
 
 def relieff_feature_score(X, y):
-    return np.array(r_relieff_feature_score(X, y))
+    return np.array(r_relieff_feature_score(X, y), dtype=float)
 
 class CFS(BaseEstimator, SelectorMixin):
     """Feature selector using Correlation Feature Selection (CFS) algorithm
@@ -99,6 +100,9 @@ class FCBF(BaseEstimator, SelectorMixin):
         self.k = k
         self.threshold = threshold
         self.memory = memory
+        self.selected_idxs_ = np.array([], dtype=int)
+        self.scores_ = np.array([], dtype=float)
+        self.n_features_ = None
 
     def fit(self, X, y):
         """
@@ -130,9 +134,15 @@ class FCBF(BaseEstimator, SelectorMixin):
                 .format(type(memory))
             )
         self.n_features_ = X.shape[1]
-        warnings.filterwarnings('ignore', category=RRuntimeWarning, message="^Rjava\.init\.warning")
-        self.selected_idxs_ = memory.cache(fcbf_feature_idxs)(X, y, threshold=self.threshold)
-        warnings.filterwarnings('always', category=RRuntimeWarning)
+        if self.k == 'all' or self.k > 0:
+            warnings.filterwarnings('ignore', category=RRuntimeWarning, message="^Rjava\.init\.warning")
+            feature_idxs, scores = memory.cache(fcbf_feature_idxs)(X, y, threshold=self.threshold)
+            warnings.filterwarnings('always', category=RRuntimeWarning)
+            if self.k != 'all':
+                feature_idxs = feature_idxs[np.argsort(scores, kind='mergesort')[-self.k:]]
+                scores = np.sort(scores, kind='mergesort')[-self.k:]
+            self.selected_idxs_ = np.sort(feature_idxs, kind='mergesort')
+            self.scores_ = scores[np.argsort(feature_idxs, kind='mergesort')]
         return self
 
     def _check_params(self, X, y):
@@ -146,10 +156,8 @@ class FCBF(BaseEstimator, SelectorMixin):
     def _get_support_mask(self):
         check_is_fitted(self, 'selected_idxs_')
         mask = np.zeros(self.n_features_, dtype=bool)
-        if self.k == 'all':
+        if self.k == 'all' or self.k > 0:
             mask[self.selected_idxs_] = True
-        elif self.k > 0:
-            mask[self.selected_idxs_[:self.k]] = True
         return mask
 
 class ReliefF(BaseEstimator, SelectorMixin):
@@ -238,5 +246,5 @@ class ReliefF(BaseEstimator, SelectorMixin):
         if self.k == 'all':
             mask = np.ones(self.scores_.shape, dtype=bool)
         elif self.k > 0:
-            mask[np.argsort(self.scores_, kind="mergesort")[-self.k:]] = True
+            mask[np.argsort(self.scores_, kind='mergesort')[-self.k:]] = True
         return mask

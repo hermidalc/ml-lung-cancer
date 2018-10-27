@@ -249,11 +249,11 @@ class CachedGradientBoostingClassifier(CachedFitMixin, GradientBoostingClassifie
 # limma feature selection scoring function
 def limma(X, y):
     f, pv = r_limma_feature_score(X, y)
-    return np.array(f), np.array(pv)
+    return np.array(f, dtype=float), np.array(pv, dtype=float)
 
 def limma_pkm(X, y):
     f, pv = r_limma_pkm_feature_score(X, y)
-    return np.array(f), np.array(pv)
+    return np.array(f, dtype=float), np.array(pv, dtype=float)
 
 # parallel pipeline fit function
 def fit_pipeline(params, pipeline_order, X_tr, y_tr):
@@ -319,7 +319,7 @@ else:
     FS_VRT_THRES = 0.
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
-elif args.fs_skb_k_min == 1:
+elif args.fs_skb_k_min == 1 and args.fs_skb_k_step > 1:
     FS_SKB_K = [1] + list(range(0, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))[1:]
 else:
     FS_SKB_K = list(range(args.fs_skb_k_min, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))
