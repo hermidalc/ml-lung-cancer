@@ -255,14 +255,21 @@ def limma_pkm(X, y):
     f, pv = r_limma_pkm_feature_score(X, y)
     return np.array(f, dtype=float), np.array(pv, dtype=float)
 
-# parallel pipeline fit function
-def fit_pipeline(params, pipeline_order, X_tr, y_tr):
+# parallel pipeline fit functions
+def fit_pipeline_1(params, pipe_steps, X, y):
+    pipe = Pipeline(pipe_steps, memory=memory)
+    pipe.set_params(**params)
+    pipe.fit(X, y)
+    if args.scv_verbose == 0: print('.', end='', flush=True)
+    return pipe
+
+def fit_pipeline_2(params, pipeline_order, X, y):
     pipe_steps = sorted([
         (k, v) for k, v in params.items() if k in pipeline_order
     ], key=lambda s: pipeline_order.index(s[0]))
     pipe = Pipeline(pipe_steps, memory=memory)
     pipe.set_params(**{ k: v for k, v in params.items() if '__' in k })
-    pipe.fit(X_tr, y_tr)
+    pipe.fit(X, y)
     if args.scv_verbose == 0: print('.', end='', flush=True)
     return pipe
 
@@ -1169,12 +1176,13 @@ if args.analysis == 1:
         )
         X = X[corr_sample_idxs, :]
         y = y[corr_sample_idxs]
-    pipe = Pipeline(sorted(
+    pipe_steps = sorted(
         pipelines['slr'][args.slr_meth]['steps'] +
         pipelines['fs'][args.fs_meth]['steps'] +
         pipelines['clf'][args.clf_meth]['steps'],
         key=lambda s: pipeline_order.index(s[0])
-    ), memory=memory)
+    )
+    pipe = Pipeline(pipe_steps, memory=memory)
     param_grid = {
         **pipelines['slr'][args.slr_meth]['param_grid'][0],
         **pipelines['fs'][args.fs_meth]['param_grid'][0],
@@ -1194,9 +1202,10 @@ if args.analysis == 1:
                 ),
                 param_grid[param]
             ))
+    scv_refit = False if args.fs_meth in ['FCBF', 'ReliefF', 'CFS'] else args.scv_refit
     if args.scv_type == 'grid':
         search = GridSearchCV(
-            pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+            pipe, param_grid=param_grid, scoring=scv_scoring, refit=scv_refit, iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
             cv=StratifiedShuffleSplit(
                 n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -1204,7 +1213,7 @@ if args.analysis == 1:
         )
     elif args.scv_type == 'rand':
         search = RandomizedSearchCV(
-            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=scv_refit, iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
             n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                 n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -1224,33 +1233,44 @@ if args.analysis == 1:
     )
     for tr_idxs, te_idxs in sss.split(X, y):
         search.fit(X[tr_idxs], y[tr_idxs])
+        if args.fs_meth in ['FCBF', 'ReliefF', 'CFS']:
+            search_best_index = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
+            search_best_params = search.cv_results_['params'][search_best_index]
+            search_best_estimator = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
+                delayed(fit_pipeline_1)(params, pipe_steps, X[tr_idxs], y[tr_idxs])
+                for params in [search_best_params]
+            )[0]
+        else:
+            search_best_estimator = search.best_estimator_
+            search_best_params = search.best_params_
+            search_best_index = search.best_index_
         feature_idxs = np.arange(X[tr_idxs].shape[1])
-        for step in search.best_estimator_.named_steps:
-            if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
-                feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
+        for step in search_best_estimator.named_steps:
+            if hasattr(search_best_estimator.named_steps[step], 'get_support'):
+                feature_idxs = feature_idxs[search_best_estimator.named_steps[step].get_support(indices=True)]
         feature_names = np.array(biobase.featureNames(eset), dtype=str)[feature_idxs]
         weights = np.array([], dtype=float)
-        if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
-            weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
-        elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
-            weights = search.best_estimator_.named_steps['clf'].feature_importances_
-        elif ('fs2' in search.best_estimator_.named_steps):
-            if (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
-                hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
-                weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
-            elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
-                weights = search.best_estimator_.named_steps['fs2'].scores_
-            elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
-                weights = search.best_estimator_.named_steps['fs2'].feature_importances_
-        roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search.best_index_]
-        bcr_cv = search.cv_results_['mean_test_bcr'][search.best_index_]
+        if hasattr(search_best_estimator.named_steps['clf'], 'coef_'):
+            weights = np.square(search_best_estimator.named_steps['clf'].coef_[0])
+        elif hasattr(search_best_estimator.named_steps['clf'], 'feature_importances_'):
+            weights = search_best_estimator.named_steps['clf'].feature_importances_
+        elif ('fs2' in search_best_estimator.named_steps):
+            if (hasattr(search_best_estimator.named_steps['fs2'], 'estimator_') and
+                hasattr(search_best_estimator.named_steps['fs2'].estimator_, 'coef_')):
+                weights = np.square(search_best_estimator.named_steps['fs2'].estimator_.coef_[0])
+            elif hasattr(search_best_estimator.named_steps['fs2'], 'scores_'):
+                weights = search_best_estimator.named_steps['fs2'].scores_
+            elif hasattr(search_best_estimator.named_steps['fs2'], 'feature_importances_'):
+                weights = search_best_estimator.named_steps['fs2'].feature_importances_
+        roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search_best_index]
+        bcr_cv = search.cv_results_['mean_test_bcr'][search_best_index]
         if hasattr(search, 'decision_function'):
-            y_score = search.decision_function(X[te_idxs])
+            y_score = search_best_estimator.decision_function(X[te_idxs])
         else:
-            y_score = search.predict_proba(X[te_idxs])[:,1]
+            y_score = search_best_estimator.predict_proba(X[te_idxs])[:,1]
         roc_auc_te = roc_auc_score(y[te_idxs], y_score)
         fpr, tpr, thres = roc_curve(y[te_idxs], y_score, pos_label=1)
-        y_pred = search.predict(X[te_idxs])
+        y_pred = search_best_estimator.predict(X[te_idxs])
         bcr_te = bcr_score(y[te_idxs], y_pred)
         print(
             'Dataset:', dataset_name,
@@ -1258,7 +1278,7 @@ if args.analysis == 1:
             ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
             ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
             ' Features: %3s' % feature_idxs.size,
-            ' Params:', search.best_params_,
+            ' Params:', search_best_params,
         )
         if args.verbose > 1:
             if weights.size > 0:
@@ -2745,7 +2765,7 @@ elif args.analysis == 4:
                 print('Fitting ' + str(len(group_best_params)) + ' pipelines', end='', flush=True)
                 if args.scv_verbose > 0: print()
                 pipes = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
-                    delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
+                    delayed(fit_pipeline_2)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
                 )
                 if args.scv_verbose == 0: print('done')
                 best_roc_auc_te = 0
