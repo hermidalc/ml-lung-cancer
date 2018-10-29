@@ -39,7 +39,8 @@ libiconv \
 lxml \
 natsort \
 rpy2 \
-seaborn
+seaborn \
+ipykernel
 conda install -c conda-forge python-language-server mlxtend=0.13.0
 conda install -c sebp scikit-survival
 ```
@@ -74,6 +75,7 @@ biocLite("hgu133plus2probe", suppressUpdates=TRUE)
 biocLite("GO.db", suppressUpdates=TRUE)
 install.packages("bapred")
 install.packages("WGCNA")
+install.packages("languageserver")
 ```
 
 5. Install Brainarray Custom Microarray Annotation DBs and CDFs
