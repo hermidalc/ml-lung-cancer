@@ -40,8 +40,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 sys.path.insert(1, sys.path[0] + '/lib/python3.6/site-packages')
 from local.sklearn.feature_selection import (
-    ANOVAFClassifierFeatureScorer, CFS, Chi2FeatureScorer, FCBF, LimmaClassifierFeatureScorer,
-    MutualInfoClassifierFeatureScorer, ReliefF, SelectKBest, SelectFromModel, RFE
+    ANOVAFScorerClassification, CFS, Chi2Scorer, FCBF, LimmaScorerClassification,
+    MutualInfoScorerClassification, ReliefF, SelectKBest, SelectFromModel, RFE
 )
 
 # ignore QDA collinearity warnings
@@ -236,16 +236,16 @@ class CachedFitMixin:
         vars(self).update(vars(cached_self))
         return self
 
-class CachedANOVAFClassifierFeatureScorer(CachedFitMixin, ANOVAFClassifierFeatureScorer):
+class CachedANOVAFScorerClassification(CachedFitMixin, ANOVAFScorerClassification):
     pass
 
-class CachedChi2FeatureScorer(CachedFitMixin, Chi2FeatureScorer):
+class CachedChi2Scorer(CachedFitMixin, Chi2Scorer):
     pass
 
-class CachedLimmaClassifierFeatureScorer(CachedFitMixin, LimmaClassifierFeatureScorer):
+class CachedLimmaScorerClassification(CachedFitMixin, LimmaScorerClassification):
     pass
 
-class CachedMutualInfoClassifierFeatureScorer(CachedFitMixin, MutualInfoClassifierFeatureScorer):
+class CachedMutualInfoScorerClassification(CachedFitMixin, MutualInfoScorerClassification):
     pass
 
 class CachedLinearSVC(CachedFitMixin, LinearSVC):
@@ -280,20 +280,20 @@ def fit_pipeline_2(params, pipeline_order, X, y):
 
 # cached functions
 if args.pipe_memory:
-    limma_scorer = CachedLimmaClassifierFeatureScorer()
-    chi2_scorer = CachedChi2FeatureScorer()
-    anova_scorer = CachedANOVAFClassifierFeatureScorer()
-    mi_scorer = CachedMutualInfoClassifierFeatureScorer(random_state=args.random_seed)
+    limma_scorer = CachedLimmaScorerClassification()
+    chi2_scorer = CachedChi2Scorer()
+    anova_scorer = CachedANOVAFScorerClassification()
+    mi_scorer = CachedMutualInfoScorerClassification(random_state=args.random_seed)
     fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
     fs_rf_estimator = CachedRandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 else:
-    limma_scorer = LimmaClassifierFeatureScorer()
-    chi2_scorer = Chi2FeatureScorer()
-    anova_scorer = ANOVAFClassifierFeatureScorer()
-    mi_scorer = MutualInfoClassifierFeatureScorer(random_state=args.random_seed)
+    limma_scorer = LimmaScorerClassification()
+    chi2_scorer = Chi2Scorer()
+    anova_scorer = ANOVAFScorerClassification()
+    mi_scorer = MutualInfoScorerClassification(random_state=args.random_seed)
     fs_svm_estimator = LinearSVC(random_state=args.random_seed)
     fs_rf_estimator = RandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)

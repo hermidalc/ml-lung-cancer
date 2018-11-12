@@ -20,10 +20,10 @@ from rpy2.robjects import numpy2ri
 # import pandas as pd
 from sklearn.base import clone
 from sklearn.feature_selection import (
-    chi2, f_classif, mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE, VarianceThreshold
+    chi2, f_classif, mutual_info_classif, SelectFpr, SelectFromModel, RFE, VarianceThreshold
 )
 from sklearn.model_selection import GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
-from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier
+from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, RobustScaler, StandardScaler
 from sklearn.externals.joblib import delayed, dump, Memory, Parallel
@@ -35,7 +35,7 @@ from sksurv.metrics import concordance_index_censored
 from sksurv.svm import (
     FastKernelSurvivalSVM, FastSurvivalSVM, MinlipSurvivalAnalysis, HingeLossSurvivalSVM, NaiveSurvivalSVM
 )
-from feature_selection import CFS, FCBF, ReliefF
+from feature_selection import SelectKBest, CFS, FCBF, ReliefF
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import style
@@ -167,6 +167,9 @@ class CachedFitMixin:
 class CachedLinearSVC(CachedFitMixin, LinearSVC):
     pass
 
+class CachedRandomForestClassifier(CachedFitMixin, RandomForestClassifier):
+    pass
+
 class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
     pass
 
@@ -221,6 +224,7 @@ if args.pipe_memory:
     coxph_score_func = memory.cache(coxph_score)
     coxnet_score_func = memory.cache(coxnet_score)
     fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
+    fs_rf_estimator = CachedRandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
@@ -233,6 +237,7 @@ else:
     coxph_score_func = coxph_score
     coxnet_score_func = coxnet_score
     fs_svm_estimator = LinearSVC(random_state=args.random_seed)
+    fs_rf_estimator = RandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = GradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
@@ -468,7 +473,21 @@ pipelines = {
                 },
             ],
         },
-        'ExtraTrees-SFM-KBest': {
+        'RF-SFM-KBest': {
+            'steps': [
+                ('fs2', SelectFromModel(fs_rf_estimator)),
+            ],
+            'param_grid': [
+                {
+                    'fs2__estimator__n_estimators': FS_SFM_RF_E,
+                    'fs2__estimator__max_depth': FS_SFM_RF_D,
+                    'fs2__estimator__max_features': FS_SFM_RF_F,
+                    'fs2__estimator__class_weight': FS_SFM_RF_CW,
+                    'fs2__k': FS_SKB_K,
+                },
+            ],
+        },
+        'EXT-SFM-KBest': {
             'steps': [
                 ('fs2', SelectFromModel(fs_ext_estimator)),
             ],
@@ -497,7 +516,11 @@ pipelines = {
         },
         'SVM-RFE': {
             'steps': [
-                ('fs2', RFE(fs_svm_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(
+                    fs_svm_estimator, step_decay=True,
+                    step_multi_stop=args.fs_rfe_step_ms,
+                    verbose=args.fs_rfe_verbose
+                )),
             ],
             'param_grid': [
                 {
@@ -508,14 +531,38 @@ pipelines = {
                 },
             ],
         },
-        'ExtraTrees-RFE': {
+        'RF-RFE': {
             'steps': [
-                ('fs2', RFE(fs_ext_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(
+                    fs_rf_estimator, step_decay=True,
+                    step_multi_stop=args.fs_rfe_step_ms,
+                    verbose=args.fs_rfe_verbose
+                )),
+            ],
+            'param_grid': [
+                {
+                    'fs2__estimator__n_estimators': FS_RFE_RF_E,
+                    'fs2__estimator__max_depth': FS_RFE_RF_D,
+                    'fs2__estimator__max_features': FS_RFE_RF_F,
+                    'fs2__estimator__class_weight': FS_RFE_RF_CW,
+                    'fs2__step': FS_RFE_STEP,
+                    'fs2__n_features_to_select': FS_SKB_K,
+                },
+            ],
+        },
+        'EXT-RFE': {
+            'steps': [
+                ('fs2', RFE(
+                    fs_ext_estimator, step_decay=True,
+                    step_multi_stop=args.fs_rfe_step_ms,
+                    verbose=args.fs_rfe_verbose
+                )),
             ],
             'param_grid': [
                 {
                     'fs2__estimator__n_estimators': FS_RFE_EXT_E,
                     'fs2__estimator__max_depth': FS_RFE_EXT_D,
+                    'fs2__estimator__max_features': FS_RFE_EXT_F,
                     'fs2__estimator__class_weight': FS_RFE_EXT_CW,
                     'fs2__step': FS_RFE_STEP,
                     'fs2__n_features_to_select': FS_SKB_K,
@@ -524,7 +571,11 @@ pipelines = {
         },
         'GRB-RFE': {
             'steps': [
-                ('fs2', RFE(fs_grb_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(
+                    fs_grb_estimator, step_decay=True,
+                    step_multi_stop=args.fs_rfe_step_ms,
+                    verbose=args.fs_rfe_verbose
+                )),
             ],
             'param_grid': [
                 {
@@ -821,12 +872,13 @@ if args.analysis == 1:
         )
         X = X[corr_sample_idxs, :]
         y = y[corr_sample_idxs]
-    pipe = Pipeline(sorted(
+    pipe_steps = sorted(
         pipelines['slr'][args.slr_meth]['steps'] +
         pipelines['fs'][args.fs_meth]['steps'] +
         pipelines['clf'][args.clf_meth]['steps'],
         key=lambda s: pipeline_order.index(s[0])
-    ), memory=memory)
+    )
+    pipe = Pipeline(pipe_steps, memory=memory)
     param_grid = {
         **pipelines['slr'][args.slr_meth]['param_grid'][0],
         **pipelines['fs'][args.fs_meth]['param_grid'][0],
@@ -846,9 +898,10 @@ if args.analysis == 1:
                 ),
                 param_grid[param]
             ))
+    scv_refit = False if args.fs_meth in ['FCBF', 'ReliefF', 'CFS'] else args.scv_refit
     if args.scv_type == 'grid':
         search = GridSearchCV(
-            pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+            pipe, param_grid=param_grid, scoring=scv_scoring, refit=scv_refit, iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
             cv=StratifiedShuffleSplit(
                 n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -856,7 +909,7 @@ if args.analysis == 1:
         )
     elif args.scv_type == 'rand':
         search = RandomizedSearchCV(
-            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
+            pipe, param_distributions=param_grid, scoring=scv_scoring, refit=scv_refit, iid=False,
             error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
             n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                 n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
@@ -876,33 +929,44 @@ if args.analysis == 1:
     )
     for tr_idxs, te_idxs in sss.split(X, y):
         search.fit(X[tr_idxs], y[tr_idxs])
+        if args.fs_meth in ['FCBF', 'ReliefF', 'CFS']:
+            search_best_index = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
+            search_best_params = search.cv_results_['params'][search_best_index]
+            search_best_estimator = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
+                delayed(fit_pipeline_1)(params, pipe_steps, X[tr_idxs], y[tr_idxs])
+                for params in [search_best_params]
+            )[0]
+        else:
+            search_best_estimator = search.best_estimator_
+            search_best_params = search.best_params_
+            search_best_index = search.best_index_
         feature_idxs = np.arange(X[tr_idxs].shape[1])
-        for step in search.best_estimator_.named_steps:
-            if hasattr(search.best_estimator_.named_steps[step], 'get_support'):
-                feature_idxs = feature_idxs[search.best_estimator_.named_steps[step].get_support(indices=True)]
+        for step in search_best_estimator.named_steps:
+            if hasattr(search_best_estimator.named_steps[step], 'get_support'):
+                feature_idxs = feature_idxs[search_best_estimator.named_steps[step].get_support(indices=True)]
         feature_names = np.array(biobase.featureNames(eset), dtype=str)[feature_idxs]
         weights = np.array([], dtype=float)
-        if hasattr(search.best_estimator_.named_steps['clf'], 'coef_'):
-            weights = np.square(search.best_estimator_.named_steps['clf'].coef_[0])
-        elif hasattr(search.best_estimator_.named_steps['clf'], 'feature_importances_'):
-            weights = search.best_estimator_.named_steps['clf'].feature_importances_
-        elif ('fs2' in search.best_estimator_.named_steps):
-            if (hasattr(search.best_estimator_.named_steps['fs2'], 'estimator_') and
-                hasattr(search.best_estimator_.named_steps['fs2'].estimator_, 'coef_')):
-                weights = np.square(search.best_estimator_.named_steps['fs2'].estimator_.coef_[0])
-            elif hasattr(search.best_estimator_.named_steps['fs2'], 'scores_'):
-                weights = search.best_estimator_.named_steps['fs2'].scores_
-            elif hasattr(search.best_estimator_.named_steps['fs2'], 'feature_importances_'):
-                weights = search.best_estimator_.named_steps['fs2'].feature_importances_
-        roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search.best_index_]
-        bcr_cv = search.cv_results_['mean_test_bcr'][search.best_index_]
+        if hasattr(search_best_estimator.named_steps['clf'], 'coef_'):
+            weights = np.square(search_best_estimator.named_steps['clf'].coef_[0])
+        elif hasattr(search_best_estimator.named_steps['clf'], 'feature_importances_'):
+            weights = search_best_estimator.named_steps['clf'].feature_importances_
+        elif ('fs2' in search_best_estimator.named_steps):
+            if (hasattr(search_best_estimator.named_steps['fs2'], 'estimator_') and
+                hasattr(search_best_estimator.named_steps['fs2'].estimator_, 'coef_')):
+                weights = np.square(search_best_estimator.named_steps['fs2'].estimator_.coef_[0])
+            elif hasattr(search_best_estimator.named_steps['fs2'], 'scores_'):
+                weights = search_best_estimator.named_steps['fs2'].scores_
+            elif hasattr(search_best_estimator.named_steps['fs2'], 'feature_importances_'):
+                weights = search_best_estimator.named_steps['fs2'].feature_importances_
+        roc_auc_cv = search.cv_results_['mean_test_roc_auc'][search_best_index]
+        bcr_cv = search.cv_results_['mean_test_bcr'][search_best_index]
         if hasattr(search, 'decision_function'):
-            y_score = search.decision_function(X[te_idxs])
+            y_score = search_best_estimator.decision_function(X[te_idxs])
         else:
-            y_score = search.predict_proba(X[te_idxs])[:,1]
+            y_score = search_best_estimator.predict_proba(X[te_idxs])[:,1]
         roc_auc_te = roc_auc_score(y[te_idxs], y_score)
         fpr, tpr, thres = roc_curve(y[te_idxs], y_score, pos_label=1)
-        y_pred = search.predict(X[te_idxs])
+        y_pred = search_best_estimator.predict(X[te_idxs])
         bcr_te = bcr_score(y[te_idxs], y_pred)
         print(
             'Dataset:', dataset_name,
@@ -910,7 +974,7 @@ if args.analysis == 1:
             ' ROC AUC (CV / Test): %.4f / %.4f' % (roc_auc_cv, roc_auc_te),
             ' BCR (CV / Test): %.4f / %.4f' % (bcr_cv, bcr_te),
             ' Features: %3s' % feature_idxs.size,
-            ' Params:', search.best_params_,
+            ' Params:', search_best_params,
         )
         if args.verbose > 1:
             if weights.size > 0:
@@ -2397,7 +2461,7 @@ elif args.analysis == 4:
                 print('Fitting ' + str(len(group_best_params)) + ' pipelines', end='', flush=True)
                 if args.scv_verbose > 0: print()
                 pipes = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
-                    delayed(fit_pipeline)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
+                    delayed(fit_pipeline_2)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
                 )
                 if args.scv_verbose == 0: print('done')
                 best_roc_auc_te = 0
