@@ -51,27 +51,22 @@ dataCorrColIdxs <- function(X, cutoff=0.5) {
     return(sort(caret::findCorrelation(cor(X), cutoff=cutoff)) - 1)
 }
 
-limmaFeatureScore <- function(X, y) {
+limmaFeatureScore <- function(X, y, pkm=FALSE) {
     suppressPackageStartupMessages(require("limma"))
     design <- model.matrix(~0 + factor(y))
     colnames(design) <- c("Class0", "Class1")
-    fit <- lmFit(t(X), design)
+    if (pkm) {
+        fit <- lmFit(t(log2(X + 1)), design)
+    } else {
+        fit <- lmFit(t(X), design)
+    }
     contrast.matrix <- makeContrasts(Class1VsClass0=Class1-Class0, levels=design)
     fit.contrasts <- contrasts.fit(fit, contrast.matrix)
-    fit.b <- eBayes(fit.contrasts)
-    results <- topTableF(fit.b, number=Inf, adjust.method="BH")
-    results <- results[order(as.integer(row.names(results))), , drop=FALSE]
-    return(list(results$F, results$adj.P.Val))
-}
-
-limmaPkmFeatureScore <- function(X, y) {
-    suppressPackageStartupMessages(require("limma"))
-    design <- model.matrix(~0 + factor(y))
-    colnames(design) <- c("Class0", "Class1")
-    fit <- lmFit(t(log2(X + 1)), design)
-    contrast.matrix <- makeContrasts(Class1VsClass0=Class1-Class0, levels=design)
-    fit.contrasts <- contrasts.fit(fit, contrast.matrix)
-    fit.b <- eBayes(fit.contrasts, trend=TRUE)
+    if (pkm) {
+        fit.b <- eBayes(fit.contrasts, trend=TRUE)
+    } else {
+        fit.b <- eBayes(fit.contrasts)
+    }
     results <- topTableF(fit.b, number=Inf, adjust.method="BH")
     results <- results[order(as.integer(row.names(results))), , drop=FALSE]
     return(list(results$F, results$adj.P.Val))
