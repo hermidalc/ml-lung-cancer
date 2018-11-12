@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import warnings
+import sys, warnings
 from argparse import ArgumentParser
 from copy import deepcopy
 from os import makedirs, path
@@ -19,9 +19,7 @@ from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
 from sklearn.base import clone
-from sklearn.feature_selection import (
-    chi2, f_classif, mutual_info_classif, SelectKBest, SelectFpr, SelectFromModel, RFE, VarianceThreshold
-)
+from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
@@ -34,14 +32,17 @@ from sklearn.ensemble import (
 )
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, RobustScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 from sklearn.svm import LinearSVC, SVC
 from sklearn.metrics import roc_auc_score, roc_curve, make_scorer
 from sklearn.externals.joblib import delayed, dump, Memory, Parallel
-from feature_selection import CFS, FCBF, ReliefF
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib import style
+sys.path.insert(1, sys.path[0] + '/lib/python3.6/site-packages')
+from local.sklearn.feature_selection import (
+    ANOVAFClassifierFeatureScorer, CFS, Chi2FeatureScorer, FCBF, LimmaClassifierFeatureScorer,
+    MutualInfoClassifierFeatureScorer, ReliefF, SelectKBest, SelectFromModel, RFE
+)
 
 # ignore QDA collinearity warnings
 warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
@@ -81,6 +82,8 @@ parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr min')
 parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
 parser.add_argument('--fs-vrt-thres', type=float, nargs='+', help='fs vrt threshold')
+parser.add_argument('--fs-mic-n', type=int, nargs='+', help='fs mic n neighbors')
+parser.add_argument('--fs-mic-n-max', type=int, default=20, help='fs mic n neighbors max')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-min', type=int, default=1, help='fs skb k min')
 parser.add_argument('--fs-skb-k-max', type=int, default=100, help='fs skb k max')
@@ -129,6 +132,7 @@ parser.add_argument('--fs-rfe-grb-d', type=int, nargs='+', help='fs rfe grb max 
 parser.add_argument('--fs-rfe-grb-d-max', type=int, default=10, help='fs rfe grb max depth max')
 parser.add_argument('--fs-rfe-grb-f', type=str, nargs='+', help='fs rfe grb max features')
 parser.add_argument('--fs-rfe-step', type=float, nargs='+', help='fs rfe step')
+parser.add_argument('--fs-rfe-step-ms', type=int, default=200, help='fs rfe step ms')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-rlf-n', type=int, nargs='+', help='fs rlf n neighbors')
 parser.add_argument('--fs-rlf-n-max', type=int, default=20, help='fs rlf n neighbors max')
@@ -142,7 +146,7 @@ parser.add_argument('--clf-svm-deg', type=int, nargs='+', help='clf svm poly deg
 parser.add_argument('--clf-svm-g', type=str, nargs='+', help='clf svm gamma')
 parser.add_argument('--clf-svm-cache', type=int, default=2000, help='libsvm cache size')
 parser.add_argument('--clf-knn-k', type=int, nargs='+', help='clf knn neighbors')
-parser.add_argument('--clf-knn-k-max', type=int, default=10, help='clf knn neighbors max')
+parser.add_argument('--clf-knn-k-max', type=int, default=20, help='clf knn neighbors max')
 parser.add_argument('--clf-knn-w', type=str, nargs='+', help='clf knn weights')
 parser.add_argument('--clf-dt-d', type=str, nargs='+', help='clf dt max depth')
 parser.add_argument('--clf-dt-d-max', type=int, default=10, help='clf dt max depth max')
@@ -216,8 +220,6 @@ r_data_nzero_col_idxs = robjects.globalenv['dataNonZeroColIdxs']
 r_data_nzsd_col_idxs = robjects.globalenv['dataNonZeroSdColIdxs']
 r_data_nzvr_col_idxs = robjects.globalenv['dataNonZeroVarColIdxs']
 r_data_corr_col_idxs = robjects.globalenv['dataCorrColIdxs']
-r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
-r_limma_pkm_feature_score = robjects.globalenv['limmaPkmFeatureScore']
 numpy2ri.activate()
 
 if args.pipe_memory:
@@ -234,6 +236,18 @@ class CachedFitMixin:
         vars(self).update(vars(cached_self))
         return self
 
+class CachedANOVAFClassifierFeatureScorer(CachedFitMixin, ANOVAFClassifierFeatureScorer):
+    pass
+
+class CachedChi2FeatureScorer(CachedFitMixin, Chi2FeatureScorer):
+    pass
+
+class CachedLimmaClassifierFeatureScorer(CachedFitMixin, LimmaClassifierFeatureScorer):
+    pass
+
+class CachedMutualInfoClassifierFeatureScorer(CachedFitMixin, MutualInfoClassifierFeatureScorer):
+    pass
+
 class CachedLinearSVC(CachedFitMixin, LinearSVC):
     pass
 
@@ -245,15 +259,6 @@ class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
 
 class CachedGradientBoostingClassifier(CachedFitMixin, GradientBoostingClassifier):
     pass
-
-# limma feature selection scoring function
-def limma(X, y):
-    f, pv = r_limma_feature_score(X, y)
-    return np.array(f, dtype=float), np.array(pv, dtype=float)
-
-def limma_pkm(X, y):
-    f, pv = r_limma_pkm_feature_score(X, y)
-    return np.array(f, dtype=float), np.array(pv, dtype=float)
 
 # parallel pipeline fit functions
 def fit_pipeline_1(params, pipe_steps, X, y):
@@ -275,22 +280,20 @@ def fit_pipeline_2(params, pipeline_order, X, y):
 
 # cached functions
 if args.pipe_memory:
-    limma_score_func = memory.cache(limma)
-    limma_pkm_score_func = memory.cache(limma_pkm)
-    chi2_func = memory.cache(chi2)
-    f_classif_func = memory.cache(f_classif)
-    mi_classif_func = memory.cache(mutual_info_classif)
+    limma_scorer = CachedLimmaClassifierFeatureScorer()
+    chi2_scorer = CachedChi2FeatureScorer()
+    anova_scorer = CachedANOVAFClassifierFeatureScorer()
+    mi_scorer = CachedMutualInfoClassifierFeatureScorer(random_state=args.random_seed)
     fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
     fs_rf_estimator = CachedRandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 else:
-    limma_score_func = limma
-    limma_pkm_score_func = limma_pkm
-    chi2_func = chi2
-    f_classif_func = f_classif
-    mi_classif_func = mutual_info_classif
+    limma_scorer = LimmaClassifierFeatureScorer()
+    chi2_scorer = Chi2FeatureScorer()
+    anova_scorer = ANOVAFClassifierFeatureScorer()
+    mi_scorer = MutualInfoClassifierFeatureScorer(random_state=args.random_seed)
     fs_svm_estimator = LinearSVC(random_state=args.random_seed)
     fs_rf_estimator = RandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)
@@ -324,6 +327,10 @@ if args.fs_vrt_thres:
     FS_VRT_THRES = sorted(args.fs_vrt_thres)
 else:
     FS_VRT_THRES = 0.
+if args.fs_mic_n:
+    FS_MIC_N = sorted(args.fs_mic_n)
+else:
+    FS_MIC_N = list(range(1, args.fs_mic_n_max + 1, 1))
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
 elif args.fs_skb_k_min == 1 and args.fs_skb_k_step > 1:
@@ -727,7 +734,7 @@ pipelines = {
         },
         'ANOVA-KBest': {
             'steps': [
-                ('fs1', SelectKBest(f_classif_func)),
+                ('fs1', SelectKBest(anova_scorer)),
             ],
             'param_grid': [
                 {
@@ -737,7 +744,7 @@ pipelines = {
         },
         'Chi2-KBest': {
             'steps': [
-                ('fs1', SelectKBest(chi2_func)),
+                ('fs1', SelectKBest(chi2_scorer)),
             ],
             'param_grid': [
                 {
@@ -747,7 +754,7 @@ pipelines = {
         },
         'Limma-KBest': {
             'steps': [
-                ('fs1', SelectKBest()),
+                ('fs1', SelectKBest(limma_scorer)),
             ],
             'param_grid': [
                 {
@@ -757,10 +764,11 @@ pipelines = {
         },
         'MI-KBest': {
             'steps': [
-                ('fs2', SelectKBest(mi_classif_func)),
+                ('fs2', SelectKBest(mi_scorer)),
             ],
             'param_grid': [
                 {
+                    'fs2__scorer__n_neighbors': FS_MIC_N,
                     'fs2__k': FS_SKB_K,
                 },
             ],
@@ -820,7 +828,11 @@ pipelines = {
         },
         'SVM-RFE': {
             'steps': [
-                ('fs2', RFE(fs_svm_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(
+                    fs_svm_estimator, step_decay=True,
+                    step_multi_stop=args.fs_rfe_step_ms,
+                    verbose=args.fs_rfe_verbose
+                )),
             ],
             'param_grid': [
                 {
@@ -833,7 +845,11 @@ pipelines = {
         },
         'RF-RFE': {
             'steps': [
-                ('fs2', RFE(fs_rf_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(
+                    fs_rf_estimator, step_decay=True,
+                    step_multi_stop=args.fs_rfe_step_ms,
+                    verbose=args.fs_rfe_verbose
+                )),
             ],
             'param_grid': [
                 {
@@ -848,7 +864,11 @@ pipelines = {
         },
         'EXT-RFE': {
             'steps': [
-                ('fs2', RFE(fs_ext_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(
+                    fs_ext_estimator, step_decay=True,
+                    step_multi_stop=args.fs_rfe_step_ms,
+                    verbose=args.fs_rfe_verbose
+                )),
             ],
             'param_grid': [
                 {
@@ -863,7 +883,11 @@ pipelines = {
         },
         'GRB-RFE': {
             'steps': [
-                ('fs2', RFE(fs_grb_estimator, verbose=args.fs_rfe_verbose)),
+                ('fs2', RFE(
+                    fs_grb_estimator, step_decay=True,
+                    step_multi_stop=args.fs_rfe_step_ms,
+                    verbose=args.fs_rfe_verbose
+                )),
             ],
             'param_grid': [
                 {
@@ -1190,9 +1214,9 @@ if args.analysis == 1:
     }
     if args.fs_meth == 'Limma-KBest':
         if norm_meth and norm_meth in ['pkm', 'ppm']:
-            pipe.set_params(fs1__score_func=limma_pkm_score_func)
+            pipe.set_params(fs1__scorer__pkm=True)
         else:
-            pipe.set_params(fs1__score_func=limma_score_func)
+            pipe.set_params(fs1__scorer__pkm=False)
     for param in param_grid:
         if param in params_feature_select:
             param_grid[param] = list(filter(
@@ -1605,9 +1629,9 @@ elif args.analysis == 2:
     }
     if args.fs_meth == 'Limma-KBest':
         if norm_meth and norm_meth in ['pkm', 'ppm']:
-            pipe.set_params(fs1__score_func=limma_pkm_score_func)
+            pipe.set_params(fs1__scorer__pkm=True)
         else:
-            pipe.set_params(fs1__score_func=limma_score_func)
+            pipe.set_params(fs1__scorer__pkm=False)
     for param in param_grid:
         if param in params_feature_select:
             param_grid[param] = list(filter(
@@ -2087,9 +2111,9 @@ elif args.analysis == 3:
                         for (step, object) in fs_meth_pipeline['steps']:
                             if object.__class__.__name__ == 'SelectKBest':
                                 if prep_group_info[pr_idx]['pkm']:
-                                    object.set_params(score_func=limma_pkm_score_func)
+                                    object.set_params(scorer__pkm=True)
                                 else:
-                                    object.set_params(score_func=limma_score_func)
+                                    object.set_params(scorer__pkm=False)
                     for fs_params in fs_meth_pipeline['param_grid']:
                         for param in fs_params:
                             if param in params_feature_select:
@@ -2143,9 +2167,9 @@ elif args.analysis == 3:
                 }
                 if args.fs_meth == 'Limma-KBest':
                     if prep_group_info[pr_idx]['pkm']:
-                        pipe.set_params(fs1__score_func=limma_pkm_score_func)
+                        pipe.set_params(fs1__scorer__pkm=True)
                     else:
-                        pipe.set_params(fs1__score_func=limma_score_func)
+                        pipe.set_params(fs1__scorer__pkm=False)
                 for param in param_grid:
                     if param in params_feature_select:
                         param_grid[param] = list(filter(
@@ -2664,9 +2688,9 @@ elif args.analysis == 4:
                             for (step, object) in fs_meth_pipeline['steps']:
                                 if object.__class__.__name__ == 'SelectKBest':
                                     if prep_group_info[pr_idx]['pkm']:
-                                        object.set_params(score_func=limma_pkm_score_func)
+                                        object.set_params(scorer__pkm=True)
                                     else:
-                                        object.set_params(score_func=limma_score_func)
+                                        object.set_params(scorer__pkm=False)
                         for fs_params in fs_meth_pipeline['param_grid']:
                             for param in fs_params:
                                 if param in params_feature_select:
@@ -2720,9 +2744,9 @@ elif args.analysis == 4:
                     }
                     if args.fs_meth == 'Limma-KBest':
                         if prep_group_info[pr_idx]['pkm']:
-                            pipe.set_params(fs1__score_func=limma_pkm_score_func)
+                            pipe.set_params(fs1__scorer__pkm=True)
                         else:
-                            pipe.set_params(fs1__score_func=limma_score_func)
+                            pipe.set_params(fs1__scorer__pkm=False)
                     for param in param_grid:
                         if param in params_feature_select:
                             param_grid[param] = list(filter(
