@@ -19,8 +19,10 @@ from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
 from sklearn.base import clone
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.model_selection import GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
+from sklearn.feature_selection import SelectFromModel, VarianceThreshold
+from sklearn.model_selection import (
+    GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
+)
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
@@ -41,7 +43,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(1, sys.path[0] + '/lib/python3.6/site-packages')
 from local.sklearn.feature_selection import (
     ANOVAFScorerClassification, CFS, Chi2Scorer, FCBF, LimmaScorerClassification,
-    MutualInfoScorerClassification, ReliefF, SelectKBest, SelectFromModel, RFE
+    MutualInfoScorerClassification, ReliefF, SelectKBest, RFE
 )
 
 # ignore QDA collinearity warnings
@@ -759,19 +761,19 @@ pipelines = {
         },
         'SVM-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(sfm_svm_estimator)),
+                ('fs2', SelectFromModel(sfm_svm_estimator, threshold=-np.inf)),
             ],
             'param_grid': [
                 {
                     'fs2__estimator__C': FS_SFM_SVM_C,
                     'fs2__estimator__class_weight': FS_SFM_SVM_CW,
-                    'fs2__k': FS_SKB_K,
+                    'fs2__max_features': FS_SKB_K,
                 },
             ],
         },
         'RF-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(fs_rf_estimator)),
+                ('fs2', SelectFromModel(fs_rf_estimator, threshold=-np.inf)),
             ],
             'param_grid': [
                 {
@@ -779,13 +781,13 @@ pipelines = {
                     'fs2__estimator__max_depth': FS_SFM_RF_D,
                     'fs2__estimator__max_features': FS_SFM_RF_F,
                     'fs2__estimator__class_weight': FS_SFM_RF_CW,
-                    'fs2__k': FS_SKB_K,
+                    'fs2__max_features': FS_SKB_K,
                 },
             ],
         },
         'EXT-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(fs_ext_estimator)),
+                ('fs2', SelectFromModel(fs_ext_estimator, threshold=-np.inf)),
             ],
             'param_grid': [
                 {
@@ -793,20 +795,20 @@ pipelines = {
                     'fs2__estimator__max_depth': FS_SFM_EXT_D,
                     'fs2__estimator__max_features': FS_SFM_EXT_F,
                     'fs2__estimator__class_weight': FS_SFM_EXT_CW,
-                    'fs2__k': FS_SKB_K,
+                    'fs2__max_features': FS_SKB_K,
                 },
             ],
         },
         'GRB-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(fs_grb_estimator)),
+                ('fs2', SelectFromModel(fs_grb_estimator, threshold=-np.inf)),
             ],
             'param_grid': [
                 {
                     'fs2__estimator__n_estimators': FS_SFM_GRB_E,
                     'fs2__estimator__max_depth': FS_SFM_GRB_D,
                     'fs2__estimator__max_features': FS_SFM_GRB_F,
-                    'fs2__k': FS_SKB_K,
+                    'fs2__max_features': FS_SKB_K,
                 },
             ],
         },
