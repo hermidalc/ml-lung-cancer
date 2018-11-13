@@ -34,7 +34,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticD
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 from sklearn.svm import LinearSVC, SVC
-from sklearn.metrics import roc_auc_score, roc_curve, make_scorer
+from sklearn.metrics import balanced_accuracy_score, roc_auc_score, roc_curve
 from sklearn.externals.joblib import delayed, dump, Memory, Parallel
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -300,23 +300,7 @@ else:
     fs_grb_estimator = GradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 
-# bcr performance metric scoring function
-def bcr_score(y_true, y_pred):
-    tp = np.sum(np.logical_and(y_pred == 1, y_true == 1))
-    tn = np.sum(np.logical_and(y_pred == 0, y_true == 0))
-    fp = np.sum(np.logical_and(y_pred == 1, y_true == 0))
-    fn = np.sum(np.logical_and(y_pred == 0, y_true == 1))
-    mes1 = (tp + fn)
-    mes2 = (tn + fp)
-    # if only one class
-    if mes2 == 0:
-        return tp / mes1
-    elif mes1 == 0:
-        return tn / mes2
-    else:
-        return (tp / mes1 + tn / mes2) / 2
-
-scv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
+scv_scoring = { 'roc_auc': 'roc_auc', 'bcr': 'balanced_accuracy' }
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 if args.slr_mms_fr_min and args.slr_mms_fr_max:
@@ -1295,7 +1279,7 @@ if args.analysis == 1:
         roc_auc_te = roc_auc_score(y[te_idxs], y_score)
         fpr, tpr, thres = roc_curve(y[te_idxs], y_score, pos_label=1)
         y_pred = search_best_estimator.predict(X[te_idxs])
-        bcr_te = bcr_score(y[te_idxs], y_pred)
+        bcr_te = balanced_accuracy_score(y[te_idxs], y_pred)
         print(
             'Dataset:', dataset_name,
             ' Split: %2s' % split_num,
@@ -1875,7 +1859,7 @@ elif args.analysis == 2:
                 roc_auc_te = roc_auc_score(y_te, y_score)
                 fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
                 y_pred = pipe.predict(X_te[:,top_feature_idxs])
-                bcr_te = bcr_score(y_te, y_pred)
+                bcr_te = balanced_accuracy_score(y_te, y_pred)
                 roc_aucs_te.append(roc_auc_te)
                 bcrs_te.append(bcr_te)
             plt.plot(
@@ -1929,7 +1913,7 @@ elif args.analysis == 2:
             roc_auc_te = roc_auc_score(y_te, y_score)
             fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
             y_pred = search.predict(X_te)
-            bcr_te = bcr_score(y_te, y_pred)
+            bcr_te = balanced_accuracy_score(y_te, y_pred)
             plt.plot(
                 fpr, tpr, lw=3, alpha=0.8,
                 label=r'%s ROC (AUC = %0.4f, BCR = %0.4f)' % (dataset_te_name, roc_auc_te, bcr_te),
@@ -2802,7 +2786,7 @@ elif args.analysis == 4:
                         y_score = pipes[group_idx].predict_proba(X_te)[:,1]
                     roc_auc_te = roc_auc_score(y_te, y_score)
                     y_pred = pipes[group_idx].predict(X_te)
-                    bcr_te = bcr_score(y_te, y_pred)
+                    bcr_te = balanced_accuracy_score(y_te, y_pred)
                     metric_scores_te = { 'roc_auc_te': roc_auc_te, 'bcr_te': bcr_te }
                     fs_idx = param_grid_group['meth_idxs']['fs']
                     clf_idx = param_grid_group['meth_idxs']['clf']
