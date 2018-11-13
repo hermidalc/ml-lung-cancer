@@ -768,7 +768,7 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'fs2__scorer__n_neighbors': FS_MIC_N,
+                    'fs2__score_func__n_neighbors': FS_MIC_N,
                     'fs2__k': FS_SKB_K,
                 },
             ],
@@ -1214,9 +1214,9 @@ if args.analysis == 1:
     }
     if args.fs_meth == 'Limma-KBest':
         if norm_meth and norm_meth in ['pkm', 'ppm']:
-            pipe.set_params(fs1__scorer__pkm=True)
+            pipe.set_params(fs1__score_func__pkm=True)
         else:
-            pipe.set_params(fs1__scorer__pkm=False)
+            pipe.set_params(fs1__score_func__pkm=False)
     for param in param_grid:
         if param in params_feature_select:
             param_grid[param] = list(filter(
@@ -1629,9 +1629,9 @@ elif args.analysis == 2:
     }
     if args.fs_meth == 'Limma-KBest':
         if norm_meth and norm_meth in ['pkm', 'ppm']:
-            pipe.set_params(fs1__scorer__pkm=True)
+            pipe.set_params(fs1__score_func__pkm=True)
         else:
-            pipe.set_params(fs1__scorer__pkm=False)
+            pipe.set_params(fs1__score_func__pkm=False)
     for param in param_grid:
         if param in params_feature_select:
             param_grid[param] = list(filter(
@@ -2111,9 +2111,9 @@ elif args.analysis == 3:
                         for (step, object) in fs_meth_pipeline['steps']:
                             if object.__class__.__name__ == 'SelectKBest':
                                 if prep_group_info[pr_idx]['pkm']:
-                                    object.set_params(scorer__pkm=True)
+                                    object.set_params(score_func__pkm=True)
                                 else:
-                                    object.set_params(scorer__pkm=False)
+                                    object.set_params(score_func__pkm=False)
                     for fs_params in fs_meth_pipeline['param_grid']:
                         for param in fs_params:
                             if param in params_feature_select:
@@ -2167,9 +2167,9 @@ elif args.analysis == 3:
                 }
                 if args.fs_meth == 'Limma-KBest':
                     if prep_group_info[pr_idx]['pkm']:
-                        pipe.set_params(fs1__scorer__pkm=True)
+                        pipe.set_params(fs1__score_func__pkm=True)
                     else:
-                        pipe.set_params(fs1__scorer__pkm=False)
+                        pipe.set_params(fs1__score_func__pkm=False)
                 for param in param_grid:
                     if param in params_feature_select:
                         param_grid[param] = list(filter(
@@ -2688,9 +2688,9 @@ elif args.analysis == 4:
                             for (step, object) in fs_meth_pipeline['steps']:
                                 if object.__class__.__name__ == 'SelectKBest':
                                     if prep_group_info[pr_idx]['pkm']:
-                                        object.set_params(scorer__pkm=True)
+                                        object.set_params(score_func__pkm=True)
                                     else:
-                                        object.set_params(scorer__pkm=False)
+                                        object.set_params(score_func__pkm=False)
                         for fs_params in fs_meth_pipeline['param_grid']:
                             for param in fs_params:
                                 if param in params_feature_select:
@@ -2744,9 +2744,9 @@ elif args.analysis == 4:
                     }
                     if args.fs_meth == 'Limma-KBest':
                         if prep_group_info[pr_idx]['pkm']:
-                            pipe.set_params(fs1__scorer__pkm=True)
+                            pipe.set_params(fs1__score_func__pkm=True)
                         else:
-                            pipe.set_params(fs1__scorer__pkm=False)
+                            pipe.set_params(fs1__score_func__pkm=False)
                     for param in param_grid:
                         if param in params_feature_select:
                             param_grid[param] = list(filter(
