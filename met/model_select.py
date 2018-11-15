@@ -19,7 +19,7 @@ from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
 from sklearn.base import clone
-from sklearn.feature_selection import SelectFromModel, VarianceThreshold
+from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import (
     GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
 )
@@ -36,14 +36,14 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticD
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 from sklearn.svm import LinearSVC, SVC
-from sklearn.metrics import balanced_accuracy_score, roc_auc_score, roc_curve
+from sklearn.metrics import make_scorer, roc_auc_score, roc_curve
 from sklearn.externals.joblib import delayed, dump, Memory, Parallel
 import seaborn as sns
 import matplotlib.pyplot as plt
 sys.path.insert(1, sys.path[0] + '/lib/python3.6/site-packages')
 from local.sklearn.feature_selection import (
     ANOVAFScorerClassification, CFS, Chi2Scorer, FCBF, LimmaScorerClassification,
-    MutualInfoScorerClassification, ReliefF, SelectKBest, RFE
+    MutualInfoScorerClassification, ReliefF, RFE, SelectFromModel, SelectKBest
 )
 
 # ignore QDA collinearity warnings
@@ -134,7 +134,8 @@ parser.add_argument('--fs-rfe-grb-d', type=int, nargs='+', help='fs rfe grb max 
 parser.add_argument('--fs-rfe-grb-d-max', type=int, default=10, help='fs rfe grb max depth max')
 parser.add_argument('--fs-rfe-grb-f', type=str, nargs='+', help='fs rfe grb max features')
 parser.add_argument('--fs-rfe-step', type=float, nargs='+', help='fs rfe step')
-parser.add_argument('--fs-rfe-step-ms', type=int, default=200, help='fs rfe step ms')
+parser.add_argument('--fs-rfe-step-one-thres', type=int, default=200, help='fs rfe step one thres')
+parser.add_argument('--fs-rfe-step-decay', default=True, action='store_true', help='fs rfe step decay')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-rlf-n', type=int, nargs='+', help='fs rlf n neighbors')
 parser.add_argument('--fs-rlf-n-max', type=int, default=20, help='fs rlf n neighbors max')
@@ -302,7 +303,23 @@ else:
     fs_grb_estimator = GradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 
-scv_scoring = { 'roc_auc': 'roc_auc', 'bcr': 'balanced_accuracy' }
+# bcr performance metric scoring function
+def bcr_score(y_true, y_pred):
+    tp = np.sum(np.logical_and(y_pred == 1, y_true == 1))
+    tn = np.sum(np.logical_and(y_pred == 0, y_true == 0))
+    fp = np.sum(np.logical_and(y_pred == 1, y_true == 0))
+    fn = np.sum(np.logical_and(y_pred == 0, y_true == 1))
+    mes1 = (tp + fn)
+    mes2 = (tn + fp)
+    # if only one class
+    if mes2 == 0:
+        return tp / mes1
+    elif mes1 == 0:
+        return tn / mes2
+    else:
+        return (tp / mes1 + tn / mes2) / 2
+
+scv_scoring = { 'roc_auc': 'roc_auc', 'bcr': make_scorer(bcr_score) }
 
 # specify elements in sort order (needed by code dealing with gridsearch cv_results)
 if args.slr_mms_fr_min and args.slr_mms_fr_max:
@@ -761,19 +778,19 @@ pipelines = {
         },
         'SVM-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(sfm_svm_estimator, threshold=-np.inf)),
+                ('fs2', SelectFromModel(sfm_svm_estimator)),
             ],
             'param_grid': [
                 {
                     'fs2__estimator__C': FS_SFM_SVM_C,
                     'fs2__estimator__class_weight': FS_SFM_SVM_CW,
-                    'fs2__max_features': FS_SKB_K,
+                    'fs2__k': FS_SKB_K,
                 },
             ],
         },
         'RF-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(fs_rf_estimator, threshold=-np.inf)),
+                ('fs2', SelectFromModel(fs_rf_estimator)),
             ],
             'param_grid': [
                 {
@@ -781,13 +798,13 @@ pipelines = {
                     'fs2__estimator__max_depth': FS_SFM_RF_D,
                     'fs2__estimator__max_features': FS_SFM_RF_F,
                     'fs2__estimator__class_weight': FS_SFM_RF_CW,
-                    'fs2__max_features': FS_SKB_K,
+                    'fs2__k': FS_SKB_K,
                 },
             ],
         },
         'EXT-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(fs_ext_estimator, threshold=-np.inf)),
+                ('fs2', SelectFromModel(fs_ext_estimator)),
             ],
             'param_grid': [
                 {
@@ -795,28 +812,28 @@ pipelines = {
                     'fs2__estimator__max_depth': FS_SFM_EXT_D,
                     'fs2__estimator__max_features': FS_SFM_EXT_F,
                     'fs2__estimator__class_weight': FS_SFM_EXT_CW,
-                    'fs2__max_features': FS_SKB_K,
+                    'fs2__k': FS_SKB_K,
                 },
             ],
         },
         'GRB-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(fs_grb_estimator, threshold=-np.inf)),
+                ('fs2', SelectFromModel(fs_grb_estimator)),
             ],
             'param_grid': [
                 {
                     'fs2__estimator__n_estimators': FS_SFM_GRB_E,
                     'fs2__estimator__max_depth': FS_SFM_GRB_D,
                     'fs2__estimator__max_features': FS_SFM_GRB_F,
-                    'fs2__max_features': FS_SKB_K,
+                    'fs2__k': FS_SKB_K,
                 },
             ],
         },
         'SVM-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_svm_estimator, step_decay=True,
-                    step_multi_stop=args.fs_rfe_step_ms,
+                    fs_svm_estimator, step_decay=args.fs_rfe_step_decay,
+                    step_one_threshold=args.fs_rfe_step_one_thres,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -832,8 +849,8 @@ pipelines = {
         'RF-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_rf_estimator, step_decay=True,
-                    step_multi_stop=args.fs_rfe_step_ms,
+                    fs_rf_estimator, step_decay=args.fs_rfe_step_decay,
+                    step_one_threshold=args.fs_rfe_step_one_thres,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -851,8 +868,8 @@ pipelines = {
         'EXT-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_ext_estimator, step_decay=True,
-                    step_multi_stop=args.fs_rfe_step_ms,
+                    fs_ext_estimator, step_decay=args.fs_rfe_step_decay,
+                    step_one_threshold=args.fs_rfe_step_one_thres,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -870,8 +887,8 @@ pipelines = {
         'GRB-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_grb_estimator, step_decay=True,
-                    step_multi_stop=args.fs_rfe_step_ms,
+                    fs_grb_estimator, step_decay=args.fs_rfe_step_decay,
+                    step_one_threshold=args.fs_rfe_step_one_thres,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -1281,7 +1298,7 @@ if args.analysis == 1:
         roc_auc_te = roc_auc_score(y[te_idxs], y_score)
         fpr, tpr, thres = roc_curve(y[te_idxs], y_score, pos_label=1)
         y_pred = search_best_estimator.predict(X[te_idxs])
-        bcr_te = balanced_accuracy_score(y[te_idxs], y_pred)
+        bcr_te = bcr_score(y[te_idxs], y_pred)
         print(
             'Dataset:', dataset_name,
             ' Split: %2s' % split_num,
@@ -1861,7 +1878,7 @@ elif args.analysis == 2:
                 roc_auc_te = roc_auc_score(y_te, y_score)
                 fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
                 y_pred = pipe.predict(X_te[:,top_feature_idxs])
-                bcr_te = balanced_accuracy_score(y_te, y_pred)
+                bcr_te = bcr_score(y_te, y_pred)
                 roc_aucs_te.append(roc_auc_te)
                 bcrs_te.append(bcr_te)
             plt.plot(
@@ -1915,7 +1932,7 @@ elif args.analysis == 2:
             roc_auc_te = roc_auc_score(y_te, y_score)
             fpr, tpr, thres = roc_curve(y_te, y_score, pos_label=1)
             y_pred = search.predict(X_te)
-            bcr_te = balanced_accuracy_score(y_te, y_pred)
+            bcr_te = bcr_score(y_te, y_pred)
             plt.plot(
                 fpr, tpr, lw=3, alpha=0.8,
                 label=r'%s ROC (AUC = %0.4f, BCR = %0.4f)' % (dataset_te_name, roc_auc_te, bcr_te),
@@ -2788,7 +2805,7 @@ elif args.analysis == 4:
                         y_score = pipes[group_idx].predict_proba(X_te)[:,1]
                     roc_auc_te = roc_auc_score(y_te, y_score)
                     y_pred = pipes[group_idx].predict(X_te)
-                    bcr_te = balanced_accuracy_score(y_te, y_pred)
+                    bcr_te = bcr_score(y_te, y_pred)
                     metric_scores_te = { 'roc_auc_te': roc_auc_te, 'bcr_te': bcr_te }
                     fs_idx = param_grid_group['meth_idxs']['fs']
                     clf_idx = param_grid_group['meth_idxs']['clf']
