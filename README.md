@@ -5,7 +5,7 @@
 1. Install System Dependencies
 
 ```bash
-sudo dnf install -y libxml-devel libxml2-devel mesa-libGL-devel mesa-libGLU-devel gcc-gfortran
+sudo dnf install -y libxml-devel mesa-libGL-devel mesa-libGLU-devel gcc-gfortran
 ```
 
 2. Install Anaconda3 5.2.0
@@ -21,7 +21,7 @@ bash ~/Downloads/Anaconda3-5.2.0-Linux-x86_64.sh
 
 ```bash
 conda install \
-r-base=3.5.1 \
+r-base=3.4.3 \
 r-essentials \
 r-devtools \
 r-argparse \
@@ -37,6 +37,7 @@ autopep8 \
 libgfortran \
 libiconv \
 lxml \
+libxml2 \
 natsort \
 rpy2 \
 seaborn \
@@ -82,7 +83,7 @@ install.packages("languageserver")
 
 ```R
 library(devtools)
-install_url("http://brainarray.mbni.med.umich.edu/bioc/src/contrib/hgu133plus2hsentrezg.db_22.0.0.tar.gz")
-install_url("http://brainarray.mbni.med.umich.edu/bioc/src/contrib/hgu133plus2hsentrezgcdf_22.0.0.tar.gz")
-install_url("http://brainarray.mbni.med.umich.edu/bioc/src/contrib/hgu133plus2hsentrezgprobe_22.0.0.tar.gz")
+install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezg.db_22.0.0.tar.gz")
+install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezgcdf_22.0.0.tar.gz")
+install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezgprobe_22.0.0.tar.gz")
 ```
