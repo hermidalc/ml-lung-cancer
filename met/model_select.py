@@ -1091,6 +1091,7 @@ params_feature_select = [
 params_num_xticks = [
     'fs1__k',
     'fs2__k',
+    'fs2__score_func__n_neighbors',
     'fs2__estimator__n_estimators',
     'fs2__n_neighbors',
     'fs2__sample_size',
