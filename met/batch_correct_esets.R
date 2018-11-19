@@ -1,9 +1,9 @@
 #!/usr/bin/env Rscript
 
 options(warn=1)
-suppressPackageStartupMessages(library("argparse"))
-suppressPackageStartupMessages(library("Biobase"))
-suppressPackageStartupMessages(library("bapred"))
+suppressPackageStartupMessages(library(argparse))
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(bapred))
 source("lib/R/svapred.R")
 source("lib/R/stICA.R")
 source("config.R")

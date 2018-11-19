@@ -1,7 +1,8 @@
 #!/usr/bin/env Rscript
 
-suppressPackageStartupMessages(library("argparse"))
-suppressPackageStartupMessages(library("Biobase"))
+options(warn=1)
+suppressPackageStartupMessages(library(argparse))
+suppressPackageStartupMessages(library(Biobase))
 source("config.R")
 
 parser <- ArgumentParser()

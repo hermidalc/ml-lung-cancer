@@ -1,21 +1,6 @@
-suppressPackageStartupMessages(library("Biobase"))
+suppressPackageStartupMessages(library(Biobase))
 
-filterEset <- function(eset, features=NULL, samples=NULL) {
-    if (!is.null(features) & !is.null(samples)) {
-        return(eset[c(features), c(samples)])
-    }
-    else if (!is.null(features)) {
-        return(eset[c(features),])
-    }
-    else if (!is.null(samples)) {
-        return(eset[, c(samples)])
-    }
-    else {
-        return(eset)
-    }
-}
-
-esetClassLabels <- function(eset, samples=NULL) {
+eset_class_labels <- function(eset, samples=NULL) {
     if (!is.null(samples)) {
         return(eset$Class[c(samples)])
     }
@@ -24,7 +9,11 @@ esetClassLabels <- function(eset, samples=NULL) {
     }
 }
 
-esetFeatureAnnots <- function(eset, annots=annots, features=NULL) {
+eset_feature_idxs <- function(eset, features) {
+    return(as.integer(which(rownames(eset) %in% features)) - 1)
+}
+
+eset_feature_annots <- function(eset, annots=annots, features=NULL) {
     if (!is.null(features)) {
         annots <- as.matrix(fData(eset)[c(features), c(annots), drop=FALSE])
     }
@@ -35,23 +24,23 @@ esetFeatureAnnots <- function(eset, annots=annots, features=NULL) {
     return(annots)
 }
 
-dataNonZeroColIdxs <- function(X) {
+data_nzero_col_idxs <- function(X) {
     return(as.integer(which(colSums(X) > 0)) - 1)
 }
 
-dataNonZeroSdColIdxs <- function(X) {
+data_nzero_sd_col_idxs <- function(X) {
     return(as.integer(which(sapply(as.data.frame(X), function(c) sd(c) != 0))) - 1)
 }
 
-dataNonZeroVarColIdxs <- function(X, freqCut=95/5, uniqueCut=1) {
+data_nzero_var_col_idxs <- function(X, freqCut=95/5, uniqueCut=1) {
     return(sort(setdiff(1:ncol(X), caret::nearZeroVar(X, freqCut=freqCut, uniqueCut=uniqueCut))) - 1)
 }
 
-dataCorrColIdxs <- function(X, cutoff=0.5) {
+data_corr_col_idxs <- function(X, cutoff=0.5) {
     return(sort(caret::findCorrelation(cor(X), cutoff=cutoff)) - 1)
 }
 
-limmaFeatureScore <- function(X, y, pkm=FALSE) {
+limma_feature_score <- function(X, y, pkm=FALSE) {
     suppressPackageStartupMessages(require("limma"))
     design <- model.matrix(~0 + factor(y))
     colnames(design) <- c("Class0", "Class1")
@@ -72,20 +61,20 @@ limmaFeatureScore <- function(X, y, pkm=FALSE) {
     return(list(results$F, results$adj.P.Val))
 }
 
-fcbfFeatureIdxs <- function(X, y, threshold=0) {
+fcbf_feature_idxs <- function(X, y, threshold=0) {
     results <- Biocomb::select.fast.filter(cbind(X, as.factor(y)), disc.method="MDL", threshold=threshold)
     results <- results[order(results$NumberFeature), , drop=FALSE]
     return(list(results$NumberFeature - 1, results$Information.Gain))
 }
 
-cfsFeatureIdxs <- function(X, y) {
+cfs_feature_idxs <- function(X, y) {
     X <- as.data.frame(X)
     colnames(X) <- seq(1, ncol(X))
     feature_idxs <- FSelector::cfs(as.formula("Class ~ ."), cbind(X, "Class"=as.factor(y)))
     return(as.integer(feature_idxs) - 1)
 }
 
-gainRatioFeatureIdxs <- function(X, y) {
+gain_ratio_feature_idxs <- function(X, y) {
     X <- as.data.frame(X)
     colnames(X) <- seq(1, ncol(X))
     results <- FSelector::gain.ratio(
@@ -96,7 +85,7 @@ gainRatioFeatureIdxs <- function(X, y) {
     return(list(as.integer(row.names(results)) - 1, results$attr_importance))
 }
 
-symUncertFeatureIdxs <- function(X, y) {
+sym_uncert_feature_idxs <- function(X, y) {
     X <- as.data.frame(X)
     colnames(X) <- seq(1, ncol(X))
     results <- FSelector::symmetrical.uncertainty(
@@ -107,7 +96,7 @@ symUncertFeatureIdxs <- function(X, y) {
     return(list(as.integer(row.names(results)) - 1, results$attr_importance))
 }
 
-relieffFeatureScore <- function(X, y, num.neighbors=10, sample.size=5) {
+relieff_feature_score <- function(X, y, num.neighbors=10, sample.size=5) {
     X <- as.data.frame(X)
     colnames(X) <- seq(1, ncol(X))
     results <- FSelector::relief(
