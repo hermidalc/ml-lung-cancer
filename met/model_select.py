@@ -42,12 +42,15 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 sys.path.insert(1, sys.path[0] + '/lib/python3.6/site-packages')
 from local.sklearn.feature_selection import (
-    ANOVAFScorerClassification, CFS, Chi2Scorer, FCBF, LimmaScorerClassification,
+    ANOVAFScorerClassification, CFS, Chi2Scorer, ColumnSelector, FCBF, LimmaScorerClassification,
     MutualInfoScorerClassification, ReliefF, RFE, SelectFromModel, SelectKBest
 )
 
 # ignore QDA collinearity warnings
 warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
+
+def str_list(arg):
+    return(list(map(str, arg.split(','))))
 
 # config
 parser = ArgumentParser()
@@ -83,6 +86,7 @@ parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr min')
 parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
+parser.add_argument('--fs-col-names', type=str_list, nargs='+', help='fs feature names')
 parser.add_argument('--fs-vrt-thres', type=float, nargs='+', help='fs vrt threshold')
 parser.add_argument('--fs-mi-n', type=int, nargs='+', help='fs mi n neighbors')
 parser.add_argument('--fs-mi-n-max', type=int, default=20, help='fs mi n neighbors max')
@@ -217,12 +221,13 @@ prep_methods = list(robjects.globalenv['prep_methods'])
 bc_methods = list(robjects.globalenv['bc_methods'])
 filt_types = list(robjects.globalenv['filt_types'])
 base.source('functions.R')
-r_eset_class_labels = robjects.globalenv['esetClassLabels']
-r_eset_feature_annots = robjects.globalenv['esetFeatureAnnots']
-r_data_nzero_col_idxs = robjects.globalenv['dataNonZeroColIdxs']
-r_data_nzsd_col_idxs = robjects.globalenv['dataNonZeroSdColIdxs']
-r_data_nzvr_col_idxs = robjects.globalenv['dataNonZeroVarColIdxs']
-r_data_corr_col_idxs = robjects.globalenv['dataCorrColIdxs']
+r_eset_class_labels = robjects.globalenv['eset_class_labels']
+r_eset_feature_idxs = robjects.globalenv['eset_feature_idxs']
+r_eset_feature_annots = robjects.globalenv['eset_feature_annots']
+r_data_nzero_col_idxs = robjects.globalenv['data_nzero_col_idxs']
+r_data_nzsd_col_idxs = robjects.globalenv['data_nzero_sd_col_idxs']
+r_data_nzvr_col_idxs = robjects.globalenv['data_nzero_var_col_idxs']
+r_data_corr_col_idxs = robjects.globalenv['data_corr_col_idxs']
 numpy2ri.activate()
 
 if args.pipe_memory:
@@ -725,6 +730,14 @@ pipelines = {
                 { },
             ],
         },
+        'Column': {
+            'steps': [
+                ('fs2', ColumnSelector()),
+            ],
+            'param_grid': [
+                { },
+            ],
+        },
         'VarianceThreshold': {
             'steps': [
                 ('fs2', VarianceThreshold()),
@@ -1088,6 +1101,9 @@ params_feature_select = [
     'fs2__k',
     'fs2__n_features_to_select',
 ]
+params_no_sort = [
+    'fs2__cols',
+]
 params_num_xticks = [
     'fs1__k',
     'fs2__k',
@@ -1101,7 +1117,8 @@ params_num_xticks = [
     'clf__n_estimators',
 ]
 params_fixed_xticks = [
-    'fs1__alpha',
+    'fs2__cols',
+    'fs2__alpha',
     'fs2__estimator__C',
     'fs2__estimator__class_weight',
     'fs2__estimator__max_depth',
@@ -1168,36 +1185,37 @@ if args.analysis == 1:
     eset = robjects.globalenv[eset_name]
     X = np.array(base.t(biobase.exprs(eset)), dtype=float)
     y = np.array(r_eset_class_labels(eset), dtype=int)
-    if args.filt_zero_feats:
-        nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X), dtype=int)
-        X = X[:, nzero_feature_idxs]
+    if args.fs_meth != 'Column':
+        if args.filt_zero_feats:
+            nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X), dtype=int)
+            X = X[:, nzero_feature_idxs]
+        if args.filt_zsdv_feats:
+            nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X), dtype=int)
+            X = X[:, nzsd_feature_idxs]
+        if args.filt_nzvr_feats:
+            nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
+                X, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
+            ), dtype=int)
+            X = X[:, nzvr_feature_idxs]
+        if args.filt_ncor_feats:
+            corr_feature_idxs = np.array(
+                r_data_corr_col_idxs(X, cutoff=args.filt_ncor_feat_cut), dtype=int
+            )
+            X = X[:, corr_feature_idxs]
     if args.filt_zero_samples:
         nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X.T), dtype=int)
         X = X[nzero_sample_idxs, :]
         y = y[nzero_sample_idxs]
-    if args.filt_zsdv_feats:
-        nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X), dtype=int)
-        X = X[:, nzsd_feature_idxs]
     if args.filt_zsdv_samples:
         nzsd_sample_idxs = np.array(r_data_nzsd_col_idxs(X.T), dtype=int)
         X = X[nzsd_sample_idxs, :]
         y = y[nzsd_sample_idxs]
-    if args.filt_nzvr_feats:
-        nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
-            X, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
-        ), dtype=int)
-        X = X[:, nzvr_feature_idxs]
     if args.filt_nzvr_samples:
         nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(
             X.T, freqCut=args.filt_nzvr_sample_freq_cut, uniqueCut=args.filt_nzvr_sample_uniq_cut
         ), dtype=int)
         X = X[nzvr_sample_idxs, :]
         y = y[nzvr_sample_idxs]
-    if args.filt_ncor_feats:
-        corr_feature_idxs = np.array(
-            r_data_corr_col_idxs(X, cutoff=args.filt_ncor_feat_cut), dtype=int
-        )
-        X = X[:, corr_feature_idxs]
     if args.filt_ncor_samples:
         corr_sample_idxs = np.array(
             r_data_corr_col_idxs(X.T, cutoff=args.filt_ncor_sample_cut), dtype=int
@@ -1216,11 +1234,6 @@ if args.analysis == 1:
         **pipelines['fs'][args.fs_meth]['param_grid'][0],
         **pipelines['clf'][args.clf_meth]['param_grid'][0],
     }
-    if args.fs_meth == 'Limma-KBest':
-        if norm_meth and norm_meth in ['pkm', 'ppm']:
-            pipe.set_params(fs1__score_func__pkm=True)
-        else:
-            pipe.set_params(fs1__score_func__pkm=False)
     for param in param_grid:
         if param in params_feature_select:
             param_grid[param] = list(filter(
@@ -1230,6 +1243,16 @@ if args.analysis == 1:
                 ),
                 param_grid[param]
             ))
+    if args.fs_meth == 'Column':
+        param_grid['fs2__cols'] = [
+            sorted(np.array(r_eset_feature_idxs(eset, features=col_names), dtype=int))
+            for col_names in args.fs_col_names
+        ]
+    elif args.fs_meth == 'Limma-KBest':
+        if norm_meth and norm_meth in ['pkm', 'ppm']:
+            pipe.set_params(fs1__score_func__pkm=True)
+        else:
+            pipe.set_params(fs1__score_func__pkm=False)
     scv_refit = False if args.fs_meth in ['FCBF', 'ReliefF', 'CFS'] else args.scv_refit
     if args.scv_type == 'grid':
         search = GridSearchCV(
@@ -1355,9 +1378,12 @@ if args.analysis == 1:
                 int(len(search.cv_results_['params']) / len(param_values))
             )
             param_values_cv = np.ma.getdata(search.cv_results_['param_%s' % param])
-            param_values_cv_sorted_idxs = np.where(
-                np.array(param_values).reshape(len(param_values), 1) == param_values_cv
-            )[1]
+            if param not in params_no_sort:
+                param_values_cv_sorted_idxs = np.where(
+                    np.array(param_values).reshape(len(param_values), 1) == param_values_cv
+                )[1]
+            else:
+                param_values_cv_sorted_idxs = np.arange(param_values_cv.shape[0])
             if param not in param_scores_cv: param_scores_cv[param] = {}
             for metric in scv_scoring.keys():
                 if args.scv_h_plt_meth == 'best':
@@ -1584,36 +1610,37 @@ elif args.analysis == 2:
     eset_tr = robjects.globalenv[eset_tr_name]
     X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
     y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
-    if args.filt_zero_feats:
-        nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X_tr), dtype=int)
-        X_tr = X_tr[:, nzero_feature_idxs]
+    if args.fs_meth != 'Column':
+        if args.filt_zero_feats:
+            nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X_tr), dtype=int)
+            X_tr = X_tr[:, nzero_feature_idxs]
+        if args.filt_zsdv_feats:
+            nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X_tr), dtype=int)
+            X_tr = X_tr[:, nzsd_feature_idxs]
+        if args.filt_nzvr_feats:
+            nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
+                X_tr, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
+            ), dtype=int)
+            X_tr = X_tr[:, nzvr_feature_idxs]
+        if args.filt_ncor_feats:
+            corr_feature_idxs = np.array(
+                r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncor_feat_cut), dtype=int
+            )
+            X_tr = X_tr[:, corr_feature_idxs]
     if args.filt_zero_samples:
         nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X_tr.T), dtype=int)
         X_tr = X_tr[nzero_sample_idxs, :]
         y_tr = y_tr[nzero_sample_idxs]
-    if args.filt_zsdv_feats:
-        nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X_tr), dtype=int)
-        X_tr = X_tr[:, nzsd_feature_idxs]
     if args.filt_zsdv_samples:
         nzsd_sample_idxs = np.array(r_data_nzsd_col_idxs(X_tr.T), dtype=int)
         X_tr = X_tr[nzsd_sample_idxs, :]
         y_tr = y_tr[nzsd_sample_idxs]
-    if args.filt_nzvr_feats:
-        nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
-            X_tr, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
-        ), dtype=int)
-        X_tr = X_tr[:, nzvr_feature_idxs]
     if args.filt_nzvr_samples:
         nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(
             X_tr.T, freqCut=args.filt_nzvr_sample_freq_cut, uniqueCut=args.filt_nzvr_sample_uniq_cut
         ), dtype=int)
         X_tr = X_tr[nzvr_sample_idxs, :]
         y_tr = y_tr[nzvr_sample_idxs]
-    if args.filt_ncor_feats:
-        corr_feature_idxs = np.array(
-            r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncor_feat_cut), dtype=int
-        )
-        X_tr = X_tr[:, corr_feature_idxs]
     if args.filt_ncor_samples:
         corr_sample_idxs = np.array(
             r_data_corr_col_idxs(X_tr.T, cutoff=args.filt_ncor_sample_cut), dtype=int
@@ -1631,11 +1658,6 @@ elif args.analysis == 2:
         **pipelines['fs'][args.fs_meth]['param_grid'][0],
         **pipelines['clf'][args.clf_meth]['param_grid'][0],
     }
-    if args.fs_meth == 'Limma-KBest':
-        if norm_meth and norm_meth in ['pkm', 'ppm']:
-            pipe.set_params(fs1__score_func__pkm=True)
-        else:
-            pipe.set_params(fs1__score_func__pkm=False)
     for param in param_grid:
         if param in params_feature_select:
             param_grid[param] = list(filter(
@@ -1645,6 +1667,16 @@ elif args.analysis == 2:
                 ),
                 param_grid[param]
             ))
+    if args.fs_meth == 'Column':
+        param_grid['fs2__cols'] = [
+            sorted(np.array(r_eset_feature_idxs(eset_tr, features=col_names), dtype=int))
+            for col_names in args.fs_col_names
+        ]
+    elif args.fs_meth == 'Limma-KBest':
+        if norm_meth and norm_meth in ['pkm', 'ppm']:
+            pipe.set_params(fs1__score_func__pkm=True)
+        else:
+            pipe.set_params(fs1__score_func__pkm=False)
     if args.scv_type == 'grid':
         search = GridSearchCV(
             pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
@@ -1746,9 +1778,12 @@ elif args.analysis == 2:
             int(len(search.cv_results_['params']) / len(param_values))
         )
         param_values_cv = np.ma.getdata(search.cv_results_['param_%s' % param])
-        param_values_cv_sorted_idxs = np.where(
-            np.array(param_values).reshape(len(param_values), 1) == param_values_cv
-        )[1]
+        if param not in params_no_sort:
+            param_values_cv_sorted_idxs = np.where(
+                np.array(param_values).reshape(len(param_values), 1) == param_values_cv
+            )[1]
+        else:
+            param_values_cv_sorted_idxs = np.arange(param_values_cv.shape[0])
         plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
         plt.rcParams['font.size'] = 14
         if param in params_num_xticks:
