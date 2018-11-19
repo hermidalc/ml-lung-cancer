@@ -92,7 +92,6 @@ class ColumnSelector(BaseEstimator, SelectorMixin):
     def __init__(self, cols=None, drop_axis=False):
         self.cols = cols
         self.drop_axis = drop_axis
-        self._n_features = None
 
     def fit(self, X, y):
         """
@@ -111,6 +110,7 @@ class ColumnSelector(BaseEstimator, SelectorMixin):
             Returns self.
         """
         X, y = check_X_y(X, y)
+        self._check_params(X, y)
         self._n_features = X.shape[1]
         return self
 
@@ -125,6 +125,7 @@ class ColumnSelector(BaseEstimator, SelectorMixin):
                     )
 
     def _get_support_mask(self):
+        check_is_fitted(self, '_n_features')
         if self.cols is None:
             mask = np.ones(self._n_features, dtype=bool)
         else:
@@ -224,6 +225,7 @@ class FCBF(BaseEstimator, SelectorMixin):
             Returns self.
         """
         X, y = check_X_y(X, y)
+        self._check_params(X, y)
         memory = self.memory
         if memory is None:
             memory = Memory(cachedir=None, verbose=0)
@@ -319,6 +321,7 @@ class ReliefF(BaseEstimator, SelectorMixin):
             Returns self.
         """
         X, y = check_X_y(X, y)
+        self._check_params(X, y)
         memory = self.memory
         if memory is None:
             memory = Memory(cachedir=None, verbose=0)

@@ -4,39 +4,42 @@ algorithms. It currently includes univariate filter selection methods and the
 recursive feature elimination algorithm.
 """
 
+from sklearn.feature_selection.mutual_info_ import (
+    mutual_info_regression, mutual_info_classif
+)
+from sklearn.feature_selection.variance_threshold import VarianceThreshold
 from .univariate_selection import (
     chi2, f_classif, f_oneway, f_regression, SelectPercentile,
     SelectKBest, SelectFpr, SelectFdr, SelectFwe, GenericUnivariateSelect,
     ANOVAFScorerClassification, ANOVAFScorerRegression, Chi2Scorer,
     MutualInfoScorerClassification, MutualInfoScorerRegression
 )
+from .from_model import SelectFromModel
+from .rfe import RFE, RFECV
 from .custom import (
     CFS, ColumnSelector, FCBF, LimmaScorerClassification, ReliefF
 )
-from .from_model import SelectFromModel
-from .rfe import RFE, RFECV
-from sklearn.feature_selection.variance_threshold import VarianceThreshold
-from sklearn.feature_selection.mutual_info_ import (
-    mutual_info_regression, mutual_info_classif
+from .custom_surv import (
+    CoxPHScorerSurvival, CoxnetScorerSurvival
 )
 
 
-__all__ = ['GenericUnivariateSelect',
-           'RFE',
-           'RFECV',
+__all__ = ['chi2',
+           'f_classif',
+           'f_oneway',
+           'f_regression',
+           'mutual_info_classif',
+           'mutual_info_regression',
            'SelectFdr',
            'SelectFpr',
            'SelectFwe',
            'SelectKBest',
            'SelectFromModel',
            'SelectPercentile',
+           'GenericUnivariateSelect',
+           'RFE',
+           'RFECV',
            'VarianceThreshold',
-           'chi2',
-           'f_classif',
-           'f_oneway',
-           'f_regression',
-           'mutual_info_classif',
-           'mutual_info_regression',
            'ANOVAFScorerClassification',
            'ANOVAFScorerRegression',
            'Chi2Scorer',
@@ -46,4 +49,6 @@ __all__ = ['GenericUnivariateSelect',
            'ColumnSelector',
            'FCBF',
            'LimmaScorerClassification',
-           'ReliefF']
+           'ReliefF',
+           'CoxPHScorerSurvival',
+           'CoxnetScorerSurvival']

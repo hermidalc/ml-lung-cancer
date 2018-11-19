@@ -40,8 +40,8 @@ from sklearn.metrics import make_scorer, roc_auc_score, roc_curve
 from sklearn.externals.joblib import delayed, dump, Memory, Parallel
 import seaborn as sns
 import matplotlib.pyplot as plt
-sys.path.insert(1, sys.path[0] + '/lib/python3.6/site-packages')
-from local.sklearn.feature_selection import (
+sys.path.insert(1, sys.path[0] + '/lib/python3')
+from feature_selection import (
     ANOVAFScorerClassification, CFS, Chi2Scorer, ColumnSelector, FCBF, LimmaScorerClassification,
     MutualInfoScorerClassification, ReliefF, RFE, SelectFromModel, SelectKBest
 )
@@ -287,20 +287,20 @@ def fit_pipeline_2(params, pipeline_order, X, y):
 
 # cached functions
 if args.pipe_memory:
-    limma_scorer = CachedLimmaScorerClassification()
-    chi2_scorer = CachedChi2Scorer()
-    anova_scorer = CachedANOVAFScorerClassification()
-    mi_scorer = CachedMutualInfoScorerClassification(random_state=args.random_seed)
+    fs_anova_scorer = CachedANOVAFScorerClassification()
+    fs_chi2_scorer = CachedChi2Scorer()
+    fs_limma_scorer = CachedLimmaScorerClassification()
+    fs_mi_scorer = CachedMutualInfoScorerClassification(random_state=args.random_seed)
     fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
     fs_rf_estimator = CachedRandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 else:
-    limma_scorer = LimmaScorerClassification()
-    chi2_scorer = Chi2Scorer()
-    anova_scorer = ANOVAFScorerClassification()
-    mi_scorer = MutualInfoScorerClassification(random_state=args.random_seed)
+    fs_anova_scorer = ANOVAFScorerClassification()
+    fs_chi2_scorer = Chi2Scorer()
+    fs_limma_scorer = LimmaScorerClassification()
+    fs_mi_scorer = MutualInfoScorerClassification(random_state=args.random_seed)
     fs_svm_estimator = LinearSVC(random_state=args.random_seed)
     fs_rf_estimator = RandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)
@@ -749,7 +749,7 @@ pipelines = {
         },
         'ANOVA-KBest': {
             'steps': [
-                ('fs1', SelectKBest(anova_scorer)),
+                ('fs1', SelectKBest(fs_anova_scorer)),
             ],
             'param_grid': [
                 {
@@ -759,7 +759,7 @@ pipelines = {
         },
         'Chi2-KBest': {
             'steps': [
-                ('fs1', SelectKBest(chi2_scorer)),
+                ('fs1', SelectKBest(fs_chi2_scorer)),
             ],
             'param_grid': [
                 {
@@ -769,7 +769,7 @@ pipelines = {
         },
         'Limma-KBest': {
             'steps': [
-                ('fs1', SelectKBest(limma_scorer)),
+                ('fs1', SelectKBest(fs_limma_scorer)),
             ],
             'param_grid': [
                 {
@@ -779,7 +779,7 @@ pipelines = {
         },
         'MI-KBest': {
             'steps': [
-                ('fs2', SelectKBest(mi_scorer)),
+                ('fs2', SelectKBest(fs_mi_scorer)),
             ],
             'param_grid': [
                 {
