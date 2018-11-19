@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import warnings
+import sys, warnings
 from argparse import ArgumentParser
 from copy import deepcopy
 from os import makedirs, path
@@ -19,31 +19,36 @@ from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
 from sklearn.base import clone
-from sklearn.feature_selection import (
-    chi2, f_classif, mutual_info_classif, SelectFpr, SelectFromModel, RFE, VarianceThreshold
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.model_selection import (
+    GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
 )
-from sklearn.model_selection import GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
 from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, RobustScaler, StandardScaler
-from sklearn.externals.joblib import delayed, dump, Memory, Parallel
-from sklearn.svm import LinearSVC, SVC
+from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
+from sklearn.svm import LinearSVC
 from sksurv.preprocessing import OneHotEncoder
 from sksurv.linear_model import CoxPHSurvivalAnalysis, CoxnetSurvivalAnalysis, IPCRidge
 from sksurv.ensemble import ComponentwiseGradientBoostingSurvivalAnalysis, GradientBoostingSurvivalAnalysis
-from sksurv.metrics import concordance_index_censored
 from sksurv.svm import (
     FastKernelSurvivalSVM, FastSurvivalSVM, MinlipSurvivalAnalysis, HingeLossSurvivalSVM, NaiveSurvivalSVM
 )
-from feature_selection import SelectKBest, CFS, FCBF, ReliefF
+from sksurv.metrics import concordance_index_censored
+from sklearn.externals.joblib import delayed, dump, Memory, Parallel
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib import style
+sys.path.insert(1, sys.path[0] + '/lib/python3.6/site-packages')
+from local.sklearn.feature_selection import (
+    ANOVAFScorerClassification, CFS, Chi2Scorer, ColumnSelector, FCBF, LimmaScorerClassification,
+    MutualInfoScorerClassification, ReliefF, RFE, SelectFromModel, SelectKBest
+)
 
 # ignore QDA collinearity warnings
 warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
 
-# config
+def str_list(arg):
+    return(list(map(str, arg.split(','))))
+
 parser = ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--test-splits', type=int, default=10, help='num outer splits')
@@ -74,15 +79,70 @@ parser.add_argument('--filt-ncor-sample-cut', type=float, help='filter non corr 
 parser.add_argument('--no-addon-te', default=False, action='store_true', help='no add-on dataset te')
 parser.add_argument('--fs-meth', type=str, nargs='+', help='feature selection method')
 parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
-parser.add_argument('--srv-meth', type=str, nargs='+', help='survival analysis method')
+parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr min')
 parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
+parser.add_argument('--fs-col-names', type=str_list, nargs='+', help='fs feature names')
 parser.add_argument('--fs-vrt-thres', type=float, nargs='+', help='fs vrt threshold')
+parser.add_argument('--fs-mi-n', type=int, nargs='+', help='fs mi n neighbors')
+parser.add_argument('--fs-mi-n-max', type=int, default=20, help='fs mi n neighbors max')
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-min', type=int, default=1, help='fs skb k min')
 parser.add_argument('--fs-skb-k-max', type=int, default=100, help='fs skb k max')
 parser.add_argument('--fs-skb-k-step', type=int, default=1, help='fs skb k step')
 parser.add_argument('--fs-skb-lim-off', default=False, action='store_true', help='skb turn off sample limit')
+parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
+parser.add_argument('--fs-sfm-svm-thres', type=float, nargs='+', help='fs sfm svm threshold')
+parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
+parser.add_argument('--fs-sfm-svm-cw', type=str, nargs='+', help='fs sfm svm class weight')
+parser.add_argument('--fs-sfm-rf-thres', type=float, nargs='+', help='fs sfm rf threshold')
+parser.add_argument('--fs-sfm-rf-e', type=int, nargs='+', help='fs sfm rf n estimators')
+parser.add_argument('--fs-sfm-rf-e-max', type=int, default=50, help='fs sfm rf n estimators max')
+parser.add_argument('--fs-sfm-rf-d', type=str, nargs='+', help='fs sfm rf max depth')
+parser.add_argument('--fs-sfm-rf-d-max', type=int, default=10, help='fs sfm rf max depth max')
+parser.add_argument('--fs-sfm-rf-f', type=str, nargs='+', help='fs sfm rf max features')
+parser.add_argument('--fs-sfm-rf-cw', type=str, nargs='+', help='fs sfm rf class weight')
+parser.add_argument('--fs-sfm-ext-thres', type=float, nargs='+', help='fs sfm ext threshold')
+parser.add_argument('--fs-sfm-ext-e', type=int, nargs='+', help='fs sfm ext n estimators')
+parser.add_argument('--fs-sfm-ext-e-max', type=int, default=50, help='fs sfm ext n estimators max')
+parser.add_argument('--fs-sfm-ext-d', type=str, nargs='+', help='fs sfm ext max depth')
+parser.add_argument('--fs-sfm-ext-d-max', type=int, default=10, help='fs sfm ext max depth max')
+parser.add_argument('--fs-sfm-ext-f', type=str, nargs='+', help='fs sfm ext max features')
+parser.add_argument('--fs-sfm-ext-cw', type=str, nargs='+', help='fs sfm ext class weight')
+parser.add_argument('--fs-sfm-grb-e', type=int, nargs='+', help='fs sfm grb n estimators')
+parser.add_argument('--fs-sfm-grb-e-max', type=int, default=200, help='fs sfm grb n estimators max')
+parser.add_argument('--fs-sfm-grb-d', type=int, nargs='+', help='fs sfm grb max depth')
+parser.add_argument('--fs-sfm-grb-d-max', type=int, default=10, help='fs sfm grb max depth max')
+parser.add_argument('--fs-sfm-grb-f', type=str, nargs='+', help='fs sfm grb max features')
+parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
+parser.add_argument('--fs-rfe-svm-cw', type=str, nargs='+', help='fs rfe svm class weight')
+parser.add_argument('--fs-rfe-rf-e', type=int, nargs='+', help='fs rfe rf n estimators')
+parser.add_argument('--fs-rfe-rf-e-max', type=int, default=50, help='fs rfe rf n estimators max')
+parser.add_argument('--fs-rfe-rf-d', type=str, nargs='+', help='fs rfe rf max depth')
+parser.add_argument('--fs-rfe-rf-d-max', type=int, default=10, help='fs rfe rf max depth max')
+parser.add_argument('--fs-rfe-rf-f', type=str, nargs='+', help='fs rfe rf max features')
+parser.add_argument('--fs-rfe-rf-cw', type=str, nargs='+', help='fs rfe rf class weight')
+parser.add_argument('--fs-rfe-ext-e', type=int, nargs='+', help='fs rfe ext n estimators')
+parser.add_argument('--fs-rfe-ext-e-max', type=int, default=50, help='fs rfe ext n estimators max')
+parser.add_argument('--fs-rfe-ext-d', type=str, nargs='+', help='fs rfe ext max depth')
+parser.add_argument('--fs-rfe-ext-d-max', type=int, default=10, help='fs rfe ext max depth max')
+parser.add_argument('--fs-rfe-ext-f', type=str, nargs='+', help='fs rfe ext max features')
+parser.add_argument('--fs-rfe-ext-cw', type=str, nargs='+', help='fs rfe ext class weight')
+parser.add_argument('--fs-rfe-grb-e', type=int, nargs='+', help='fs rfe grb n estimators')
+parser.add_argument('--fs-rfe-grb-e-max', type=int, default=200, help='fs rfe grb n estimators max')
+parser.add_argument('--fs-rfe-grb-d', type=int, nargs='+', help='fs rfe grb max depth')
+parser.add_argument('--fs-rfe-grb-d-max', type=int, default=10, help='fs rfe grb max depth max')
+parser.add_argument('--fs-rfe-grb-f', type=str, nargs='+', help='fs rfe grb max features')
+parser.add_argument('--fs-rfe-step', type=float, nargs='+', help='fs rfe step')
+parser.add_argument('--fs-rfe-step-one-thres', type=int, default=None, help='fs rfe step one thres')
+parser.add_argument('--fs-rfe-reduce-step', default=False, action='store_true', help='fs rfe reduce step')
+parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
+parser.add_argument('--fs-rlf-n', type=int, nargs='+', help='fs rlf n neighbors')
+parser.add_argument('--fs-rlf-n-max', type=int, default=20, help='fs rlf n neighbors max')
+parser.add_argument('--fs-rlf-s', type=int, nargs='+', help='fs rlf sample size')
+parser.add_argument('--fs-rlf-s-max', type=int, default=10, help='fs rlf sample size max')
+parser.add_argument('--fs-rank-meth', type=str, default='mean_weights', help='fs rank method')
+
 parser.add_argument('--srv-cxph-a', type=int, nargs='+', help='srv coxph alpha')
 parser.add_argument('--srv-cxnt-na', type=int, nargs='+', help='srv coxnet num alphas')
 parser.add_argument('--srv-cxnt-l1r', type=float, nargs='+', help='srv coxnet l1 ratio')
@@ -104,11 +164,12 @@ parser.add_argument('--srv-grb-e-max', type=int, default=200, help='srv grb n es
 parser.add_argument('--srv-grb-d', type=int, nargs='+', help='srv grb max depth')
 parser.add_argument('--srv-grb-d-max', type=int, default=10, help='srv grb max depth max')
 parser.add_argument('--srv-grb-f', type=str, nargs='+', help='srv grb max features')
+
 parser.add_argument('--scv-type', type=str, default='grid', help='scv type (grid or rand)')
 parser.add_argument('--scv-splits', type=int, default=100, help='scv splits')
 parser.add_argument('--scv-size', type=float, default=0.3, help='scv size')
 parser.add_argument('--scv-verbose', type=int, default=1, help='scv verbosity')
-parser.add_argument('--scv-refit', type=str, default='c_index', help='scv refit score func')
+parser.add_argument('--scv-refit', type=str, default='roc_auc', help='scv refit score func (roc_auc, bcr)')
 parser.add_argument('--scv-n-iter', type=int, default=100, help='randomized scv num iterations')
 parser.add_argument('--scv-h-plt-meth', type=str, default='best', help='scv hyperparam plot meth (best, all)')
 parser.add_argument('--show-annots', type=str, nargs='+', help='show annotations')
@@ -140,14 +201,13 @@ prep_methods = list(robjects.globalenv['prep_methods'])
 bc_methods = list(robjects.globalenv['bc_methods'])
 filt_types = list(robjects.globalenv['filt_types'])
 base.source('functions.R')
-r_eset_class_labels = robjects.globalenv['esetClassLabels']
-r_eset_feature_annots = robjects.globalenv['esetFeatureAnnots']
-r_data_nzero_col_idxs = robjects.globalenv['dataNonZeroColIdxs']
-r_data_nzsd_col_idxs = robjects.globalenv['dataNonZeroSdColIdxs']
-r_data_nzvr_col_idxs = robjects.globalenv['dataNonZeroVarColIdxs']
-r_data_corr_col_idxs = robjects.globalenv['dataCorrColIdxs']
-r_limma_feature_score = robjects.globalenv['limmaFeatureScore']
-r_limma_pkm_feature_score = robjects.globalenv['limmaPkmFeatureScore']
+r_eset_class_labels = robjects.globalenv['eset_class_labels']
+r_eset_feature_idxs = robjects.globalenv['eset_feature_idxs']
+r_eset_feature_annots = robjects.globalenv['eset_feature_annots']
+r_data_nzero_col_idxs = robjects.globalenv['data_nzero_col_idxs']
+r_data_nzsd_col_idxs = robjects.globalenv['data_nzero_sd_col_idxs']
+r_data_nzvr_col_idxs = robjects.globalenv['data_nzero_var_col_idxs']
+r_data_corr_col_idxs = robjects.globalenv['data_corr_col_idxs']
 numpy2ri.activate()
 
 if args.pipe_memory:
@@ -164,6 +224,18 @@ class CachedFitMixin:
         vars(self).update(vars(cached_self))
         return self
 
+class CachedANOVAFScorerClassification(CachedFitMixin, ANOVAFScorerClassification):
+    pass
+
+class CachedChi2Scorer(CachedFitMixin, Chi2Scorer):
+    pass
+
+class CachedLimmaScorerClassification(CachedFitMixin, LimmaScorerClassification):
+    pass
+
+class CachedMutualInfoScorerClassification(CachedFitMixin, MutualInfoScorerClassification):
+    pass
+
 class CachedLinearSVC(CachedFitMixin, LinearSVC):
     pass
 
@@ -177,14 +249,6 @@ class CachedGradientBoostingClassifier(CachedFitMixin, GradientBoostingClassifie
     pass
 
 # feature selection scoring functions
-def limma(X, y):
-    f, pv = r_limma_feature_score(X, y)
-    return np.array(f), np.array(pv)
-
-def limma_pkm(X, y):
-    f, pv = r_limma_pkm_feature_score(X, y)
-    return np.array(f), np.array(pv)
-
 def coxph_score(X, y):
     srv = CoxPHSurvivalAnalysis()
     scores = np.zeros(X.shape[1])
@@ -199,48 +263,49 @@ def coxnet_score(X, y):
         scores[j] = srv.fit(X[:,[j]], y).score(X[:,[j]], y)
     return scores
 
-# c-index performance metric scoring function
-def c_index_score(srv, X, y):
-    return concordance_index_censored(y['Status'], y['Survival_in_days'], srv.predict(X))[0]
+# parallel pipeline fit functions
+def fit_pipeline_1(params, pipe_steps, X, y):
+    pipe = Pipeline(pipe_steps, memory=memory)
+    pipe.set_params(**params)
+    pipe.fit(X, y)
+    if args.scv_verbose == 0: print('.', end='', flush=True)
+    return pipe
 
-# parallel pipeline fit function
-def fit_pipeline(params, pipeline_order, X_tr, y_tr):
+def fit_pipeline_2(params, pipeline_order, X, y):
     pipe_steps = sorted([
         (k, v) for k, v in params.items() if k in pipeline_order
     ], key=lambda s: pipeline_order.index(s[0]))
     pipe = Pipeline(pipe_steps, memory=memory)
     pipe.set_params(**{ k: v for k, v in params.items() if '__' in k })
-    pipe.fit(X_tr, y_tr)
+    pipe.fit(X, y)
     if args.scv_verbose == 0: print('.', end='', flush=True)
     return pipe
 
 # cached functions
 if args.pipe_memory:
-    limma_score_func = memory.cache(limma)
-    limma_pkm_score_func = memory.cache(limma_pkm)
-    chi2_func = memory.cache(chi2)
-    f_classif_func = memory.cache(f_classif)
-    mi_classif_func = memory.cache(mutual_info_classif)
-    coxph_score_func = memory.cache(coxph_score)
-    coxnet_score_func = memory.cache(coxnet_score)
+    limma_scorer = CachedLimmaScorerClassification()
+    chi2_scorer = CachedChi2Scorer()
+    anova_scorer = CachedANOVAFScorerClassification()
+    mi_scorer = CachedMutualInfoScorerClassification(random_state=args.random_seed)
     fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
     fs_rf_estimator = CachedRandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 else:
-    limma_score_func = limma
-    limma_pkm_score_func = limma_pkm
-    chi2_func = chi2
-    f_classif_func = f_classif
-    mi_classif_func = mutual_info_classif
-    coxph_score_func = coxph_score
-    coxnet_score_func = coxnet_score
+    limma_scorer = LimmaScorerClassification()
+    chi2_scorer = Chi2Scorer()
+    anova_scorer = ANOVAFScorerClassification()
+    mi_scorer = MutualInfoScorerClassification(random_state=args.random_seed)
     fs_svm_estimator = LinearSVC(random_state=args.random_seed)
     fs_rf_estimator = RandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = GradientBoostingClassifier(random_state=args.random_seed)
     sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
+
+# c-index performance metric scoring function
+def c_index_score(srv, X, y):
+    return concordance_index_censored(y['Status'], y['Survival_in_days'], srv.predict(X))[0]
 
 scv_scoring = c_index_score
 
@@ -249,16 +314,201 @@ if args.slr_mms_fr_min and args.slr_mms_fr_max:
     SLR_MMS_FR = list(zip(args.slr_mms_fr_min, args.slr_mms_fr_max))
 else:
     SLR_MMS_FR = [(0,1)]
+if args.fs_vrt_thres:
+    FS_VRT_THRES = sorted(args.fs_vrt_thres)
+else:
+    FS_VRT_THRES = 0.
+if args.fs_mi_n:
+    FS_MI_N = sorted(args.fs_mi_n)
+else:
+    FS_MI_N = list(range(1, args.fs_mi_n_max + 1, 1))
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
 elif args.fs_skb_k_min == 1 and args.fs_skb_k_step > 1:
     FS_SKB_K = [1] + list(range(0, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))[1:]
 else:
     FS_SKB_K = list(range(args.fs_skb_k_min, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))
-if args.fs_vrt_thres:
-    FS_VRT_THRES = sorted(args.fs_vrt_thres)
+if args.fs_sfp_p:
+    FS_SFP_P = sorted(args.fs_sfp_p)
 else:
-    FS_VRT_THRES = 0.
+    FS_SFP_P = [ 1e-2, 5e-2 ]
+if args.fs_sfm_svm_thres:
+    FS_SFM_SVM_THRES = sorted(args.fs_sfm_svm_thres)
+else:
+    FS_SFM_SVM_THRES = np.logspace(-11, -5, 7)
+if args.fs_sfm_svm_c:
+    FS_SFM_SVM_C = sorted(args.fs_sfm_svm_c)
+else:
+    FS_SFM_SVM_C = np.logspace(-2, 5, 8)
+if args.fs_sfm_svm_cw:
+    FS_SFM_SVM_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_svm_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_SVM_CW = [None, 'balanced']
+if args.fs_sfm_rf_thres:
+    FS_SFM_RF_THRES = sorted(args.fs_sfm_rf_thres)
+else:
+    FS_SFM_RF_THRES = np.logspace(-11, -5, 7)
+if args.fs_sfm_rf_e:
+    FS_SFM_RF_E = sorted(args.fs_sfm_rf_e)
+else:
+    FS_SFM_RF_E = list(range(5, args.fs_sfm_rf_e_max + 1, 5))
+if args.fs_sfm_rf_d:
+    FS_SFM_RF_D = sorted(
+        [None if a in ('None', 'none') else int(a) for a in args.fs_sfm_rf_d],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_RF_D = [None] + list(range(1, args.fs_sfm_rf_d_max + 1, 1))
+if args.fs_sfm_rf_f:
+    FS_SFM_RF_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_rf_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_RF_F = [None, 'auto', 'log2', 'sqrt']
+if args.fs_sfm_rf_cw:
+    FS_SFM_RF_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_rf_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_RF_CW = [None, 'balanced', 'balanced_subsample']
+if args.fs_sfm_ext_thres:
+    FS_SFM_EXT_THRES = sorted(args.fs_sfm_ext_thres)
+else:
+    FS_SFM_EXT_THRES = np.logspace(-11, -5, 7)
+if args.fs_sfm_ext_e:
+    FS_SFM_EXT_E = sorted(args.fs_sfm_ext_e)
+else:
+    FS_SFM_EXT_E = list(range(5, args.fs_sfm_ext_e_max + 1, 5))
+if args.fs_sfm_ext_d:
+    FS_SFM_EXT_D = sorted(
+        [None if a in ('None', 'none') else int(a) for a in args.fs_sfm_ext_d],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_EXT_D = [None] + list(range(1, args.fs_sfm_ext_d_max + 1, 1))
+if args.fs_sfm_ext_f:
+    FS_SFM_EXT_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_ext_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_EXT_F = [None, 'auto', 'log2', 'sqrt']
+if args.fs_sfm_ext_cw:
+    FS_SFM_EXT_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_ext_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_EXT_CW = [None, 'balanced', 'balanced_subsample']
+if args.fs_sfm_grb_e:
+    FS_SFM_GRB_E = sorted(args.fs_sfm_grb_e)
+else:
+    FS_SFM_GRB_E = list(range(20, args.fs_sfm_grb_e_max + 1, 20))
+if args.fs_sfm_grb_d:
+    FS_SFM_GRB_D = sorted(args.fs_sfm_grb_d)
+else:
+    FS_SFM_GRB_D = list(range(1, args.fs_sfm_grb_d_max + 1, 1))
+if args.fs_sfm_grb_f:
+    FS_SFM_GRB_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_sfm_grb_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_SFM_GRB_F = [None, 'auto', 'log2', 'sqrt']
+if args.fs_rfe_svm_c:
+    FS_RFE_SVM_C = sorted(args.fs_rfe_svm_c)
+else:
+    FS_RFE_SVM_C = np.logspace(-7, 3, 11)
+if args.fs_rfe_svm_cw:
+    FS_RFE_SVM_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_svm_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_SVM_CW = [None, 'balanced']
+if args.fs_rfe_rf_e:
+    FS_RFE_RF_E = sorted(args.fs_rfe_rf_e)
+else:
+    FS_RFE_RF_E = list(range(5, args.fs_rfe_rf_e_max + 1, 5))
+if args.fs_rfe_rf_d:
+    FS_RFE_RF_D = sorted(
+        [None if a in ('None', 'none') else int(a) for a in args.fs_rfe_rf_d],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_RF_D = [None] + list(range(1, args.fs_rfe_rf_d_max + 1, 1))
+if args.fs_rfe_rf_f:
+    FS_RFE_RF_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_rf_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_RF_F = [None, 'auto', 'log2', 'sqrt']
+if args.fs_rfe_rf_cw:
+    FS_RFE_RF_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_rf_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_RF_CW = [None, 'balanced', 'balanced_subsample']
+if args.fs_rfe_ext_e:
+    FS_RFE_EXT_E = sorted(args.fs_rfe_ext_e)
+else:
+    FS_RFE_EXT_E = list(range(5, args.fs_rfe_ext_e_max + 1, 5))
+if args.fs_rfe_ext_d:
+    FS_RFE_EXT_D = sorted(
+        [None if a in ('None', 'none') else int(a) for a in args.fs_rfe_ext_d],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_EXT_D = [None] + list(range(1, args.fs_rfe_ext_d_max + 1, 1))
+if args.fs_rfe_ext_f:
+    FS_RFE_EXT_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_ext_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_EXT_F = [None, 'auto', 'log2', 'sqrt']
+if args.fs_rfe_ext_cw:
+    FS_RFE_EXT_CW = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_ext_cw],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_EXT_CW = [None, 'balanced', 'balanced_subsample']
+if args.fs_rfe_grb_e:
+    FS_RFE_GRB_E = sorted(args.fs_rfe_grb_e)
+else:
+    FS_RFE_GRB_E = list(range(20, args.fs_rfe_grb_e_max + 1, 20))
+if args.fs_rfe_grb_d:
+    FS_RFE_GRB_D = sorted(args.fs_rfe_grb_d)
+else:
+    FS_RFE_GRB_D = list(range(1, args.fs_rfe_grb_d_max + 1, 1))
+if args.fs_rfe_grb_f:
+    FS_RFE_GRB_F = sorted(
+        [None if a in ('None', 'none') else a for a in args.fs_rfe_grb_f],
+        key=lambda x: (x is not None, x)
+    )
+else:
+    FS_RFE_GRB_F = [None, 'auto', 'log2', 'sqrt']
+if args.fs_rfe_step:
+    FS_RFE_STEP = sorted(args.fs_rfe_step)
+else:
+    FS_RFE_STEP = [1]
+if args.fs_rlf_n:
+    FS_RLF_N = sorted(args.fs_rlf_n)
+else:
+    FS_RLF_N = list(range(1, args.fs_rlf_n_max + 1, 1))
+if args.fs_rlf_s:
+    FS_RLF_S = sorted(args.fs_rlf_s)
+else:
+    FS_RLF_S = list(range(1, args.fs_rlf_s_max + 1, 1))
+
 if args.srv_cxph_a:
     SRV_CXPH_A = sorted(args.srv_cxph_a)
 else:
@@ -391,6 +641,14 @@ pipelines = {
                 { },
             ],
         },
+        'Column': {
+            'steps': [
+                ('fs2', ColumnSelector()),
+            ],
+            'param_grid': [
+                { },
+            ],
+        },
         'VarianceThreshold': {
             'steps': [
                 ('fs2', VarianceThreshold()),
@@ -403,7 +661,7 @@ pipelines = {
         },
         'ANOVA-KBest': {
             'steps': [
-                ('fs1', SelectKBest(f_classif_func)),
+                ('fs1', SelectKBest(anova_scorer)),
             ],
             'param_grid': [
                 {
@@ -413,7 +671,7 @@ pipelines = {
         },
         'Chi2-KBest': {
             'steps': [
-                ('fs1', SelectKBest(chi2_func)),
+                ('fs1', SelectKBest(chi2_scorer)),
             ],
             'param_grid': [
                 {
@@ -423,7 +681,7 @@ pipelines = {
         },
         'Limma-KBest': {
             'steps': [
-                ('fs1', SelectKBest()),
+                ('fs1', SelectKBest(limma_scorer)),
             ],
             'param_grid': [
                 {
@@ -433,17 +691,18 @@ pipelines = {
         },
         'MI-KBest': {
             'steps': [
-                ('fs2', SelectKBest(mi_classif_func)),
+                ('fs2', SelectKBest(mi_scorer)),
             ],
             'param_grid': [
                 {
+                    'fs2__score_func__n_neighbors': FS_MI_N,
                     'fs2__k': FS_SKB_K,
                 },
             ],
         },
         'CoxPH-KBest': {
             'steps': [
-                ('fs1', SelectKBest(coxph_score_func)),
+                ('fs1', SelectKBest(coxph_score)),
             ],
             'param_grid': [
                 {
@@ -453,7 +712,7 @@ pipelines = {
         },
         'Coxnet-KBest': {
             'steps': [
-                ('fs1', SelectKBest(coxnet_score_func)),
+                ('fs1', SelectKBest(coxnet_score)),
             ],
             'param_grid': [
                 {
@@ -517,8 +776,8 @@ pipelines = {
         'SVM-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_svm_estimator, step_decay=True,
-                    step_multi_stop=args.fs_rfe_step_ms,
+                    fs_svm_estimator, reducing_step=args.fs_rfe_reduce_step,
+                    step_one_threshold=args.fs_rfe_step_one_thres,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -534,8 +793,8 @@ pipelines = {
         'RF-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_rf_estimator, step_decay=True,
-                    step_multi_stop=args.fs_rfe_step_ms,
+                    fs_rf_estimator, reducing_step=args.fs_rfe_reduce_step,
+                    step_one_threshold=args.fs_rfe_step_one_thres,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -553,8 +812,8 @@ pipelines = {
         'EXT-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_ext_estimator, step_decay=True,
-                    step_multi_stop=args.fs_rfe_step_ms,
+                    fs_ext_estimator, reducing_step=args.fs_rfe_reduce_step,
+                    step_one_threshold=args.fs_rfe_step_one_thres,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -572,8 +831,8 @@ pipelines = {
         'GRB-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_grb_estimator, step_decay=True,
-                    step_multi_stop=args.fs_rfe_step_ms,
+                    fs_grb_estimator, reducing_step=args.fs_rfe_reduce_step,
+                    step_one_threshold=args.fs_rfe_step_one_thres,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -752,9 +1011,13 @@ params_feature_select = [
     'fs2__k',
     'fs2__n_features_to_select',
 ]
+params_no_sort = [
+    'fs2__cols',
+]
 params_num_xticks = [
     'fs1__k',
     'fs2__k',
+    'fs2__score_func__n_neighbors',
     'fs2__estimator__n_estimators',
     'fs2__n_neighbors',
     'fs2__sample_size',
@@ -768,7 +1031,8 @@ params_num_xticks = [
     'srv__n_estimators',
 ]
 params_fixed_xticks = [
-    'fs1__alpha',
+    'fs2__cols',
+    'fs2__alpha',
     'fs2__estimator__C',
     'fs2__estimator__class_weight',
     'fs2__estimator__max_depth',
@@ -836,36 +1100,37 @@ if args.analysis == 1:
     eset = robjects.globalenv[eset_name]
     X = np.array(base.t(biobase.exprs(eset)), dtype=float)
     y = np.array(r_eset_class_labels(eset), dtype=int)
-    if args.filt_zero_feats:
-        nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X), dtype=int)
-        X = X[:, nzero_feature_idxs]
+    if args.fs_meth != 'Column':
+        if args.filt_zero_feats:
+            nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X), dtype=int)
+            X = X[:, nzero_feature_idxs]
+        if args.filt_zsdv_feats:
+            nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X), dtype=int)
+            X = X[:, nzsd_feature_idxs]
+        if args.filt_nzvr_feats:
+            nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
+                X, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
+            ), dtype=int)
+            X = X[:, nzvr_feature_idxs]
+        if args.filt_ncor_feats:
+            corr_feature_idxs = np.array(
+                r_data_corr_col_idxs(X, cutoff=args.filt_ncor_feat_cut), dtype=int
+            )
+            X = X[:, corr_feature_idxs]
     if args.filt_zero_samples:
         nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X.T), dtype=int)
         X = X[nzero_sample_idxs, :]
         y = y[nzero_sample_idxs]
-    if args.filt_zsdv_feats:
-        nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X), dtype=int)
-        X = X[:, nzsd_feature_idxs]
     if args.filt_zsdv_samples:
         nzsd_sample_idxs = np.array(r_data_nzsd_col_idxs(X.T), dtype=int)
         X = X[nzsd_sample_idxs, :]
         y = y[nzsd_sample_idxs]
-    if args.filt_nzvr_feats:
-        nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
-            X, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
-        ), dtype=int)
-        X = X[:, nzvr_feature_idxs]
     if args.filt_nzvr_samples:
         nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(
             X.T, freqCut=args.filt_nzvr_sample_freq_cut, uniqueCut=args.filt_nzvr_sample_uniq_cut
         ), dtype=int)
         X = X[nzvr_sample_idxs, :]
         y = y[nzvr_sample_idxs]
-    if args.filt_ncor_feats:
-        corr_feature_idxs = np.array(
-            r_data_corr_col_idxs(X, cutoff=args.filt_ncor_feat_cut), dtype=int
-        )
-        X = X[:, corr_feature_idxs]
     if args.filt_ncor_samples:
         corr_sample_idxs = np.array(
             r_data_corr_col_idxs(X.T, cutoff=args.filt_ncor_sample_cut), dtype=int
@@ -884,11 +1149,6 @@ if args.analysis == 1:
         **pipelines['fs'][args.fs_meth]['param_grid'][0],
         **pipelines['clf'][args.clf_meth]['param_grid'][0],
     }
-    if args.fs_meth == 'Limma-KBest':
-        if norm_meth and norm_meth in ['pkm', 'ppm']:
-            pipe.set_params(fs1__score_func=limma_pkm_score_func)
-        else:
-            pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
         if param in params_feature_select:
             param_grid[param] = list(filter(
@@ -898,6 +1158,16 @@ if args.analysis == 1:
                 ),
                 param_grid[param]
             ))
+    if args.fs_meth == 'Column':
+        param_grid['fs2__cols'] = [
+            sorted(np.array(r_eset_feature_idxs(eset, features=col_names), dtype=int))
+            for col_names in args.fs_col_names
+        ]
+    elif args.fs_meth == 'Limma-KBest':
+        if norm_meth and norm_meth in ['pkm', 'ppm']:
+            pipe.set_params(fs1__score_func__pkm=True)
+        else:
+            pipe.set_params(fs1__score_func__pkm=False)
     scv_refit = False if args.fs_meth in ['FCBF', 'ReliefF', 'CFS'] else args.scv_refit
     if args.scv_type == 'grid':
         search = GridSearchCV(
@@ -1023,9 +1293,12 @@ if args.analysis == 1:
                 int(len(search.cv_results_['params']) / len(param_values))
             )
             param_values_cv = np.ma.getdata(search.cv_results_['param_%s' % param])
-            param_values_cv_sorted_idxs = np.where(
-                np.array(param_values).reshape(len(param_values), 1) == param_values_cv
-            )[1]
+            if param not in params_no_sort:
+                param_values_cv_sorted_idxs = np.where(
+                    np.array(param_values).reshape(len(param_values), 1) == param_values_cv
+                )[1]
+            else:
+                param_values_cv_sorted_idxs = np.arange(param_values_cv.shape[0])
             if param not in param_scores_cv: param_scores_cv[param] = {}
             for metric in scv_scoring.keys():
                 if args.scv_h_plt_meth == 'best':
@@ -1252,36 +1525,37 @@ elif args.analysis == 2:
     eset_tr = robjects.globalenv[eset_tr_name]
     X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
     y_tr = np.array(r_eset_class_labels(eset_tr), dtype=int)
-    if args.filt_zero_feats:
-        nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X_tr), dtype=int)
-        X_tr = X_tr[:, nzero_feature_idxs]
+    if args.fs_meth != 'Column':
+        if args.filt_zero_feats:
+            nzero_feature_idxs = np.array(r_data_nzero_col_idxs(X_tr), dtype=int)
+            X_tr = X_tr[:, nzero_feature_idxs]
+        if args.filt_zsdv_feats:
+            nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X_tr), dtype=int)
+            X_tr = X_tr[:, nzsd_feature_idxs]
+        if args.filt_nzvr_feats:
+            nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
+                X_tr, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
+            ), dtype=int)
+            X_tr = X_tr[:, nzvr_feature_idxs]
+        if args.filt_ncor_feats:
+            corr_feature_idxs = np.array(
+                r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncor_feat_cut), dtype=int
+            )
+            X_tr = X_tr[:, corr_feature_idxs]
     if args.filt_zero_samples:
         nzero_sample_idxs = np.array(r_data_nzero_col_idxs(X_tr.T), dtype=int)
         X_tr = X_tr[nzero_sample_idxs, :]
         y_tr = y_tr[nzero_sample_idxs]
-    if args.filt_zsdv_feats:
-        nzsd_feature_idxs = np.array(r_data_nzsd_col_idxs(X_tr), dtype=int)
-        X_tr = X_tr[:, nzsd_feature_idxs]
     if args.filt_zsdv_samples:
         nzsd_sample_idxs = np.array(r_data_nzsd_col_idxs(X_tr.T), dtype=int)
         X_tr = X_tr[nzsd_sample_idxs, :]
         y_tr = y_tr[nzsd_sample_idxs]
-    if args.filt_nzvr_feats:
-        nzvr_feature_idxs = np.array(r_data_nzvr_col_idxs(
-            X_tr, freqCut=args.filt_nzvr_feat_freq_cut, uniqueCut=args.filt_nzvr_feat_uniq_cut
-        ), dtype=int)
-        X_tr = X_tr[:, nzvr_feature_idxs]
     if args.filt_nzvr_samples:
         nzvr_sample_idxs = np.array(r_data_nzvr_col_idxs(
             X_tr.T, freqCut=args.filt_nzvr_sample_freq_cut, uniqueCut=args.filt_nzvr_sample_uniq_cut
         ), dtype=int)
         X_tr = X_tr[nzvr_sample_idxs, :]
         y_tr = y_tr[nzvr_sample_idxs]
-    if args.filt_ncor_feats:
-        corr_feature_idxs = np.array(
-            r_data_corr_col_idxs(X_tr, cutoff=args.filt_ncor_feat_cut), dtype=int
-        )
-        X_tr = X_tr[:, corr_feature_idxs]
     if args.filt_ncor_samples:
         corr_sample_idxs = np.array(
             r_data_corr_col_idxs(X_tr.T, cutoff=args.filt_ncor_sample_cut), dtype=int
@@ -1299,11 +1573,6 @@ elif args.analysis == 2:
         **pipelines['fs'][args.fs_meth]['param_grid'][0],
         **pipelines['clf'][args.clf_meth]['param_grid'][0],
     }
-    if args.fs_meth == 'Limma-KBest':
-        if norm_meth and norm_meth in ['pkm', 'ppm']:
-            pipe.set_params(fs1__score_func=limma_pkm_score_func)
-        else:
-            pipe.set_params(fs1__score_func=limma_score_func)
     for param in param_grid:
         if param in params_feature_select:
             param_grid[param] = list(filter(
@@ -1313,6 +1582,16 @@ elif args.analysis == 2:
                 ),
                 param_grid[param]
             ))
+    if args.fs_meth == 'Column':
+        param_grid['fs2__cols'] = [
+            sorted(np.array(r_eset_feature_idxs(eset_tr, features=col_names), dtype=int))
+            for col_names in args.fs_col_names
+        ]
+    elif args.fs_meth == 'Limma-KBest':
+        if norm_meth and norm_meth in ['pkm', 'ppm']:
+            pipe.set_params(fs1__score_func__pkm=True)
+        else:
+            pipe.set_params(fs1__score_func__pkm=False)
     if args.scv_type == 'grid':
         search = GridSearchCV(
             pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
@@ -1414,9 +1693,12 @@ elif args.analysis == 2:
             int(len(search.cv_results_['params']) / len(param_values))
         )
         param_values_cv = np.ma.getdata(search.cv_results_['param_%s' % param])
-        param_values_cv_sorted_idxs = np.where(
-            np.array(param_values).reshape(len(param_values), 1) == param_values_cv
-        )[1]
+        if param not in params_no_sort:
+            param_values_cv_sorted_idxs = np.where(
+                np.array(param_values).reshape(len(param_values), 1) == param_values_cv
+            )[1]
+        else:
+            param_values_cv_sorted_idxs = np.arange(param_values_cv.shape[0])
         plt.figure('Figure ' + str(args.analysis) + '-' + str(num_figures + 1))
         plt.rcParams['font.size'] = 14
         if param in params_num_xticks:
@@ -1783,9 +2065,9 @@ elif args.analysis == 3:
                         for (step, object) in fs_meth_pipeline['steps']:
                             if object.__class__.__name__ == 'SelectKBest':
                                 if prep_group_info[pr_idx]['pkm']:
-                                    object.set_params(score_func=limma_pkm_score_func)
+                                    object.set_params(score_func__pkm=True)
                                 else:
-                                    object.set_params(score_func=limma_score_func)
+                                    object.set_params(score_func__pkm=False)
                     for fs_params in fs_meth_pipeline['param_grid']:
                         for param in fs_params:
                             if param in params_feature_select:
@@ -1839,9 +2121,9 @@ elif args.analysis == 3:
                 }
                 if args.fs_meth == 'Limma-KBest':
                     if prep_group_info[pr_idx]['pkm']:
-                        pipe.set_params(fs1__score_func=limma_pkm_score_func)
+                        pipe.set_params(fs1__score_func__pkm=True)
                     else:
-                        pipe.set_params(fs1__score_func=limma_score_func)
+                        pipe.set_params(fs1__score_func__pkm=False)
                 for param in param_grid:
                     if param in params_feature_select:
                         param_grid[param] = list(filter(
@@ -2360,9 +2642,9 @@ elif args.analysis == 4:
                             for (step, object) in fs_meth_pipeline['steps']:
                                 if object.__class__.__name__ == 'SelectKBest':
                                     if prep_group_info[pr_idx]['pkm']:
-                                        object.set_params(score_func=limma_pkm_score_func)
+                                        object.set_params(score_func__pkm=True)
                                     else:
-                                        object.set_params(score_func=limma_score_func)
+                                        object.set_params(score_func__pkm=False)
                         for fs_params in fs_meth_pipeline['param_grid']:
                             for param in fs_params:
                                 if param in params_feature_select:
@@ -2416,9 +2698,9 @@ elif args.analysis == 4:
                     }
                     if args.fs_meth == 'Limma-KBest':
                         if prep_group_info[pr_idx]['pkm']:
-                            pipe.set_params(fs1__score_func=limma_pkm_score_func)
+                            pipe.set_params(fs1__score_func__pkm=True)
                         else:
-                            pipe.set_params(fs1__score_func=limma_score_func)
+                            pipe.set_params(fs1__score_func__pkm=False)
                     for param in param_grid:
                         if param in params_feature_select:
                             param_grid[param] = list(filter(

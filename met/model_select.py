@@ -52,7 +52,6 @@ warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are 
 def str_list(arg):
     return(list(map(str, arg.split(','))))
 
-# config
 parser = ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
 parser.add_argument('--test-splits', type=int, default=10, help='num outer splits')
