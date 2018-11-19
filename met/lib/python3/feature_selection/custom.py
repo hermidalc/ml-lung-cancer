@@ -63,6 +63,7 @@ class LimmaScorerClassification(BaseScorer):
         self : object
             Returns self.
         """
+        self._check_params(X, y)
         f, pv = r_limma_feature_score(X, y, pkm=self.pkm)
         self.scores_, self.pvalues_ = np.array(f, dtype=float), np.array(pv, dtype=float)
         return self
