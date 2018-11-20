@@ -19,9 +19,6 @@ from .rfe import RFE, RFECV
 from .custom import (
     CFS, ColumnSelector, FCBF, LimmaScorerClassification, ReliefF
 )
-from .custom_surv import (
-    CoxPHScorerSurvival, CoxnetScorerSurvival
-)
 
 
 __all__ = ['chi2',
@@ -49,6 +46,4 @@ __all__ = ['chi2',
            'ColumnSelector',
            'FCBF',
            'LimmaScorerClassification',
-           'ReliefF',
-           'CoxPHScorerSurvival',
-           'CoxnetScorerSurvival']
+           'ReliefF']

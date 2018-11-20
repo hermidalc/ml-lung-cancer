@@ -1,6 +1,6 @@
 import numpy as np
 from sksurv.feature_selection import CoxPHSurvivalAnalysis, CoxnetSurvivalAnalysis
-from .univariate_selection import BaseScorer
+from ..univariate_selection import BaseScorer
 
 
 class CoxPHScorerSurvival(BaseScorer):
