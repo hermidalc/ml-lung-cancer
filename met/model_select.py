@@ -292,20 +292,20 @@ if args.pipe_memory:
     fs_limma_scorer = CachedLimmaScorerClassification()
     fs_mi_scorer = CachedMutualInfoScorerClassification(random_state=args.random_seed)
     fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
+    fs_svm_sfm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
     fs_rf_estimator = CachedRandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
-    sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 else:
     fs_anova_scorer = ANOVAFScorerClassification()
     fs_chi2_scorer = Chi2Scorer()
     fs_limma_scorer = LimmaScorerClassification()
     fs_mi_scorer = MutualInfoScorerClassification(random_state=args.random_seed)
     fs_svm_estimator = LinearSVC(random_state=args.random_seed)
+    fs_svm_sfm_estimator = LinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
     fs_rf_estimator = RandomForestClassifier(random_state=args.random_seed)
     fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)
     fs_grb_estimator = GradientBoostingClassifier(random_state=args.random_seed)
-    sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
 
 # bcr performance metric scoring function
 def bcr_score(y_true, y_pred):
@@ -790,7 +790,7 @@ pipelines = {
         },
         'SVM-SFM-KBest': {
             'steps': [
-                ('fs2', SelectFromModel(sfm_svm_estimator)),
+                ('fs2', SelectFromModel(fs_svm_sfm_estimator)),
             ],
             'param_grid': [
                 {
