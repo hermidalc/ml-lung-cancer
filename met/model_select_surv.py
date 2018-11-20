@@ -37,14 +37,11 @@ from sksurv.metrics import concordance_index_censored
 from sklearn.externals.joblib import delayed, dump, Memory, Parallel
 import seaborn as sns
 import matplotlib.pyplot as plt
-sys.path.insert(1, sys.path[0] + '/lib/python3.6/site-packages')
-from local.sklearn.feature_selection import (
-    ANOVAFScorerClassification, CFS, Chi2Scorer, ColumnSelector, FCBF, LimmaScorerClassification,
-    MutualInfoScorerClassification, ReliefF, RFE, SelectFromModel, SelectKBest
+sys.path.insert(1, sys.path[0] + '/lib/python3')
+from feature_selection import ColumnSelector, SelectKBest
+from feature_selection.survival import (
+    CoxPHScorerSurvival, CoxnetScorerSurvival
 )
-
-# ignore QDA collinearity warnings
-warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
 
 def str_list(arg):
     return(list(map(str, arg.split(','))))
@@ -82,69 +79,19 @@ parser.add_argument('--slr-meth', type=str, nargs='+', help='scaling method')
 parser.add_argument('--clf-meth', type=str, nargs='+', help='classifier method')
 parser.add_argument('--slr-mms-fr-min', type=int, nargs='+', help='slr mms fr min')
 parser.add_argument('--slr-mms-fr-max', type=int, nargs='+', help='slr mms fr max')
+
 parser.add_argument('--fs-col-names', type=str_list, nargs='+', help='fs feature names')
-parser.add_argument('--fs-vrt-thres', type=float, nargs='+', help='fs vrt threshold')
-parser.add_argument('--fs-mi-n', type=int, nargs='+', help='fs mi n neighbors')
-parser.add_argument('--fs-mi-n-max', type=int, default=20, help='fs mi n neighbors max')
+parser.add_argument('--fs-cxph-a', type=float, nargs='+', help='fs coxph alpha')
+parser.add_argument('--fs-cxnt-l1r', type=float, nargs='+', help='fs coxnet l1 ratio')
+
 parser.add_argument('--fs-skb-k', type=int, nargs='+', help='fs skb k select')
 parser.add_argument('--fs-skb-k-min', type=int, default=1, help='fs skb k min')
 parser.add_argument('--fs-skb-k-max', type=int, default=100, help='fs skb k max')
 parser.add_argument('--fs-skb-k-step', type=int, default=1, help='fs skb k step')
 parser.add_argument('--fs-skb-lim-off', default=False, action='store_true', help='skb turn off sample limit')
-parser.add_argument('--fs-sfp-p', type=float, nargs='+', help='fs sfp fpr')
-parser.add_argument('--fs-sfm-svm-thres', type=float, nargs='+', help='fs sfm svm threshold')
-parser.add_argument('--fs-sfm-svm-c', type=float, nargs='+', help='fs sfm svm c')
-parser.add_argument('--fs-sfm-svm-cw', type=str, nargs='+', help='fs sfm svm class weight')
-parser.add_argument('--fs-sfm-rf-thres', type=float, nargs='+', help='fs sfm rf threshold')
-parser.add_argument('--fs-sfm-rf-e', type=int, nargs='+', help='fs sfm rf n estimators')
-parser.add_argument('--fs-sfm-rf-e-max', type=int, default=50, help='fs sfm rf n estimators max')
-parser.add_argument('--fs-sfm-rf-d', type=str, nargs='+', help='fs sfm rf max depth')
-parser.add_argument('--fs-sfm-rf-d-max', type=int, default=10, help='fs sfm rf max depth max')
-parser.add_argument('--fs-sfm-rf-f', type=str, nargs='+', help='fs sfm rf max features')
-parser.add_argument('--fs-sfm-rf-cw', type=str, nargs='+', help='fs sfm rf class weight')
-parser.add_argument('--fs-sfm-ext-thres', type=float, nargs='+', help='fs sfm ext threshold')
-parser.add_argument('--fs-sfm-ext-e', type=int, nargs='+', help='fs sfm ext n estimators')
-parser.add_argument('--fs-sfm-ext-e-max', type=int, default=50, help='fs sfm ext n estimators max')
-parser.add_argument('--fs-sfm-ext-d', type=str, nargs='+', help='fs sfm ext max depth')
-parser.add_argument('--fs-sfm-ext-d-max', type=int, default=10, help='fs sfm ext max depth max')
-parser.add_argument('--fs-sfm-ext-f', type=str, nargs='+', help='fs sfm ext max features')
-parser.add_argument('--fs-sfm-ext-cw', type=str, nargs='+', help='fs sfm ext class weight')
-parser.add_argument('--fs-sfm-grb-e', type=int, nargs='+', help='fs sfm grb n estimators')
-parser.add_argument('--fs-sfm-grb-e-max', type=int, default=200, help='fs sfm grb n estimators max')
-parser.add_argument('--fs-sfm-grb-d', type=int, nargs='+', help='fs sfm grb max depth')
-parser.add_argument('--fs-sfm-grb-d-max', type=int, default=10, help='fs sfm grb max depth max')
-parser.add_argument('--fs-sfm-grb-f', type=str, nargs='+', help='fs sfm grb max features')
-parser.add_argument('--fs-rfe-svm-c', type=float, nargs='+', help='fs rfe svm c')
-parser.add_argument('--fs-rfe-svm-cw', type=str, nargs='+', help='fs rfe svm class weight')
-parser.add_argument('--fs-rfe-rf-e', type=int, nargs='+', help='fs rfe rf n estimators')
-parser.add_argument('--fs-rfe-rf-e-max', type=int, default=50, help='fs rfe rf n estimators max')
-parser.add_argument('--fs-rfe-rf-d', type=str, nargs='+', help='fs rfe rf max depth')
-parser.add_argument('--fs-rfe-rf-d-max', type=int, default=10, help='fs rfe rf max depth max')
-parser.add_argument('--fs-rfe-rf-f', type=str, nargs='+', help='fs rfe rf max features')
-parser.add_argument('--fs-rfe-rf-cw', type=str, nargs='+', help='fs rfe rf class weight')
-parser.add_argument('--fs-rfe-ext-e', type=int, nargs='+', help='fs rfe ext n estimators')
-parser.add_argument('--fs-rfe-ext-e-max', type=int, default=50, help='fs rfe ext n estimators max')
-parser.add_argument('--fs-rfe-ext-d', type=str, nargs='+', help='fs rfe ext max depth')
-parser.add_argument('--fs-rfe-ext-d-max', type=int, default=10, help='fs rfe ext max depth max')
-parser.add_argument('--fs-rfe-ext-f', type=str, nargs='+', help='fs rfe ext max features')
-parser.add_argument('--fs-rfe-ext-cw', type=str, nargs='+', help='fs rfe ext class weight')
-parser.add_argument('--fs-rfe-grb-e', type=int, nargs='+', help='fs rfe grb n estimators')
-parser.add_argument('--fs-rfe-grb-e-max', type=int, default=200, help='fs rfe grb n estimators max')
-parser.add_argument('--fs-rfe-grb-d', type=int, nargs='+', help='fs rfe grb max depth')
-parser.add_argument('--fs-rfe-grb-d-max', type=int, default=10, help='fs rfe grb max depth max')
-parser.add_argument('--fs-rfe-grb-f', type=str, nargs='+', help='fs rfe grb max features')
-parser.add_argument('--fs-rfe-step', type=float, nargs='+', help='fs rfe step')
-parser.add_argument('--fs-rfe-step-one-thres', type=int, default=None, help='fs rfe step one thres')
-parser.add_argument('--fs-rfe-reduce-step', default=False, action='store_true', help='fs rfe reduce step')
-parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
-parser.add_argument('--fs-rlf-n', type=int, nargs='+', help='fs rlf n neighbors')
-parser.add_argument('--fs-rlf-n-max', type=int, default=20, help='fs rlf n neighbors max')
-parser.add_argument('--fs-rlf-s', type=int, nargs='+', help='fs rlf sample size')
-parser.add_argument('--fs-rlf-s-max', type=int, default=10, help='fs rlf sample size max')
 parser.add_argument('--fs-rank-meth', type=str, default='mean_weights', help='fs rank method')
 
 parser.add_argument('--srv-cxph-a', type=int, nargs='+', help='srv coxph alpha')
-parser.add_argument('--srv-cxnt-na', type=int, nargs='+', help='srv coxnet num alphas')
 parser.add_argument('--srv-cxnt-l1r', type=float, nargs='+', help='srv coxnet l1 ratio')
 parser.add_argument('--srv-ipcr-a', type=int, nargs='+', help='srv ipcridge alpha')
 parser.add_argument('--srv-svm-a', type=float, nargs='+', help='srv svm alpha')
@@ -169,7 +116,7 @@ parser.add_argument('--scv-type', type=str, default='grid', help='scv type (grid
 parser.add_argument('--scv-splits', type=int, default=100, help='scv splits')
 parser.add_argument('--scv-size', type=float, default=0.3, help='scv size')
 parser.add_argument('--scv-verbose', type=int, default=1, help='scv verbosity')
-parser.add_argument('--scv-refit', type=str, default='roc_auc', help='scv refit score func (roc_auc, bcr)')
+parser.add_argument('--scv-refit', type=str, default='c_index', help='scv refit scorer')
 parser.add_argument('--scv-n-iter', type=int, default=100, help='randomized scv num iterations')
 parser.add_argument('--scv-h-plt-meth', type=str, default='best', help='scv hyperparam plot meth (best, all)')
 parser.add_argument('--show-annots', type=str, nargs='+', help='show annotations')
@@ -224,44 +171,11 @@ class CachedFitMixin:
         vars(self).update(vars(cached_self))
         return self
 
-class CachedANOVAFScorerClassification(CachedFitMixin, ANOVAFScorerClassification):
+class CachedCoxPHScorerSurvival(CachedFitMixin, CoxPHScorerSurvival):
     pass
 
-class CachedChi2Scorer(CachedFitMixin, Chi2Scorer):
+class CachedCoxnetScorerSurvival(CachedFitMixin, CoxnetScorerSurvival):
     pass
-
-class CachedLimmaScorerClassification(CachedFitMixin, LimmaScorerClassification):
-    pass
-
-class CachedMutualInfoScorerClassification(CachedFitMixin, MutualInfoScorerClassification):
-    pass
-
-class CachedLinearSVC(CachedFitMixin, LinearSVC):
-    pass
-
-class CachedRandomForestClassifier(CachedFitMixin, RandomForestClassifier):
-    pass
-
-class CachedExtraTreesClassifier(CachedFitMixin, ExtraTreesClassifier):
-    pass
-
-class CachedGradientBoostingClassifier(CachedFitMixin, GradientBoostingClassifier):
-    pass
-
-# feature selection scoring functions
-def coxph_score(X, y):
-    srv = CoxPHSurvivalAnalysis()
-    scores = np.zeros(X.shape[1])
-    for j in range(X.shape[1]):
-        scores[j] = srv.fit(X[:,[j]], y).score(X[:,[j]], y)
-    return scores
-
-def coxnet_score(X, y):
-    srv = CoxnetSurvivalAnalysis()
-    scores = np.zeros(X.shape[1])
-    for j in range(X.shape[1]):
-        scores[j] = srv.fit(X[:,[j]], y).score(X[:,[j]], y)
-    return scores
 
 # parallel pipeline fit functions
 def fit_pipeline_1(params, pipe_steps, X, y):
@@ -283,25 +197,11 @@ def fit_pipeline_2(params, pipeline_order, X, y):
 
 # cached functions
 if args.pipe_memory:
-    limma_scorer = CachedLimmaScorerClassification()
-    chi2_scorer = CachedChi2Scorer()
-    anova_scorer = CachedANOVAFScorerClassification()
-    mi_scorer = CachedMutualInfoScorerClassification(random_state=args.random_seed)
-    fs_svm_estimator = CachedLinearSVC(random_state=args.random_seed)
-    fs_rf_estimator = CachedRandomForestClassifier(random_state=args.random_seed)
-    fs_ext_estimator = CachedExtraTreesClassifier(random_state=args.random_seed)
-    fs_grb_estimator = CachedGradientBoostingClassifier(random_state=args.random_seed)
-    sfm_svm_estimator = CachedLinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
+    fs_coxph_scorer = CachedCoxPHScorerSurvival()
+    fs_coxnet_scorer = CachedCoxnetScorerSurvival()
 else:
-    limma_scorer = LimmaScorerClassification()
-    chi2_scorer = Chi2Scorer()
-    anova_scorer = ANOVAFScorerClassification()
-    mi_scorer = MutualInfoScorerClassification(random_state=args.random_seed)
-    fs_svm_estimator = LinearSVC(random_state=args.random_seed)
-    fs_rf_estimator = RandomForestClassifier(random_state=args.random_seed)
-    fs_ext_estimator = ExtraTreesClassifier(random_state=args.random_seed)
-    fs_grb_estimator = GradientBoostingClassifier(random_state=args.random_seed)
-    sfm_svm_estimator = LinearSVC(penalty='l1', dual=False, random_state=args.random_seed)
+    fs_coxph_scorer = CoxPHScorerSurvival()
+    fs_coxnet_scorer = CoxnetScorerSurvival()
 
 # c-index performance metric scoring function
 def c_index_score(srv, X, y):
@@ -314,209 +214,30 @@ if args.slr_mms_fr_min and args.slr_mms_fr_max:
     SLR_MMS_FR = list(zip(args.slr_mms_fr_min, args.slr_mms_fr_max))
 else:
     SLR_MMS_FR = [(0,1)]
-if args.fs_vrt_thres:
-    FS_VRT_THRES = sorted(args.fs_vrt_thres)
+
+
+if args.fs_cxph_a:
+    FS_CXPH_A = sorted(args.fs_cxph_a)
 else:
-    FS_VRT_THRES = 0.
-if args.fs_mi_n:
-    FS_MI_N = sorted(args.fs_mi_n)
+    FS_CXPH_A = np.logspace(-3, 7, 11)
+if args.fs_cxnt_l1r:
+    FS_CXNT_L1R = sorted(args.fs_cxnt_l1r)
 else:
-    FS_MI_N = list(range(1, args.fs_mi_n_max + 1, 1))
+    FS_CXNT_L1R = np.linspace(0, 1, 11)
+
+
 if args.fs_skb_k:
     FS_SKB_K = sorted(args.fs_skb_k)
 elif args.fs_skb_k_min == 1 and args.fs_skb_k_step > 1:
     FS_SKB_K = [1] + list(range(0, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))[1:]
 else:
     FS_SKB_K = list(range(args.fs_skb_k_min, args.fs_skb_k_max + args.fs_skb_k_step, args.fs_skb_k_step))
-if args.fs_sfp_p:
-    FS_SFP_P = sorted(args.fs_sfp_p)
-else:
-    FS_SFP_P = [ 1e-2, 5e-2 ]
-if args.fs_sfm_svm_thres:
-    FS_SFM_SVM_THRES = sorted(args.fs_sfm_svm_thres)
-else:
-    FS_SFM_SVM_THRES = np.logspace(-11, -5, 7)
-if args.fs_sfm_svm_c:
-    FS_SFM_SVM_C = sorted(args.fs_sfm_svm_c)
-else:
-    FS_SFM_SVM_C = np.logspace(-2, 5, 8)
-if args.fs_sfm_svm_cw:
-    FS_SFM_SVM_CW = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_sfm_svm_cw],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_SFM_SVM_CW = [None, 'balanced']
-if args.fs_sfm_rf_thres:
-    FS_SFM_RF_THRES = sorted(args.fs_sfm_rf_thres)
-else:
-    FS_SFM_RF_THRES = np.logspace(-11, -5, 7)
-if args.fs_sfm_rf_e:
-    FS_SFM_RF_E = sorted(args.fs_sfm_rf_e)
-else:
-    FS_SFM_RF_E = list(range(5, args.fs_sfm_rf_e_max + 1, 5))
-if args.fs_sfm_rf_d:
-    FS_SFM_RF_D = sorted(
-        [None if a in ('None', 'none') else int(a) for a in args.fs_sfm_rf_d],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_SFM_RF_D = [None] + list(range(1, args.fs_sfm_rf_d_max + 1, 1))
-if args.fs_sfm_rf_f:
-    FS_SFM_RF_F = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_sfm_rf_f],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_SFM_RF_F = [None, 'auto', 'log2', 'sqrt']
-if args.fs_sfm_rf_cw:
-    FS_SFM_RF_CW = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_sfm_rf_cw],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_SFM_RF_CW = [None, 'balanced', 'balanced_subsample']
-if args.fs_sfm_ext_thres:
-    FS_SFM_EXT_THRES = sorted(args.fs_sfm_ext_thres)
-else:
-    FS_SFM_EXT_THRES = np.logspace(-11, -5, 7)
-if args.fs_sfm_ext_e:
-    FS_SFM_EXT_E = sorted(args.fs_sfm_ext_e)
-else:
-    FS_SFM_EXT_E = list(range(5, args.fs_sfm_ext_e_max + 1, 5))
-if args.fs_sfm_ext_d:
-    FS_SFM_EXT_D = sorted(
-        [None if a in ('None', 'none') else int(a) for a in args.fs_sfm_ext_d],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_SFM_EXT_D = [None] + list(range(1, args.fs_sfm_ext_d_max + 1, 1))
-if args.fs_sfm_ext_f:
-    FS_SFM_EXT_F = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_sfm_ext_f],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_SFM_EXT_F = [None, 'auto', 'log2', 'sqrt']
-if args.fs_sfm_ext_cw:
-    FS_SFM_EXT_CW = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_sfm_ext_cw],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_SFM_EXT_CW = [None, 'balanced', 'balanced_subsample']
-if args.fs_sfm_grb_e:
-    FS_SFM_GRB_E = sorted(args.fs_sfm_grb_e)
-else:
-    FS_SFM_GRB_E = list(range(20, args.fs_sfm_grb_e_max + 1, 20))
-if args.fs_sfm_grb_d:
-    FS_SFM_GRB_D = sorted(args.fs_sfm_grb_d)
-else:
-    FS_SFM_GRB_D = list(range(1, args.fs_sfm_grb_d_max + 1, 1))
-if args.fs_sfm_grb_f:
-    FS_SFM_GRB_F = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_sfm_grb_f],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_SFM_GRB_F = [None, 'auto', 'log2', 'sqrt']
-if args.fs_rfe_svm_c:
-    FS_RFE_SVM_C = sorted(args.fs_rfe_svm_c)
-else:
-    FS_RFE_SVM_C = np.logspace(-7, 3, 11)
-if args.fs_rfe_svm_cw:
-    FS_RFE_SVM_CW = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_rfe_svm_cw],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_RFE_SVM_CW = [None, 'balanced']
-if args.fs_rfe_rf_e:
-    FS_RFE_RF_E = sorted(args.fs_rfe_rf_e)
-else:
-    FS_RFE_RF_E = list(range(5, args.fs_rfe_rf_e_max + 1, 5))
-if args.fs_rfe_rf_d:
-    FS_RFE_RF_D = sorted(
-        [None if a in ('None', 'none') else int(a) for a in args.fs_rfe_rf_d],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_RFE_RF_D = [None] + list(range(1, args.fs_rfe_rf_d_max + 1, 1))
-if args.fs_rfe_rf_f:
-    FS_RFE_RF_F = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_rfe_rf_f],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_RFE_RF_F = [None, 'auto', 'log2', 'sqrt']
-if args.fs_rfe_rf_cw:
-    FS_RFE_RF_CW = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_rfe_rf_cw],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_RFE_RF_CW = [None, 'balanced', 'balanced_subsample']
-if args.fs_rfe_ext_e:
-    FS_RFE_EXT_E = sorted(args.fs_rfe_ext_e)
-else:
-    FS_RFE_EXT_E = list(range(5, args.fs_rfe_ext_e_max + 1, 5))
-if args.fs_rfe_ext_d:
-    FS_RFE_EXT_D = sorted(
-        [None if a in ('None', 'none') else int(a) for a in args.fs_rfe_ext_d],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_RFE_EXT_D = [None] + list(range(1, args.fs_rfe_ext_d_max + 1, 1))
-if args.fs_rfe_ext_f:
-    FS_RFE_EXT_F = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_rfe_ext_f],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_RFE_EXT_F = [None, 'auto', 'log2', 'sqrt']
-if args.fs_rfe_ext_cw:
-    FS_RFE_EXT_CW = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_rfe_ext_cw],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_RFE_EXT_CW = [None, 'balanced', 'balanced_subsample']
-if args.fs_rfe_grb_e:
-    FS_RFE_GRB_E = sorted(args.fs_rfe_grb_e)
-else:
-    FS_RFE_GRB_E = list(range(20, args.fs_rfe_grb_e_max + 1, 20))
-if args.fs_rfe_grb_d:
-    FS_RFE_GRB_D = sorted(args.fs_rfe_grb_d)
-else:
-    FS_RFE_GRB_D = list(range(1, args.fs_rfe_grb_d_max + 1, 1))
-if args.fs_rfe_grb_f:
-    FS_RFE_GRB_F = sorted(
-        [None if a in ('None', 'none') else a for a in args.fs_rfe_grb_f],
-        key=lambda x: (x is not None, x)
-    )
-else:
-    FS_RFE_GRB_F = [None, 'auto', 'log2', 'sqrt']
-if args.fs_rfe_step:
-    FS_RFE_STEP = sorted(args.fs_rfe_step)
-else:
-    FS_RFE_STEP = [1]
-if args.fs_rlf_n:
-    FS_RLF_N = sorted(args.fs_rlf_n)
-else:
-    FS_RLF_N = list(range(1, args.fs_rlf_n_max + 1, 1))
-if args.fs_rlf_s:
-    FS_RLF_S = sorted(args.fs_rlf_s)
-else:
-    FS_RLF_S = list(range(1, args.fs_rlf_s_max + 1, 1))
+
 
 if args.srv_cxph_a:
     SRV_CXPH_A = sorted(args.srv_cxph_a)
 else:
     SRV_CXPH_A = np.logspace(-3, 7, 11)
-if args.srv_cxnt_na:
-    SRV_CXNT_NA = sorted(args.srv_cxnt_na)
-else:
-    SRV_CXNT_NA = [50, 100, 500, 1000]
 if args.srv_cxnt_l1r:
     SRV_CXNT_L1R = sorted(args.srv_cxnt_l1r)
 else:
@@ -649,231 +370,26 @@ pipelines = {
                 { },
             ],
         },
-        'VarianceThreshold': {
-            'steps': [
-                ('fs2', VarianceThreshold()),
-            ],
-            'param_grid': [
-                {
-                    'fs2__threshold': FS_VRT_THRES,
-                },
-            ],
-        },
-        'ANOVA-KBest': {
-            'steps': [
-                ('fs1', SelectKBest(anova_scorer)),
-            ],
-            'param_grid': [
-                {
-                    'fs1__k': FS_SKB_K,
-                },
-            ],
-        },
-        'Chi2-KBest': {
-            'steps': [
-                ('fs1', SelectKBest(chi2_scorer)),
-            ],
-            'param_grid': [
-                {
-                    'fs1__k': FS_SKB_K,
-                },
-            ],
-        },
-        'Limma-KBest': {
-            'steps': [
-                ('fs1', SelectKBest(limma_scorer)),
-            ],
-            'param_grid': [
-                {
-                    'fs1__k': FS_SKB_K,
-                },
-            ],
-        },
-        'MI-KBest': {
-            'steps': [
-                ('fs2', SelectKBest(mi_scorer)),
-            ],
-            'param_grid': [
-                {
-                    'fs2__score_func__n_neighbors': FS_MI_N,
-                    'fs2__k': FS_SKB_K,
-                },
-            ],
-        },
         'CoxPH-KBest': {
             'steps': [
-                ('fs1', SelectKBest(coxph_score)),
+                ('fs1', SelectKBest(fs_coxph_scorer)),
             ],
             'param_grid': [
                 {
+                    'fs1__score_func__alpha': FS_CXPH_A,
                     'fs1__k': FS_SKB_K,
                 },
             ],
         },
         'Coxnet-KBest': {
             'steps': [
-                ('fs1', SelectKBest(coxnet_score)),
+                ('fs1', SelectKBest(fs_coxnet_scorer)),
             ],
             'param_grid': [
                 {
+                    'fs1__score_func__l1_ratio': FS_CXNT_L1R,
                     'fs1__k': FS_SKB_K,
                 },
-            ],
-        },
-        'SVM-SFM-KBest': {
-            'steps': [
-                ('fs2', SelectFromModel(sfm_svm_estimator)),
-            ],
-            'param_grid': [
-                {
-                    'fs2__estimator__C': FS_SFM_SVM_C,
-                    'fs2__estimator__class_weight': FS_SFM_SVM_CW,
-                    'fs2__k': FS_SKB_K,
-                },
-            ],
-        },
-        'RF-SFM-KBest': {
-            'steps': [
-                ('fs2', SelectFromModel(fs_rf_estimator)),
-            ],
-            'param_grid': [
-                {
-                    'fs2__estimator__n_estimators': FS_SFM_RF_E,
-                    'fs2__estimator__max_depth': FS_SFM_RF_D,
-                    'fs2__estimator__max_features': FS_SFM_RF_F,
-                    'fs2__estimator__class_weight': FS_SFM_RF_CW,
-                    'fs2__k': FS_SKB_K,
-                },
-            ],
-        },
-        'EXT-SFM-KBest': {
-            'steps': [
-                ('fs2', SelectFromModel(fs_ext_estimator)),
-            ],
-            'param_grid': [
-                {
-                    'fs2__estimator__n_estimators': FS_SFM_EXT_E,
-                    'fs2__estimator__max_depth': FS_SFM_EXT_D,
-                    'fs2__estimator__max_features': FS_SFM_EXT_F,
-                    'fs2__estimator__class_weight': FS_SFM_EXT_CW,
-                    'fs2__k': FS_SKB_K,
-                },
-            ],
-        },
-        'GRB-SFM-KBest': {
-            'steps': [
-                ('fs2', SelectFromModel(fs_grb_estimator)),
-            ],
-            'param_grid': [
-                {
-                    'fs2__estimator__n_estimators': FS_SFM_GRB_E,
-                    'fs2__estimator__max_depth': FS_SFM_GRB_D,
-                    'fs2__estimator__max_features': FS_SFM_GRB_F,
-                    'fs2__k': FS_SKB_K,
-                },
-            ],
-        },
-        'SVM-RFE': {
-            'steps': [
-                ('fs2', RFE(
-                    fs_svm_estimator, reducing_step=args.fs_rfe_reduce_step,
-                    step_one_threshold=args.fs_rfe_step_one_thres,
-                    verbose=args.fs_rfe_verbose
-                )),
-            ],
-            'param_grid': [
-                {
-                    'fs2__estimator__C': FS_RFE_SVM_C,
-                    'fs2__estimator__class_weight': FS_RFE_SVM_CW,
-                    'fs2__step': FS_RFE_STEP,
-                    'fs2__n_features_to_select': FS_SKB_K,
-                },
-            ],
-        },
-        'RF-RFE': {
-            'steps': [
-                ('fs2', RFE(
-                    fs_rf_estimator, reducing_step=args.fs_rfe_reduce_step,
-                    step_one_threshold=args.fs_rfe_step_one_thres,
-                    verbose=args.fs_rfe_verbose
-                )),
-            ],
-            'param_grid': [
-                {
-                    'fs2__estimator__n_estimators': FS_RFE_RF_E,
-                    'fs2__estimator__max_depth': FS_RFE_RF_D,
-                    'fs2__estimator__max_features': FS_RFE_RF_F,
-                    'fs2__estimator__class_weight': FS_RFE_RF_CW,
-                    'fs2__step': FS_RFE_STEP,
-                    'fs2__n_features_to_select': FS_SKB_K,
-                },
-            ],
-        },
-        'EXT-RFE': {
-            'steps': [
-                ('fs2', RFE(
-                    fs_ext_estimator, reducing_step=args.fs_rfe_reduce_step,
-                    step_one_threshold=args.fs_rfe_step_one_thres,
-                    verbose=args.fs_rfe_verbose
-                )),
-            ],
-            'param_grid': [
-                {
-                    'fs2__estimator__n_estimators': FS_RFE_EXT_E,
-                    'fs2__estimator__max_depth': FS_RFE_EXT_D,
-                    'fs2__estimator__max_features': FS_RFE_EXT_F,
-                    'fs2__estimator__class_weight': FS_RFE_EXT_CW,
-                    'fs2__step': FS_RFE_STEP,
-                    'fs2__n_features_to_select': FS_SKB_K,
-                },
-            ],
-        },
-        'GRB-RFE': {
-            'steps': [
-                ('fs2', RFE(
-                    fs_grb_estimator, reducing_step=args.fs_rfe_reduce_step,
-                    step_one_threshold=args.fs_rfe_step_one_thres,
-                    verbose=args.fs_rfe_verbose
-                )),
-            ],
-            'param_grid': [
-                {
-                    'fs2__estimator__n_estimators': FS_RFE_GRB_E,
-                    'fs2__estimator__max_depth': FS_RFE_GRB_D,
-                    'fs2__estimator__max_features': FS_RFE_GRB_F,
-                    'fs2__step': FS_RFE_STEP,
-                    'fs2__n_features_to_select': FS_SKB_K,
-                },
-            ],
-        },
-        'FCBF': {
-            'steps': [
-                ('fs2', FCBF(memory=memory)),
-            ],
-            'param_grid': [
-                {
-                    'fs2__k': FS_SKB_K,
-                },
-            ],
-        },
-        'ReliefF': {
-            'steps': [
-                ('fs2', ReliefF(memory=memory)),
-            ],
-            'param_grid': [
-                {
-                    'fs2__k': FS_SKB_K,
-                    'fs2__n_neighbors': FS_RLF_N,
-                    'fs2__sample_size': FS_RLF_S,
-                },
-            ],
-        },
-        'CFS': {
-            'steps': [
-                ('fs2', CFS()),
-            ],
-            'param_grid': [
-                { },
             ],
         },
     },
@@ -894,7 +410,6 @@ pipelines = {
             ],
             'param_grid': [
                 {
-                    'srv__n_alphas': SRV_CXNT_NA,
                     'srv__l1_ratio': SRV_CXNT_L1R,
                 },
             ],
