@@ -40,7 +40,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(1, sys.path[0] + '/lib/python3')
 from feature_selection import ColumnSelector, SelectKBest
 from feature_selection.survival import (
-    CoxPHScorerSurvival, CoxnetScorerSurvival
+    CoxnetScorerSurvival, CoxPHScorerSurvival, IPCRidgeScorerSurvival
 )
 
 def str_list(arg):
@@ -177,6 +177,9 @@ class CachedCoxPHScorerSurvival(CachedFitMixin, CoxPHScorerSurvival):
 class CachedCoxnetScorerSurvival(CachedFitMixin, CoxnetScorerSurvival):
     pass
 
+class CachedIPCRidgeScorerSurvival(CachedFitMixin, IPCRidgeScorerSurvival):
+    pass
+
 # parallel pipeline fit functions
 def fit_pipeline_1(params, pipe_steps, X, y):
     pipe = Pipeline(pipe_steps, memory=memory)
@@ -199,9 +202,11 @@ def fit_pipeline_2(params, pipeline_order, X, y):
 if args.pipe_memory:
     fs_coxph_scorer = CachedCoxPHScorerSurvival()
     fs_coxnet_scorer = CachedCoxnetScorerSurvival()
+    fs_ipcridge_scorer = CachedIPCRidgeScorerSurvival()
 else:
     fs_coxph_scorer = CoxPHScorerSurvival()
     fs_coxnet_scorer = CoxnetScorerSurvival()
+    fs_ipcridge_scorer = IPCRidgeScorerSurvival()
 
 # c-index performance metric scoring function
 def c_index_score(srv, X, y):
@@ -388,6 +393,17 @@ pipelines = {
             'param_grid': [
                 {
                     'fs1__score_func__l1_ratio': FS_CXNT_L1R,
+                    'fs1__k': FS_SKB_K,
+                },
+            ],
+        },
+        'IPCRidge-KBest': {
+            'steps': [
+                ('fs1', SelectKBest(fs_ipcridge_scorer)),
+            ],
+            'param_grid': [
+                {
+                    'fs1__score_func__alpha': FS_CXPH_A,
                     'fs1__k': FS_SKB_K,
                 },
             ],

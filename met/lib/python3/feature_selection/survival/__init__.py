@@ -1,7 +1,8 @@
 from .custom_surv import (
-    CoxPHScorerSurvival, CoxnetScorerSurvival
+    CoxnetScorerSurvival, CoxPHScorerSurvival, IPCRidgeScorerSurvival
 )
 
 
-__all__ = ['CoxPHScorerSurvival',
-           'CoxnetScorerSurvival']
+__all__ = ['CoxnetScorerSurvival',
+           'CoxPHScorerSurvival',
+           'IPCRidgeScorerSurvival']
