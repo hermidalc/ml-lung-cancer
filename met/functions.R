@@ -1,4 +1,4 @@
-suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library("Biobase"))
 
 eset_class_labels <- function(eset, samples=NULL) {
     if (!is.null(samples)) {

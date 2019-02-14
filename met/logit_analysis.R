@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 options(warn=1)
-suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library("Biobase"))
 
 dataset_name <- "lhc_nsclc_met"
 eset_name <- paste("eset", dataset_name, sep="_")

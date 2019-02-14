@@ -1,5 +1,5 @@
-suppressPackageStartupMessages(library(Biobase))
-suppressPackageStartupMessages(library(bapred))
+suppressPackageStartupMessages(library("Biobase"))
+suppressPackageStartupMessages(library("bapred"))
 
 rmatrain <- function(affybatch) {
     cat("Performing normalization/summarization\n")
