@@ -15,6 +15,8 @@ https://docs.anaconda.com/anaconda/install/linux
 
 ```bash
 bash ~/Downloads/Anaconda3-5.2.0-Linux-x86_64.sh
+conda update -n base conda
+conda init bash
 ```
 
 3. Install Conda Packages
@@ -42,11 +44,18 @@ natsort \
 rpy2 \
 seaborn \
 ipykernel
-conda install -c conda-forge python-language-server mlxtend=0.13.0
-conda install -c sebp scikit-survival
+conda config --add channels bioconda
+conda config --add channels conda-forge
+conda install python-language-server mlxtend=0.13.0
 ```
 
-4. Install CRAN and Bioconductor Packages (not available/working via Conda)
+4. Install scikit-survival Env and Package
+
+```bash
+
+```
+
+5. Install CRAN and Bioconductor Packages (not available/working via Conda)
 
 ```R
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
@@ -79,7 +88,7 @@ install.packages("WGCNA")
 install.packages("languageserver")
 ```
 
-5. Install Brainarray Custom Microarray Annotation DBs and CDFs
+6. Install Brainarray Custom Microarray Annotation DBs and CDFs
 
 ```R
 library(devtools)
