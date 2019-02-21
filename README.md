@@ -44,6 +44,7 @@ natsort \
 rpy2 \
 seaborn \
 ipykernel
+conda install scikit-learn=0.19.2 jedi
 conda config --add channels bioconda
 conda config --add channels conda-forge
 conda install python-language-server mlxtend=0.13.0
@@ -52,7 +53,16 @@ conda install python-language-server mlxtend=0.13.0
 4. Install scikit-survival Env and Package
 
 ```bash
-
+cd ~/projects/github/hermidalc/scikit-survival
+git fetch upstream
+git pull upstream master
+git push
+python ci/list-requirements.py requirements/dev.txt > /tmp/requirements.txt
+conda create -n sksurv --override-channels -c defaults -c sebp python=3 --file /tmp/requirements.txt
+conda activate sksurv
+git submodule update --init --recursive
+python setup.py install
+py.test tests/
 ```
 
 5. Install CRAN and Bioconductor Packages (not available/working via Conda)
