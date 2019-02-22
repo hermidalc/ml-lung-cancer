@@ -2,13 +2,7 @@
 
 ## Environment and Analysis Pipeline Setup
 
-1. Install System Dependencies
-
-```bash
-sudo dnf install -y libxml-devel mesa-libGL-devel mesa-libGLU-devel gcc-gfortran
-```
-
-2. Install Anaconda3 5.2.0
+1. Install Anaconda3 5.2.0
 
 https://www.anaconda.com/download/
 https://docs.anaconda.com/anaconda/install/linux
@@ -36,18 +30,19 @@ r-rgl \
 r-rjava \
 r-xml \
 autopep8 \
+ipykernel \
+jedi \
 libgfortran \
 libiconv \
 lxml \
 libxml2 \
 natsort \
 rpy2 \
-seaborn \
-ipykernel
-conda install scikit-learn=0.19.2 jedi
+scikit-learn=0.19.2 \
+seaborn
 conda config --add channels bioconda
 conda config --add channels conda-forge
-conda install python-language-server mlxtend=0.13.0
+conda install mlxtend=0.13.0 python-language-server
 ```
 
 4. Install scikit-survival Env and Package
