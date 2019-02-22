@@ -62,7 +62,7 @@ conda create -n sksurv --override-channels -c defaults -c sebp python=3 --file /
 conda activate sksurv
 git submodule update --init --recursive
 python setup.py install
-py.test tests/
+pytest tests/
 ```
 
 5. Install CRAN and Bioconductor Packages (not available/working via Conda)
