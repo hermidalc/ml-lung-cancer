@@ -137,8 +137,8 @@ parser.add_argument('--fs-rfe-grb-d', type=int, nargs='+', help='fs rfe grb max 
 parser.add_argument('--fs-rfe-grb-d-max', type=int, default=10, help='fs rfe grb max depth max')
 parser.add_argument('--fs-rfe-grb-f', type=str, nargs='+', help='fs rfe grb max features')
 parser.add_argument('--fs-rfe-step', type=float, nargs='+', help='fs rfe step')
-parser.add_argument('--fs-rfe-step-one-thres', type=int, default=None, help='fs rfe step one thres')
-parser.add_argument('--fs-rfe-reduce-step', default=False, action='store_true', help='fs rfe reduce step')
+parser.add_argument('--fs-rfe-tune-step-at', type=int, default=None, help='fs rfe tune step at')
+parser.add_argument('--fs-rfe-reducing-step', default=False, action='store_true', help='fs rfe reducing step')
 parser.add_argument('--fs-rfe-verbose', type=int, default=0, help='fs rfe verbosity')
 parser.add_argument('--fs-rlf-n', type=int, nargs='+', help='fs rlf n neighbors')
 parser.add_argument('--fs-rlf-n-max', type=int, default=20, help='fs rlf n neighbors max')
@@ -844,8 +844,9 @@ pipelines = {
         'SVM-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_svm_estimator, reducing_step=args.fs_rfe_reduce_step,
-                    step_one_threshold=args.fs_rfe_step_one_thres,
+                    fs_svm_estimator,
+                    tune_step_at=args.fs_rfe_tune_step_at,
+                    reducing_step=args.fs_rfe_reducing_step,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -861,8 +862,9 @@ pipelines = {
         'RF-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_rf_estimator, reducing_step=args.fs_rfe_reduce_step,
-                    step_one_threshold=args.fs_rfe_step_one_thres,
+                    fs_rf_estimator,
+                    tune_step_at=args.fs_rfe_tune_step_at,
+                    reducing_step=args.fs_rfe_reducing_step,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -880,8 +882,9 @@ pipelines = {
         'EXT-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_ext_estimator, reducing_step=args.fs_rfe_reduce_step,
-                    step_one_threshold=args.fs_rfe_step_one_thres,
+                    fs_ext_estimator,
+                    tune_step_at=args.fs_rfe_tune_step_at,
+                    reducing_step=args.fs_rfe_reducing_step,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
@@ -899,8 +902,9 @@ pipelines = {
         'GRB-RFE': {
             'steps': [
                 ('fs2', RFE(
-                    fs_grb_estimator, reducing_step=args.fs_rfe_reduce_step,
-                    step_one_threshold=args.fs_rfe_step_one_thres,
+                    fs_grb_estimator,
+                    tune_step_at=args.fs_rfe_tune_step_at,
+                    reducing_step=args.fs_rfe_reducing_step,
                     verbose=args.fs_rfe_verbose
                 )),
             ],
