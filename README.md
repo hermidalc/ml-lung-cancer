@@ -30,8 +30,10 @@ r-rgl \
 r-rjava \
 r-xml \
 autopep8 \
+cython \
 ipykernel \
 jedi \
+joblib \
 libgfortran \
 libiconv \
 lxml \
@@ -40,27 +42,12 @@ natsort \
 rpy2 \
 scikit-learn=0.19.2 \
 seaborn
-conda config --add channels bioconda
-conda config --add channels conda-forge
+conda config --append channels conda-forge
+conda config --append channels bioconda
 conda install mlxtend=0.13.0 python-language-server
 ```
 
-4. Install scikit-survival Env and Package
-
-```bash
-cd ~/projects/github/hermidalc/scikit-survival
-git fetch upstream
-git pull upstream master
-git push
-python ci/list-requirements.py requirements/dev.txt > /tmp/requirements.txt
-conda create -n sksurv --override-channels -c defaults -c sebp python=3 --file /tmp/requirements.txt
-conda activate sksurv
-git submodule update --init --recursive
-python setup.py install
-pytest tests/
-```
-
-5. Install CRAN and Bioconductor Packages (not available/working via Conda)
+4. Install CRAN and Bioconductor Packages (not available/working via Conda)
 
 ```R
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
@@ -89,15 +76,39 @@ biocLite("hgu133plus2cdf", suppressUpdates=TRUE)
 biocLite("hgu133plus2probe", suppressUpdates=TRUE)
 biocLite("GO.db", suppressUpdates=TRUE)
 install.packages("bapred")
-install.packages("WGCNA")
 install.packages("languageserver")
+library(devtools)
+install_version("mvtnorm", version="1.0-8")
+install.packages("WGCNA")
 ```
 
-6. Install Brainarray Custom Microarray Annotation DBs and CDFs
+5. Install Brainarray Custom Microarray Annotation DBs and CDFs
 
 ```R
 library(devtools)
 install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezg.db_22.0.0.tar.gz")
 install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezgcdf_22.0.0.tar.gz")
 install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezgprobe_22.0.0.tar.gz")
+```
+
+6. Create scikit-survival Environment and Install Package
+
+```bash
+conda create -n sksurv -c sebp python=3 scikit-survival
+conda activate sksurv
+```
+
+Or from source if needing latest dev version:
+
+```bash
+cd ~/projects/github/hermidalc/scikit-survival
+git fetch upstream
+git pull upstream master
+git push
+python ci/list-requirements.py requirements/dev.txt > /tmp/requirements.txt
+conda create -n sksurv -c sebp python=3 --file /tmp/requirements.txt
+conda activate sksurv
+git submodule update --init --recursive
+python setup.py install
+pytest tests/
 ```
