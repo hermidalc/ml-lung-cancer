@@ -195,6 +195,7 @@ parser.add_argument('--show-annots', type=str, nargs='+', help='show annotations
 parser.add_argument('--save-figs', default=False, action='store_true', help='save figures')
 parser.add_argument('--show-figs', default=False, action='store_true', help='show figures')
 parser.add_argument('--save-model', default=False, action='store_true', help='save model')
+parser.add_argument('--save-results', default=False, action='store_true', help='save results')
 parser.add_argument('--results-dir', type=str, default='results', help='results dir')
 parser.add_argument('--load-only', default=False, action='store_true', help='show dataset loads only')
 parser.add_argument('--num-cores', type=int, default=-1, help='num parallel cores')
@@ -1433,6 +1434,10 @@ if args.analysis == 1:
         split_num += 1
         # flush cache with each combo run (grows too big if not)
         if args.pipe_memory: memory.clear(warn=False)
+    if args.save_results:
+        makedirs(args.results_dir, mode=0o755, exist_ok=True)
+        dump(split_results, args.results_dir + '/' + dataset_name + '_split_results.pkl')
+        dump(param_scores_cv, args.results_dir + '/' + dataset_name + '_param_scores_cv.pkl')
     # plot grid search parameters vs cv perf metrics
     sns.set_palette(sns.color_palette('hls', len(scv_scoring)))
     for param_idx, param in enumerate(param_scores_cv):
