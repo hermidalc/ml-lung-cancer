@@ -72,6 +72,7 @@ r-rjava \
 r-rocr \
 r-statmod \
 r-styler \
+r-tinytex \
 r-wgcna \
 r-xml \
 rpy2 \
