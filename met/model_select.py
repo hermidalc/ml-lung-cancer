@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 
-import sys, warnings
+import sys
+import os
+import warnings
 from argparse import ArgumentParser
 from copy import deepcopy
-from os import makedirs, path
 from pprint import pprint
 from tempfile import mkdtemp
 from shutil import rmtree
 from natsort import natsorted
 from itertools import combinations
 from operator import itemgetter
+from joblib import delayed, dump, Memory, Parallel, parallel_backend
 import numpy as np
 import rpy2.rinterface as rinterface
 rinterface.set_initoptions((b'rpy2', b'--quiet', b'--no-save', b'--max-ppsize=500000'))
@@ -19,6 +21,7 @@ from rpy2.robjects import numpy2ri
 # from rpy2.robjects import pandas2ri
 # import pandas as pd
 from sklearn.base import clone
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import (
     GridSearchCV, ParameterGrid, RandomizedSearchCV, StratifiedShuffleSplit
@@ -37,7 +40,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 from sklearn.svm import LinearSVC, SVC
 from sklearn.metrics import make_scorer, roc_auc_score, roc_curve
-from sklearn.externals.joblib import delayed, dump, Memory, Parallel
 import seaborn as sns
 import matplotlib.pyplot as plt
 sys.path.insert(1, sys.path[0] + '/lib/python3')
@@ -46,11 +48,8 @@ from feature_selection import (
     MutualInfoScorerClassification, ReliefF, RFE, SelectFromModel, SelectKBest
 )
 
-# ignore QDA collinearity warnings
-warnings.filterwarnings('ignore', category=UserWarning, message="^Variables are collinear")
-
 def str_list(arg):
-    return(list(map(str, arg.split(','))))
+    return list(map(str, arg.split(',')))
 
 parser = ArgumentParser()
 parser.add_argument('--analysis', type=int, help='analysis run number')
@@ -198,7 +197,8 @@ parser.add_argument('--save-model', default=False, action='store_true', help='sa
 parser.add_argument('--save-results', default=False, action='store_true', help='save results')
 parser.add_argument('--results-dir', type=str, default='results', help='results dir')
 parser.add_argument('--load-only', default=False, action='store_true', help='show dataset loads only')
-parser.add_argument('--num-cores', type=int, default=-1, help='num parallel cores')
+parser.add_argument('--n-jobs', type=int, default=-1, help='num parallel jobs')
+parser.add_argument('--parallel-backend', type=str, default='multiprocessing', help='joblib parallel backend')
 parser.add_argument('--pipe-memory', default=False, action='store_true', help='turn on pipeline memory')
 parser.add_argument('--cache-dir', type=str, default='/tmp', help='cache dir')
 parser.add_argument('--random-seed', type=int, default=19825791, help='random state seed')
@@ -207,6 +207,20 @@ parser.add_argument('--verbose', type=int, default=0, help='program verbosity')
 args = parser.parse_args()
 if args.test_size >= 1.0: args.test_size = int(args.test_size)
 if args.scv_size >= 1.0: args.scv_size = int(args.scv_size)
+
+if args.parallel_backend == 'multiprocessing':
+    # ignore sklearn >=0.20 LinearSVC convergence warnings
+    warnings.filterwarnings('ignore', category=ConvergenceWarning,
+                            message="^Liblinear failed to converge",
+                            module='sklearn.svm.base')
+    # ignore QDA collinearity warnings
+    warnings.filterwarnings('ignore', category=UserWarning,
+                            message="^Variables are collinear")
+else:
+    os.environ['PYTHONWARNINGS'] = (
+        'ignore:Liblinear failed to converge:UserWarning:sklearn.svm.base,' +
+        'ignore:Variables are collinear:UserWarning:sklearn.discriminant_analysis')
+
 
 base = importr('base')
 biobase = importr('Biobase')
@@ -232,7 +246,7 @@ numpy2ri.activate()
 
 if args.pipe_memory:
     cachedir = mkdtemp(dir=args.cache_dir)
-    memory = Memory(cachedir=cachedir, verbose=0)
+    memory = Memory(location=cachedir, verbose=0)
 else:
     memory = None
 
@@ -1182,7 +1196,7 @@ if args.analysis == 1:
         dataset_name = '_'.join(args.dataset_tr + prep_steps)
     eset_name = 'eset_' + dataset_name
     eset_file = 'data/' + eset_name + '.Rda'
-    if path.isfile(eset_file):
+    if os.path.isfile(eset_file):
         base.load('data/' + eset_name + '.Rda')
     else:
         exit('File does not exist or invalid: ' + eset_file)
@@ -1261,7 +1275,7 @@ if args.analysis == 1:
     if args.scv_type == 'grid':
         search = GridSearchCV(
             pipe, param_grid=param_grid, scoring=scv_scoring, refit=scv_refit, iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+            error_score=0, return_train_score=False, n_jobs=args.n_jobs, verbose=args.scv_verbose,
             cv=StratifiedShuffleSplit(
                 n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
             ),
@@ -1269,7 +1283,7 @@ if args.analysis == 1:
     elif args.scv_type == 'rand':
         search = RandomizedSearchCV(
             pipe, param_distributions=param_grid, scoring=scv_scoring, refit=scv_refit, iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+            error_score=0, return_train_score=False, n_jobs=args.n_jobs, verbose=args.scv_verbose,
             n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                 n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
             ),
@@ -1287,14 +1301,16 @@ if args.analysis == 1:
         n_splits=args.test_splits, test_size=args.test_size, random_state=args.random_seed
     )
     for tr_idxs, te_idxs in sss.split(X, y):
-        search.fit(X[tr_idxs], y[tr_idxs])
+        with parallel_backend(args.parallel_backend):
+            search.fit(X[tr_idxs], y[tr_idxs])
         if args.fs_meth in ['FCBF', 'ReliefF', 'CFS']:
             search_best_index = np.argmin(search.cv_results_['rank_test_' + args.scv_refit])
             search_best_params = search.cv_results_['params'][search_best_index]
-            search_best_estimator = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
+            search_best_estimator = Parallel(
+                n_jobs=args.n_jobs, backend=args.parallel_backend,
+                verbose=args.scv_verbose)(
                 delayed(fit_pipeline_1)(params, pipe_steps, X[tr_idxs], y[tr_idxs])
-                for params in [search_best_params]
-            )[0]
+                for params in [search_best_params])[0]
         else:
             search_best_estimator = search.best_estimator_
             search_best_params = search.best_params_
@@ -1435,7 +1451,7 @@ if args.analysis == 1:
         # flush cache with each combo run (grows too big if not)
         if args.pipe_memory: memory.clear(warn=False)
     if args.save_results:
-        makedirs(args.results_dir, mode=0o755, exist_ok=True)
+        os.makedirs(args.results_dir, mode=0o755, exist_ok=True)
         dump(split_results, args.results_dir + '/' + dataset_name + '_split_results.pkl')
         dump(param_scores_cv, args.results_dir + '/' + dataset_name + '_param_scores_cv.pkl')
     # plot grid search parameters vs cv perf metrics
@@ -1611,7 +1627,7 @@ elif args.analysis == 2:
         dataset_tr_name = '_'.join(args.dataset_tr + prep_steps)
     eset_tr_name = 'eset_' + dataset_tr_name
     eset_tr_file = 'data/' + eset_tr_name + '.Rda'
-    if path.isfile(eset_tr_file):
+    if os.path.isfile(eset_tr_file):
         base.load('data/' + eset_tr_name + '.Rda')
     else:
         exit('File does not exist or invalid: ' + eset_tr_file)
@@ -1688,7 +1704,7 @@ elif args.analysis == 2:
     if args.scv_type == 'grid':
         search = GridSearchCV(
             pipe, param_grid=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+            error_score=0, return_train_score=False, n_jobs=args.n_jobs, verbose=args.scv_verbose,
             cv=StratifiedShuffleSplit(
                 n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
             ),
@@ -1696,7 +1712,7 @@ elif args.analysis == 2:
     elif args.scv_type == 'rand':
         search = RandomizedSearchCV(
             pipe, param_distributions=param_grid, scoring=scv_scoring, refit=args.scv_refit, iid=False,
-            error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+            error_score=0, return_train_score=False, n_jobs=args.n_jobs, verbose=args.scv_verbose,
             n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                 n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
             ),
@@ -1707,9 +1723,10 @@ elif args.analysis == 2:
         print('Param grid:')
         pprint(param_grid)
     print('Train:', dataset_tr_name, X_tr.shape, y_tr.shape)
-    search.fit(X_tr, y_tr)
+    with parallel_backend(args.parallel_backend):
+        search.fit(X_tr, y_tr)
     if args.save_model:
-        makedirs(args.results_dir, mode=0o755, exist_ok=True)
+        os.makedirs(args.results_dir, mode=0o755, exist_ok=True)
         dump(search, '_'.join([
             args.results_dir, '/search', dataset_tr_name,
             args.slr_meth.lower(), args.fs_meth.lower(), args.clf_meth.lower()
@@ -1897,7 +1914,7 @@ elif args.analysis == 2:
                 dataset_te_name = '_'.join([dataset_tr_name, dataset_te_basename, 'te'])
             eset_te_name = 'eset_' + dataset_te_name
             eset_te_file = 'data/' + eset_te_name + '.Rda'
-            if not path.isfile(eset_te_file): continue
+            if not os.path.isfile(eset_te_file): continue
             base.load(eset_te_file)
             eset_te = robjects.globalenv[eset_te_name]
             X_te = np.array(base.t(biobase.exprs(eset_te)), dtype=float)
@@ -2049,7 +2066,7 @@ elif args.analysis == 3:
                 dataset_tr_name = '_'.join([dataset_tr_basename, prep_method])
             eset_tr_name = 'eset_' + dataset_tr_name
             eset_tr_file = 'data/' + eset_tr_name + '.Rda'
-            if not path.isfile(eset_tr_file): continue
+            if not os.path.isfile(eset_tr_file): continue
             if args.load_only: print(dataset_tr_name)
             dataset_tr_combos_subset.append(dataset_tr_combo)
             prep_groups_subset.append(prep_steps)
@@ -2106,7 +2123,7 @@ elif args.analysis == 3:
                 dataset_tr_name = '_'.join([dataset_tr_basename, prep_method])
             eset_tr_name = 'eset_' + dataset_tr_name
             eset_tr_file = 'data/' + eset_tr_name + '.Rda'
-            if not path.isfile(eset_tr_file): continue
+            if not os.path.isfile(eset_tr_file): continue
             base.load('data/' + eset_tr_name + '.Rda')
             eset_tr = robjects.globalenv[eset_tr_name]
             X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
@@ -2195,7 +2212,7 @@ elif args.analysis == 3:
                 search = GridSearchCV(
                     Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
                     param_grid=param_grid, scoring=scv_scoring, refit=False, iid=False,
-                    error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+                    error_score=0, return_train_score=False, n_jobs=args.n_jobs, verbose=args.scv_verbose,
                     cv=StratifiedShuffleSplit(
                         n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
                     ),
@@ -2228,7 +2245,7 @@ elif args.analysis == 3:
                         ))
                 search = RandomizedSearchCV(
                     pipe, param_distributions=param_grid, scoring=scv_scoring, refit=False, iid=False,
-                    error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+                    error_score=0, return_train_score=False, n_jobs=args.n_jobs, verbose=args.scv_verbose,
                     n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                         n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
                     ),
@@ -2242,7 +2259,8 @@ elif args.analysis == 3:
                 if args.verbose > 1 and args.scv_type == 'grid':
                     print('Param grid data:')
                     pprint(param_grid_data)
-            search.fit(X_tr, y_tr)
+            with parallel_backend(args.parallel_backend):
+                search.fit(X_tr, y_tr)
             group_best_grid_idx, group_best_params = [], []
             for group_idx, param_grid_group in enumerate(param_grid_data):
                 for grid_idx in param_grid_group['grid_idxs']:
@@ -2285,7 +2303,7 @@ elif args.analysis == 3:
             dataset_num += 1
             # flush cache with each tr/te pair run (can grow too big if not)
             if args.pipe_memory: memory.clear(warn=False)
-    makedirs(args.results_dir, mode=0o755, exist_ok=True)
+    os.makedirs(args.results_dir, mode=0o755, exist_ok=True)
     dump(results, args.results_dir + '/results_analysis_' + str(args.analysis) + '.pkl')
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):
@@ -2591,7 +2609,7 @@ elif args.analysis == 4:
                 eset_te_name = 'eset_' + dataset_te_name
                 eset_tr_file = 'data/' + eset_tr_name + '.Rda'
                 eset_te_file = 'data/' + eset_te_name + '.Rda'
-                if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
+                if not os.path.isfile(eset_tr_file) or not os.path.isfile(eset_te_file): continue
                 if args.load_only: print(dataset_tr_name, '->', dataset_te_name)
                 dataset_tr_combos_subset.append(dataset_tr_combo)
                 dataset_te_basenames_subset.append(dataset_te_basename)
@@ -2675,7 +2693,7 @@ elif args.analysis == 4:
                 eset_te_name = 'eset_' + dataset_te_name
                 eset_tr_file = 'data/' + eset_tr_name + '.Rda'
                 eset_te_file = 'data/' + eset_te_name + '.Rda'
-                if not path.isfile(eset_tr_file) or not path.isfile(eset_te_file): continue
+                if not os.path.isfile(eset_tr_file) or not os.path.isfile(eset_te_file): continue
                 base.load('data/' + eset_tr_name + '.Rda')
                 eset_tr = robjects.globalenv[eset_tr_name]
                 X_tr = np.array(base.t(biobase.exprs(eset_tr)), dtype=float)
@@ -2772,7 +2790,7 @@ elif args.analysis == 4:
                     search = GridSearchCV(
                         Pipeline(list(map(lambda x: (x, None), pipeline_order)), memory=memory),
                         param_grid=param_grid, scoring=scv_scoring, refit=False, iid=False,
-                        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+                        error_score=0, return_train_score=False, n_jobs=args.n_jobs, verbose=args.scv_verbose,
                         cv=StratifiedShuffleSplit(
                             n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
                         ),
@@ -2805,7 +2823,7 @@ elif args.analysis == 4:
                             ))
                     search = RandomizedSearchCV(
                         pipe, param_distributions=param_grid, scoring=scv_scoring, refit=False, iid=False,
-                        error_score=0, return_train_score=False, n_jobs=args.num_cores, verbose=args.scv_verbose,
+                        error_score=0, return_train_score=False, n_jobs=args.n_jobs, verbose=args.scv_verbose,
                         n_iter=args.scv_n_iter, cv=StratifiedShuffleSplit(
                             n_splits=args.scv_splits, test_size=args.scv_size, random_state=args.random_seed
                         ),
@@ -2819,7 +2837,8 @@ elif args.analysis == 4:
                     if args.verbose > 1 and args.scv_type == 'grid':
                         print('Param grid data:')
                         pprint(param_grid_data)
-                search.fit(X_tr, y_tr)
+                with parallel_backend(args.parallel_backend):
+                    search.fit(X_tr, y_tr)
                 group_best_grid_idx, group_best_params = [], []
                 for group_idx, param_grid_group in enumerate(param_grid_data):
                     for grid_idx in param_grid_group['grid_idxs']:
@@ -2835,9 +2854,10 @@ elif args.analysis == 4:
                     })
                 print('Fitting ' + str(len(group_best_params)) + ' pipelines', end='', flush=True)
                 if args.scv_verbose > 0: print()
-                pipes = Parallel(n_jobs=args.num_cores, verbose=args.scv_verbose)(
-                    delayed(fit_pipeline_2)(params, pipeline_order, X_tr, y_tr) for params in group_best_params
-                )
+                pipes = Parallel(n_jobs=args.n_jobs, backend=args.parallel_backend,
+                                 verbose=args.scv_verbose)(
+                    delayed(fit_pipeline_2)(params, pipeline_order, X_tr, y_tr)
+                    for params in group_best_params)
                 if args.scv_verbose == 0: print('done')
                 best_roc_auc_te = 0
                 best_bcr_te = 0
@@ -2912,7 +2932,7 @@ elif args.analysis == 4:
                 dataset_pair_num += 1
                 # flush cache with each tr/te pair run (can grow too big if not)
                 if args.pipe_memory: memory.clear(warn=False)
-    makedirs(args.results_dir, mode=0o755, exist_ok=True)
+    os.makedirs(args.results_dir, mode=0o755, exist_ok=True)
     dump(results, args.results_dir + '/results_analysis_' + str(args.analysis) + '.pkl')
     title_sub = ''
     if args.clf_meth and isinstance(args.clf_meth, str):

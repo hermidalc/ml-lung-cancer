@@ -2,10 +2,10 @@
 # License: BSD 3 clause
 
 import numpy as np
+import six
 
 from sklearn.feature_selection.base import SelectorMixin
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
-from sklearn.externals import six
 
 from sklearn.exceptions import NotFittedError
 from sklearn.utils.metaestimators import if_delegate_has_method
