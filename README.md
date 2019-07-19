@@ -7,9 +7,19 @@
 https://docs.conda.io/en/latest/miniconda.html
 
 ```bash
-conda config --add channels bioconda
+bash ~/Downloads/Miniconda3-latest-Linux-x86_64.sh
 conda config --add channels conda-forge
 conda update --all
+conda config --set auto_activate_base false
+```
+
+2. Create Environment
+
+```bash
+conda create --name ml-bio-sklearn --yes
+conda activate ml-bio-sklearn
+conda config --env --add channels bioconda
+conda config --env --add channels conda-forge
 ```
 
 2. Install Conda Packages
@@ -26,7 +36,6 @@ bioconductor-edger \
 bioconductor-impute \
 bioconductor-gcrma \
 bioconductor-limma \
-bioconductor-mlseq \
 bioconductor-pvca \
 bioconductor-sva \
 cython \
@@ -59,7 +68,6 @@ r-gtools \
 r-lintr \
 r-lme4 \
 r-minqa \
-r-mlr \
 r-mnormt \
 r-nloptr \
 r-pamr \
@@ -87,7 +95,7 @@ options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
 install.packages("Biocomb")
 install.packages("bapred")
 install.packages("languageserver")
-suppressPackageStartupMessages(library("BiocManager"))
+library(BiocManager)
 install("JADE", update=FALSE)
 install("hgu133plus2.db", update=FALSE)
 install("hgu133plus2cdf", update=FALSE)
