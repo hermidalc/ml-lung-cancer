@@ -2,9 +2,9 @@
 
 ## Environment and Analysis Pipeline Setup
 
-1. Install Latest Miniconda3
+1.  Install latest Miniconda3
 
-https://docs.conda.io/en/latest/miniconda.html
+<https://docs.conda.io/en/latest/miniconda.html>
 
 ```bash
 bash ~/Downloads/Miniconda3-latest-Linux-x86_64.sh
@@ -13,7 +13,7 @@ conda update --all
 conda config --set auto_activate_base false
 ```
 
-2. Create Environment
+2.  Create environment
 
 ```bash
 conda create --name ml-bio-sklearn --yes
@@ -22,7 +22,7 @@ conda config --env --add channels bioconda
 conda config --env --add channels conda-forge
 ```
 
-2. Install Conda Packages
+3.  Install conda packages
 
 ```bash
 conda install \
@@ -47,7 +47,7 @@ libiconv \
 lxml \
 libxml2 \
 matplotlib \
-mlxtend=0.16.0 \
+mlxtend \
 natsort \
 python-language-server \
 r-base \
@@ -88,7 +88,22 @@ scikit-learn \
 seaborn
 ```
 
-3. Install CRAN and Bioconductor Packages (not available/working via Conda)
+4.  Switching between different BLAS implementations
+
+By default conda-forge installed numpy, scipy, scikit-learn, numexpr packages
+are built against OpenBLAS, but for your particular architecture others might
+have better performance:
+
+<https://conda-forge.org/docs/maintainer/knowledge_base.html#switching-blas-implementation>
+
+```bash
+conda install "libblas=*=*mkl"
+conda install "libblas=*=*openblas"
+conda install "libblas=*=*blis"
+conda install "libblas=*=*netlib"
+```
+
+5.  Install CRAN and Bioconductor packages (not available/working via Conda)
 
 ```R
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
@@ -103,7 +118,7 @@ install("hgu133plus2probe", update=FALSE)
 install("GO.db", update=FALSE)
 ```
 
-4. Install Brainarray Custom Microarray Annotation DBs and CDFs
+6.  Install Brainarray Custom Microarray Annotation DBs and CDFs
 
 ```R
 library(devtools)
@@ -112,7 +127,7 @@ install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentr
 install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentrezgprobe_23.0.0.tar.gz")
 ```
 
-5. Create scikit-survival Environment and Install Package
+7.  Create scikit-survival Environment and Install Package
 
 ```bash
 conda create -n sksurv -c sebp python=3 scikit-survival
@@ -134,13 +149,12 @@ python setup.py install
 pytest tests/
 ```
 
-
 ## Old Anaconda3 5.2.0 Instructions
 
-1. Install Anaconda3 5.2.0
+1.  Install Anaconda3 5.2.0
 
-https://www.anaconda.com/download/
-https://docs.anaconda.com/anaconda/install/linux
+<https://www.anaconda.com/download/>
+<https://docs.anaconda.com/anaconda/install/linux>
 
 ```bash
 bash ~/Downloads/Anaconda3-5.2.0-Linux-x86_64.sh
@@ -148,7 +162,7 @@ conda update -n base conda
 conda init bash
 ```
 
-2. Install Conda Packages
+2.  Install Conda Packages
 
 ```bash
 conda install \
@@ -182,7 +196,7 @@ conda config --append channels bioconda
 conda install mlxtend=0.16.0 python-language-server
 ```
 
-3. Install CRAN and Bioconductor Packages (not available/working via Conda)
+3.  Install CRAN and Bioconductor Packages (not available/working via Conda)
 
 ```R
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
@@ -217,7 +231,7 @@ install_version("mvtnorm", version="1.0-8")
 install.packages("WGCNA")
 ```
 
-4. Install Brainarray Custom Microarray Annotation DBs and CDFs
+4.  Install Brainarray Custom Microarray Annotation DBs and CDFs
 
 ```R
 library(devtools)
@@ -226,7 +240,7 @@ install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentr
 install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezgprobe_22.0.0.tar.gz")
 ```
 
-5. Create scikit-survival Environment and Install Package
+5.  Create scikit-survival Environment and Install Package
 
 ```bash
 conda create -n sksurv -c sebp python=3 scikit-survival
