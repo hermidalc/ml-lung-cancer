@@ -8,9 +8,14 @@
 
 ```bash
 bash ~/Downloads/Miniconda3-latest-Linux-x86_64.sh
+```
+
+Restart shell and then:
+
+```bash
+conda config --set auto_activate_base false
 conda config --add channels conda-forge
 conda update --all
-conda config --set auto_activate_base false
 ```
 
 2.  Create environment
@@ -35,8 +40,10 @@ bioconductor-biocversion \
 bioconductor-edger \
 bioconductor-impute \
 bioconductor-gcrma \
+bioconductor-gsva \
 bioconductor-limma \
 bioconductor-pvca \
+bioconductor-singscore \
 bioconductor-sva \
 cython \
 ipykernel \
@@ -49,6 +56,7 @@ libxml2 \
 matplotlib \
 mlxtend \
 natsort \
+pillow \
 python-language-server \
 r-base \
 r-essentials \
@@ -91,8 +99,8 @@ seaborn
 4.  Switching between different BLAS implementations
 
 By default conda-forge installed numpy, scipy, scikit-learn, numexpr packages
-are built against OpenBLAS, but for your particular architecture others might
-have better performance:
+are built against OpenBLAS, but for your particular CPU architecture others
+might have better performance:
 
 <https://conda-forge.org/docs/maintainer/knowledge_base.html#switching-blas-implementation>
 
@@ -101,6 +109,13 @@ conda install "libblas=*=*mkl"
 conda install "libblas=*=*openblas"
 conda install "libblas=*=*blis"
 conda install "libblas=*=*netlib"
+```
+
+If you switch from `openblas` then you also need to create a `pinned` file in
+your environment `conda-meta` directory, e.g.:
+
+```bash
+echo 'libblas[build=*mkl]' > <path to miniconda3>/envs/ml-bio-sklearn/conda-meta/pinned
 ```
 
 5.  Install CRAN and Bioconductor packages (not available/working via Conda)
