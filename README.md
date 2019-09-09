@@ -15,21 +15,18 @@ Restart shell and then:
 ```bash
 conda config --set auto_activate_base false
 conda config --add channels conda-forge
+conda config --set channel_priority strict
 conda update --all
 ```
 
-2.  Create environment
+2.  Create `ml-bio-sklearn` environment
 
 ```bash
 conda create --name ml-bio-sklearn --yes
 conda activate ml-bio-sklearn
 conda config --env --add channels bioconda
 conda config --env --add channels conda-forge
-```
-
-3.  Install conda packages
-
-```bash
+conda config --env --set channel_priority strict
 conda install \
 autopep8 \
 bioconductor-affy \
@@ -40,6 +37,7 @@ bioconductor-biocversion \
 bioconductor-edger \
 bioconductor-impute \
 bioconductor-gcrma \
+bioconductor-geoquery \
 bioconductor-gsva \
 bioconductor-limma \
 bioconductor-pvca \
@@ -96,7 +94,7 @@ scikit-learn \
 seaborn
 ```
 
-4.  Switching between different BLAS implementations
+3.  Switching between different BLAS implementations
 
 By default conda-forge installed numpy, scipy, scikit-learn, numexpr packages
 are built against OpenBLAS, but for your particular CPU architecture others
@@ -118,7 +116,7 @@ your environment `conda-meta` directory, e.g.:
 echo 'libblas[build=*mkl]' > <path to miniconda3>/envs/ml-bio-sklearn/conda-meta/pinned
 ```
 
-5.  Install CRAN and Bioconductor packages (not available/working via Conda)
+4.  Install CRAN and Bioconductor packages (not available/working via Conda)
 
 ```R
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
@@ -133,7 +131,7 @@ install("hgu133plus2probe", update=FALSE)
 install("GO.db", update=FALSE)
 ```
 
-6.  Install Brainarray Custom Microarray Annotation DBs and CDFs
+5.  Install Brainarray custom microarray annotations and CDFs
 
 ```R
 library(devtools)
@@ -142,120 +140,7 @@ install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentr
 install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentrezgprobe_23.0.0.tar.gz")
 ```
 
-7.  Create scikit-survival Environment and Install Package
-
-```bash
-conda create -n sksurv -c sebp python=3 scikit-survival
-conda activate sksurv
-```
-
-Or from source if needing latest dev version:
-
-```bash
-cd ~/projects/github/hermidalc/scikit-survival
-git fetch upstream
-git pull upstream master
-git push
-python ci/list-requirements.py requirements/dev.txt > /tmp/requirements.txt
-conda create -n sksurv -c sebp python=3 --file /tmp/requirements.txt
-conda activate sksurv
-git submodule update --init --recursive
-python setup.py install
-pytest tests/
-```
-
-## Old Anaconda3 5.2.0 Instructions
-
-1.  Install Anaconda3 5.2.0
-
-<https://www.anaconda.com/download/>
-<https://docs.anaconda.com/anaconda/install/linux>
-
-```bash
-bash ~/Downloads/Anaconda3-5.2.0-Linux-x86_64.sh
-conda update -n base conda
-conda init bash
-```
-
-2.  Install Conda Packages
-
-```bash
-conda install \
-r-base \
-r-essentials \
-r-devtools \
-r-argparse \
-r-lintr \
-r-lme4 \
-r-minqa \
-r-nloptr \
-r-rcppeigen \
-r-rgl \
-r-rjava \
-r-xml \
-autopep8 \
-cython \
-ipykernel \
-jedi \
-joblib \
-libgfortran \
-libiconv \
-lxml \
-libxml2 \
-natsort \
-rpy2 \
-scikit-learn=0.19.2 \
-seaborn
-conda config --append channels conda-forge
-conda config --append channels bioconda
-conda install mlxtend=0.16.0 python-language-server
-```
-
-3.  Install CRAN and Bioconductor Packages (not available/working via Conda)
-
-```R
-options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
-source("https://bioconductor.org/biocLite.R")
-install.packages("corpcor")
-install.packages("pamr")
-install.packages("mlr")
-install.packages("statmod")
-install.packages("FSelector")
-install.packages("FSelectorRcpp")
-install.packages("Biocomb")
-biocLite("Biobase", suppressUpdates=TRUE)
-biocLite("affyio", suppressUpdates=TRUE)
-biocLite("affy", suppressUpdates=TRUE)
-biocLite("gcrma", suppressUpdates=TRUE)
-biocLite("affyPLM", suppressUpdates=TRUE)
-biocLite("impute", suppressUpdates=TRUE)
-biocLite("limma", suppressUpdates=TRUE)
-biocLite("edgeR", suppressUpdates=TRUE)
-biocLite("sva", suppressUpdates=TRUE)
-biocLite("pvca", suppressUpdates=TRUE)
-biocLite("JADE", suppressUpdates=TRUE)
-biocLite("MLSeq", suppressUpdates=TRUE)
-biocLite("hgu133plus2.db", suppressUpdates=TRUE)
-biocLite("hgu133plus2cdf", suppressUpdates=TRUE)
-biocLite("hgu133plus2probe", suppressUpdates=TRUE)
-biocLite("GO.db", suppressUpdates=TRUE)
-install.packages("bapred")
-install.packages("languageserver")
-library(devtools)
-install_version("mvtnorm", version="1.0-8")
-install.packages("WGCNA")
-```
-
-4.  Install Brainarray Custom Microarray Annotation DBs and CDFs
-
-```R
-library(devtools)
-install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezg.db_22.0.0.tar.gz")
-install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezgcdf_22.0.0.tar.gz")
-install_url("http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezgprobe_22.0.0.tar.gz")
-```
-
-5.  Create scikit-survival Environment and Install Package
+6.  Create `sksurv` environment and scikit-survival installation
 
 ```bash
 conda create -n sksurv -c sebp python=3 scikit-survival
