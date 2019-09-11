@@ -135,9 +135,9 @@ install("GO.db", update=FALSE)
 
 ```R
 library(devtools)
-install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentrezg.db_23.0.0.tar.gz")
-install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentrezgcdf_23.0.0.tar.gz")
-install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentrezgprobe_23.0.0.tar.gz")
+install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentrezg.db_23.0.0.tar.gz", upgrade="never")
+install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentrezgcdf_23.0.0.tar.gz", upgrade="never")
+install_url("http://mbni.org/customcdf/23.0.0/entrezg.download/hgu133plus2hsentrezgprobe_23.0.0.tar.gz", upgrade="never")
 ```
 
 6.  Create `sksurv` environment and scikit-survival installation
