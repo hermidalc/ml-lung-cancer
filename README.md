@@ -34,6 +34,7 @@ bioconductor-affyio \
 bioconductor-affyplm \
 bioconductor-biobase \
 bioconductor-biocversion \
+bioconductor-deseq2 \
 bioconductor-edger \
 bioconductor-impute \
 bioconductor-gcrma \
