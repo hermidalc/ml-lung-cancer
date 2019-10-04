@@ -32,6 +32,7 @@ autopep8 \
 bioconductor-affy \
 bioconductor-affyio \
 bioconductor-affyplm \
+bioconductor-aldex2 \
 bioconductor-biobase \
 bioconductor-biocversion \
 bioconductor-deseq2 \
@@ -41,6 +42,7 @@ bioconductor-gcrma \
 bioconductor-geoquery \
 bioconductor-gsva \
 bioconductor-limma \
+bioconductor-metagenomeseq \
 bioconductor-pvca \
 bioconductor-singscore \
 bioconductor-sva \
