@@ -19,11 +19,11 @@ conda config --set channel_priority strict
 conda update --all
 ```
 
-2.  Create `ml-bio-sklearn` environment
+2.  Create `ml-omics-sklearn` environment
 
 ```bash
-conda create --name ml-bio-sklearn --yes
-conda activate ml-bio-sklearn
+conda create --name ml-omics-sklearn --yes
+conda activate ml-omics-sklearn
 conda config --env --add channels bioconda
 conda config --env --add channels conda-forge
 conda config --env --set channel_priority strict
@@ -33,6 +33,7 @@ bioconductor-affy \
 bioconductor-affyio \
 bioconductor-affyplm \
 bioconductor-aldex2 \
+bioconductor-apeglm \
 bioconductor-biobase \
 bioconductor-biocversion \
 bioconductor-deseq2 \
@@ -46,6 +47,7 @@ bioconductor-metagenomeseq \
 bioconductor-pvca \
 bioconductor-singscore \
 bioconductor-sva \
+bioconductor-variancepartition \
 cython \
 ipykernel \
 jedi \
@@ -74,6 +76,8 @@ r-fselector \
 r-gdata \
 r-gplots \
 r-gtools \
+r-jade \
+r-languageserver \
 r-lintr \
 r-lme4 \
 r-minqa \
@@ -116,18 +120,17 @@ If you switch from `openblas` then you also need to create a `pinned` file in
 your environment `conda-meta` directory, e.g.:
 
 ```bash
-echo 'libblas[build=*mkl]' > <path to miniconda3>/envs/ml-bio-sklearn/conda-meta/pinned
+echo 'libblas[build=*mkl]' > <path to miniconda3>/envs/ml-omics-sklearn/conda-meta/pinned
 ```
 
 4.  Install CRAN and Bioconductor packages (not available/working via Conda)
 
 ```R
 options(repos=structure(c(CRAN="https://cloud.r-project.org/")))
-install.packages("Biocomb")
 install.packages("bapred")
-install.packages("languageserver")
+install.packages("Biocomb")
+install.packages("FSelectorRcpp")
 library(BiocManager)
-install("JADE", update=FALSE)
 install("hgu133plus2.db", update=FALSE)
 install("hgu133plus2cdf", update=FALSE)
 install("hgu133plus2probe", update=FALSE)
